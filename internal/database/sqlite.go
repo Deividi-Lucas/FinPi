@@ -150,9 +150,31 @@ func (d *DB) GetSummaryByMonth(yearMonth string) (models.Summary, error) {
 	return s, nil
 }
 
+// UpdateTransaction atualiza os dados de um lançamento existente pelo ID.
+func (d *DB) UpdateTransaction(t *models.Transaction) error {
+	query := `
+		UPDATE transactions
+		SET description = ?, amount = ?, type = ?, category = ?, date = ?
+		WHERE id = ?
+	`
+	res, err := d.conn.Exec(query, t.Description, t.Amount, t.Type, t.Category, t.Date, t.ID)
+	if err != nil {
+		return err
+	}
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("lançamento com id %d não encontrado", t.ID)
+	}
+	return nil
+}
+
 // DeleteTransaction exclui um lançamento pelo ID.
 func (d *DB) DeleteTransaction(id int64) error {
 	query := `DELETE FROM transactions WHERE id = ?`
 	_, err := d.conn.Exec(query, id)
 	return err
 }
+

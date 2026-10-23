@@ -132,6 +132,70 @@ func (h *Handler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/?month="+targetMonth, http.StatusSeeOther)
 }
 
+// UpdateTransaction processa a edição de um lançamento existente.
+func (h *Handler) UpdateTransaction(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Método não permitido", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Dados do formulário inválidos", http.StatusBadRequest)
+		return
+	}
+
+	idStr := strings.TrimSpace(r.FormValue("id"))
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil || id <= 0 {
+		http.Error(w, "ID inválido", http.StatusBadRequest)
+		return
+	}
+
+	desc := strings.TrimSpace(r.FormValue("description"))
+	amountStr := strings.TrimSpace(r.FormValue("amount"))
+	txType := strings.TrimSpace(r.FormValue("type"))
+	category := strings.TrimSpace(r.FormValue("category"))
+	date := strings.TrimSpace(r.FormValue("date"))
+	redirectMonth := r.FormValue("month")
+
+	amount, err := strconv.ParseFloat(amountStr, 64)
+	if err != nil || amount <= 0 {
+		http.Error(w, "Valor numérico inválido", http.StatusBadRequest)
+		return
+	}
+
+	if txType != "income" && txType != "expense" {
+		http.Error(w, "Tipo inválido: use 'income' ou 'expense'", http.StatusBadRequest)
+		return
+	}
+
+	if desc == "" || date == "" {
+		http.Error(w, "Descrição e data são obrigatórios", http.StatusBadRequest)
+		return
+	}
+
+	t := &models.Transaction{
+		ID:          id,
+		Description: desc,
+		Amount:      amount,
+		Type:        txType,
+		Category:    category,
+		Date:        date,
+	}
+
+	if err := h.db.UpdateTransaction(t); err != nil {
+		http.Error(w, "Erro ao atualizar transação: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	targetMonth := redirectMonth
+	if len(date) >= 7 {
+		targetMonth = date[:7]
+	}
+	http.Redirect(w, r, "/?month="+targetMonth, http.StatusSeeOther)
+}
+
+
 // DeleteTransaction remove um lançamento existente pelo ID.
 func (h *Handler) DeleteTransaction(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {

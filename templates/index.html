@@ -274,19 +274,37 @@
                                 {{if eq .Type "income"}}+{{else}}-{{end}} {{formatCurrency .Amount}}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-center">
-                                <form method="POST" action="/transactions/delete" onsubmit="return confirm('Deseja realmente excluir este lançamento?');" class="inline">
-                                    <input type="hidden" name="id" value="{{.ID}}">
-                                    <input type="hidden" name="month" value="{{$.SelectedMonth}}">
+                                <div class="flex items-center justify-center gap-1">
                                     <button 
-                                        type="submit" 
-                                        title="Excluir lançamento"
-                                        class="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition"
+                                        type="button" 
+                                        data-id="{{.ID}}"
+                                        data-desc="{{.Description}}"
+                                        data-amount="{{.Amount}}"
+                                        data-type="{{.Type}}"
+                                        data-category="{{.Category}}"
+                                        data-date="{{.Date}}"
+                                        onclick="openEditModal(this)"
+                                        title="Editar lançamento"
+                                        class="p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition cursor-pointer"
                                     >
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                         </svg>
                                     </button>
-                                </form>
+                                    <form method="POST" action="/transactions/delete" onsubmit="return confirm('Deseja realmente excluir este lançamento?');" class="inline">
+                                        <input type="hidden" name="id" value="{{.ID}}">
+                                        <input type="hidden" name="month" value="{{$.SelectedMonth}}">
+                                        <button 
+                                            type="submit" 
+                                            title="Excluir lançamento"
+                                            class="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition cursor-pointer"
+                                        >
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                        </button>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                         {{else}}
@@ -309,5 +327,160 @@
             <p>🪙 Open Finance Go &bull; Binário único em Go &bull; Armazenamento SQLite WAL &bull; Otimizado para Raspberry Pi 3</p>
         </footer>
     </div>
+
+    <!-- Modal de Edição de Lançamento -->
+    <div id="edit-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 backdrop-blur-sm p-4" onclick="handleBackdropClick(event)">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl p-6 relative" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-5">
+                <h3 class="text-lg font-semibold text-white flex items-center gap-2">
+                    <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    Editar Lançamento
+                </h3>
+                <button type="button" onclick="closeEditModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <form method="POST" action="/transactions/update" class="space-y-4">
+                <input type="hidden" id="edit-id" name="id">
+                <input type="hidden" name="month" value="{{.SelectedMonth}}">
+
+                <!-- Descrição -->
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Descrição</label>
+                    <input 
+                        type="text" 
+                        id="edit-description"
+                        name="description" 
+                        required 
+                        placeholder="Ex: Mercado, Salário, Internet" 
+                        class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
+                    >
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Valor -->
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Valor (R$)</label>
+                        <input 
+                            type="number" 
+                            step="0.01" 
+                            min="0.01" 
+                            id="edit-amount"
+                            name="amount" 
+                            required 
+                            placeholder="0,00" 
+                            class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
+                        >
+                    </div>
+
+                    <!-- Tipo -->
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Tipo</label>
+                        <select 
+                            id="edit-type"
+                            name="type" 
+                            required 
+                            class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
+                        >
+                            <option value="expense">Despesa</option>
+                            <option value="income">Receita</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Categoria -->
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Categoria</label>
+                        <select 
+                            id="edit-category"
+                            name="category" 
+                            required 
+                            class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
+                        >
+                            <option value="Alimentação">Alimentação</option>
+                            <option value="Moradia">Moradia</option>
+                            <option value="Transporte">Transporte</option>
+                            <option value="Salário">Salário</option>
+                            <option value="Lazer">Lazer</option>
+                            <option value="Saúde">Saúde</option>
+                            <option value="Investimentos">Investimentos</option>
+                            <option value="Educação">Educação</option>
+                            <option value="Outros">Outros</option>
+                        </select>
+                    </div>
+
+                    <!-- Data -->
+                    <div>
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Data</label>
+                        <input 
+                            type="date" 
+                            id="edit-date"
+                            name="date" 
+                            required 
+                            class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
+                        >
+                    </div>
+                </div>
+
+                <!-- Botões de Ação do Modal -->
+                <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-800 mt-6">
+                    <button 
+                        type="button" 
+                        onclick="closeEditModal()" 
+                        class="px-4 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition cursor-pointer"
+                    >
+                        Cancelar
+                    </button>
+                    <button 
+                        type="submit" 
+                        class="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm px-5 py-2 rounded-xl shadow-lg shadow-emerald-600/20 active:scale-[0.98] transition cursor-pointer"
+                    >
+                        Salvar Alterações
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Scripts de Interatividade -->
+    <script>
+        function openEditModal(btn) {
+            document.getElementById('edit-id').value = btn.dataset.id;
+            document.getElementById('edit-description').value = btn.dataset.desc;
+            document.getElementById('edit-amount').value = parseFloat(btn.dataset.amount).toFixed(2);
+            document.getElementById('edit-type').value = btn.dataset.type;
+            document.getElementById('edit-category').value = btn.dataset.category;
+            document.getElementById('edit-date').value = btn.dataset.date;
+
+            const modal = document.getElementById('edit-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeEditModal() {
+            const modal = document.getElementById('edit-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function handleBackdropClick(e) {
+            if (e.target.id === 'edit-modal') {
+                closeEditModal();
+            }
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeEditModal();
+            }
+        });
+    </script>
 </body>
 </html>
+

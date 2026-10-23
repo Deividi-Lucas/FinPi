@@ -56,6 +56,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", h.Dashboard)
 	mux.HandleFunc("/transactions", h.CreateTransaction)
+	mux.HandleFunc("/transactions/update", h.UpdateTransaction)
 	mux.HandleFunc("/transactions/delete", h.DeleteTransaction)
 
 	addr := fmt.Sprintf("%s:%s", *host, *port)
