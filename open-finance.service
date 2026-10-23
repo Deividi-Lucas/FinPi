@@ -1,0 +1,29 @@
+[Unit]
+Description=Open Finance Go - Gestao Financeira Pessoal Minimalista
+After=network.target
+
+[Service]
+Type=simple
+User=deividi
+Group=deividi
+WorkingDirectory=/opt/open-finance
+ExecStart=/opt/open-finance/open-finance -port 8080 -db /opt/open-finance/data/finances.db
+
+# Otimizacao de Memoria para Raspberry Pi 3 (Mantem uso de RAM rigorosamente baixo)
+Environment="GOMEMLIMIT=25MiB"
+Environment="GOGC=50"
+
+# Politica de Resiliencia
+Restart=always
+RestartSec=5s
+
+# Hardening / Seguranca basica em producao
+NoNewPrivileges=true
+ProtectSystem=full
+ReadWritePaths=/opt/open-finance/data
+
+# Limites de Recursos cgroups
+MemoryMax=40M
+
+[Install]
+WantedBy=multi-user.target

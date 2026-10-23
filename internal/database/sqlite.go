@@ -1,0 +1,158 @@
+package database
+
+import (
+	"database/sql"
+	"fmt"
+	"time"
+
+	"finpi/internal/models"
+
+	_ "modernc.org/sqlite" // Driver SQLite 100% puro Go sem CGO
+)
+
+type DB struct {
+	conn *sql.DB
+}
+
+// InitDB inicializa o banco SQLite com pragmas otimizados para baixo consumo de RAM e durabilidade do cartão SD do Raspberry Pi.
+func InitDB(dbPath string) (*DB, error) {
+	conn, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("erro ao abrir banco de dados sqlite: %w", err)
+	}
+
+	// SQLite trabalha de forma ideal com conexão única em sistemas embarcados:
+	// evita contenção de locks de escrita e reduz drasticamente o consumo de RAM.
+	conn.SetMaxOpenConns(1)
+	conn.SetMaxIdleConns(1)
+	conn.SetConnMaxLifetime(0)
+
+	// Pragmas essenciais para Raspberry Pi (protege o cartão microSD e melhora concorrência)
+	pragmas := []string{
+		"PRAGMA journal_mode = WAL;",       // Write-Ahead Logging: reduz escritas síncronas no SD
+		"PRAGMA synchronous = NORMAL;",     // Seguro com WAL, evita fsync agressivo que desgasta o flash
+		"PRAGMA busy_timeout = 5000;",      // Aguarda até 5s em caso de bloqueio antes de falhar
+		"PRAGMA cache_size = -2000;",       // Limita o cache em memória a ~2MB (reduz uso de RAM)
+		"PRAGMA temp_store = MEMORY;",      // Tabelas temporárias leves em RAM em vez de disco
+	}
+
+	for _, pragma := range pragmas {
+		if _, err := conn.Exec(pragma); err != nil {
+			conn.Close()
+			return nil, fmt.Errorf("erro ao aplicar pragma '%s': %w", pragma, err)
+		}
+	}
+
+	if err := migrate(conn); err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("erro ao aplicar schema inicial: %w", err)
+	}
+
+	return &DB{conn: conn}, nil
+}
+
+func migrate(conn *sql.DB) error {
+	schema := `
+	CREATE TABLE IF NOT EXISTS transactions (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		description TEXT NOT NULL,
+		amount REAL NOT NULL,
+		type TEXT NOT NULL CHECK(type IN ('income', 'expense')),
+		category TEXT NOT NULL,
+		date TEXT NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
+	`
+	_, err := conn.Exec(schema)
+	return err
+}
+
+func (d *DB) Close() error {
+	return d.conn.Close()
+}
+
+// CreateTransaction insere um novo lançamento.
+func (d *DB) CreateTransaction(t *models.Transaction) error {
+	query := `
+		INSERT INTO transactions (description, amount, type, category, date, created_at)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`
+	now := time.Now()
+	res, err := d.conn.Exec(query, t.Description, t.Amount, t.Type, t.Category, t.Date, now)
+	if err != nil {
+		return err
+	}
+	id, err := res.LastInsertId()
+	if err == nil {
+		t.ID = id
+	}
+	return nil
+}
+
+// GetTransactions recupera lançamentos ordenados do mais recente para o mais antigo.
+// Se yearMonth estiver preenchido (ex: "2026-10"), filtra por esse mês.
+func (d *DB) GetTransactions(yearMonth string) ([]models.Transaction, error) {
+	var query string
+	var args []interface{}
+
+	if yearMonth != "" {
+		query = `
+			SELECT id, description, amount, type, category, date, created_at
+			FROM transactions
+			WHERE strftime('%Y-%m', date) = ?
+			ORDER BY date DESC, id DESC
+		`
+		args = append(args, yearMonth)
+	} else {
+		query = `
+			SELECT id, description, amount, type, category, date, created_at
+			FROM transactions
+			ORDER BY date DESC, id DESC
+			LIMIT 100
+		`
+	}
+
+	rows, err := d.conn.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []models.Transaction
+	for rows.Next() {
+		var t models.Transaction
+		if err := rows.Scan(&t.ID, &t.Description, &t.Amount, &t.Type, &t.Category, &t.Date, &t.CreatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, t)
+	}
+
+	return list, rows.Err()
+}
+
+// GetSummaryByMonth calcula Total de Receitas, Total de Despesas e Saldo para o mês fornecido.
+func (d *DB) GetSummaryByMonth(yearMonth string) (models.Summary, error) {
+	query := `
+		SELECT 
+			COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) AS total_income,
+			COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) AS total_expense
+		FROM transactions
+		WHERE strftime('%Y-%m', date) = ?
+	`
+	var s models.Summary
+	row := d.conn.QueryRow(query, yearMonth)
+	if err := row.Scan(&s.TotalIncome, &s.TotalExpense); err != nil {
+		return s, err
+	}
+	s.Balance = s.TotalIncome - s.TotalExpense
+	return s, nil
+}
+
+// DeleteTransaction exclui um lançamento pelo ID.
+func (d *DB) DeleteTransaction(id int64) error {
+	query := `DELETE FROM transactions WHERE id = ?`
+	_, err := d.conn.Exec(query, id)
+	return err
+}

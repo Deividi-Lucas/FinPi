@@ -1,0 +1,29 @@
+[Unit]
+Description=FinPi - Gestao Financeira Pessoal Minimalista
+After=network.target
+
+[Service]
+Type=simple
+User=deividi
+Group=deividi
+WorkingDirectory=/opt/finpi
+ExecStart=/opt/finpi/finpi -port 8080 -db /opt/finpi/data/finpi.db
+
+# Otimizacao de Memoria para Raspberry Pi 3 (Mantem uso de RAM rigorosamente baixo)
+Environment="GOMEMLIMIT=25MiB"
+Environment="GOGC=50"
+
+# Politica de Resiliencia
+Restart=always
+RestartSec=5s
+
+# Hardening / Seguranca basica em producao
+NoNewPrivileges=true
+ProtectSystem=full
+ReadWritePaths=/opt/finpi/data
+
+# Limites de Recursos
+MemoryMax=40M
+
+[Install]
+WantedBy=multi-user.target
