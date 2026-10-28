@@ -42,7 +42,7 @@ jobs:
         GOARCH: arm64
         CGO_ENABLED: 0
       run: |
-        go build -v -ldflags="-s -w" -o finpi-linux-arm64 .
+        go build -v -ldflags="-s -w -X main.version=build-${{ github.run_number }}" -o finpi-linux-arm64 .
         sha256sum finpi-linux-arm64 > SHA256SUMS
 
     - name: Upload Artifact

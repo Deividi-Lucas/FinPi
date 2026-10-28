@@ -48,7 +48,7 @@ func newTestHandler(t *testing.T) (*Handler, *database.DB) {
 	}
 	t.Cleanup(func() { db.Close() })
 
-	h, err := NewHandler(db, os.DirFS("../.."))
+	h, err := NewHandler(db, os.DirFS("../.."), "")
 	if err != nil {
 		t.Fatalf("NewHandler: %v", err)
 	}
@@ -203,5 +203,24 @@ func TestDashboard_DoesNotLeakInternalErrors(t *testing.T) {
 	}
 	if strings.Contains(strings.ToLower(rec.Body.String()), "closed") {
 		t.Errorf("resposta vaza detalhe interno: %q", rec.Body.String())
+	}
+}
+
+func TestDashboard_ShowsBuildVersionInFooter(t *testing.T) {
+	h, _ := newTestHandler(t)
+	h.version = "build-42"
+
+	rec := httptest.NewRecorder()
+	h.Dashboard(rec, httptest.NewRequest(http.MethodGet, "/?month=2026-10", nil))
+
+	if !strings.Contains(rec.Body.String(), "build-42") {
+		t.Error("o rodapé deve mostrar a versão da build")
+	}
+}
+
+func TestNewHandler_EmptyVersionFallsBackToDev(t *testing.T) {
+	h, _ := newTestHandler(t)
+	if h.version != "dev" {
+		t.Errorf("version = %q, quer \"dev\" quando não informada", h.version)
 	}
 }

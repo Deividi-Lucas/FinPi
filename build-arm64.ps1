@@ -14,7 +14,8 @@ $env:CGO_ENABLED = "0"
 
 Write-Host "Compilando binario estatico para Linux ARM64..." -ForegroundColor Cyan
 
-go build -ldflags="-s -w" -o finpi .
+$versao = "manual-" + (Get-Date -Format "yyyyMMdd-HHmm")
+go build -ldflags="-s -w -X main.version=$versao" -o finpi .
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "Sucesso! Binario 'finpi' gerado para ARM64 (Linux)." -ForegroundColor Green

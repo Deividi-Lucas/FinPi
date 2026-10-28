@@ -21,11 +21,16 @@ type Handler struct {
 	tmpl      *template.Template
 	events    *Broker
 	heartbeat time.Duration
+	version   string // versão da build exibida no rodapé
 }
 
 // NewHandler compila os templates HTML embutidos uma única vez na inicialização,
 // garantindo alta performance e baixo consumo contínuo de memória.
-func NewHandler(db *database.DB, templateFS fs.FS) (*Handler, error) {
+func NewHandler(db *database.DB, templateFS fs.FS, version string) (*Handler, error) {
+	if version == "" {
+		version = "dev"
+	}
+
 	funcMap := template.FuncMap{
 		"formatCurrency": formatCurrencyBRL,
 		"centsInput":     formatCentsInput,
@@ -42,6 +47,7 @@ func NewHandler(db *database.DB, templateFS fs.FS) (*Handler, error) {
 		tmpl:      tmpl,
 		events:    NewBroker(maxEventClients),
 		heartbeat: defaultHeartbeat,
+		version:   version,
 	}, nil
 }
 
@@ -95,6 +101,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		Summary:       summary,
 		Transactions:  transactions,
 		TodayDate:     now.Format("2006-01-02"),
+		Version:       h.version,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
