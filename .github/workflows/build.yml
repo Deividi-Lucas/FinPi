@@ -16,10 +16,10 @@ jobs:
 
     steps:
     - name: Checkout Code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Set up Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version: '1.22'
         cache: true
@@ -46,7 +46,7 @@ jobs:
         sha256sum finpi-linux-arm64 > SHA256SUMS
 
     - name: Upload Artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: finpi-linux-arm64
         path: |
@@ -68,7 +68,7 @@ jobs:
 
     steps:
     - name: Download build
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         name: finpi-linux-arm64
         path: dist
