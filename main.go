@@ -58,6 +58,7 @@ func main() {
 	mux.HandleFunc("/transactions", h.CreateTransaction)
 	mux.HandleFunc("/transactions/update", h.UpdateTransaction)
 	mux.HandleFunc("/transactions/delete", h.DeleteTransaction)
+	mux.HandleFunc("/events", h.Events) // atualização em tempo real (SSE)
 
 	addr := fmt.Sprintf("%s:%s", *host, *port)
 	server := &http.Server{
@@ -68,6 +69,10 @@ func main() {
 		IdleTimeout:    60 * time.Second,
 		MaxHeaderBytes: 1 << 20, // 1 MB
 	}
+
+	// As conexões SSE ficam abertas indefinidamente: precisam ser encerradas no shutdown,
+	// senão o servidor esperaria o timeout inteiro antes de parar.
+	server.RegisterOnShutdown(h.Shutdown)
 
 	// 4. Graceful Shutdown (Tratamento de SIGINT / SIGTERM)
 	// Essencial no Raspberry Pi para garantir que o SQLite WAL feche com integridade.

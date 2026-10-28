@@ -41,6 +41,8 @@ finpi/
 │   │   └── sqlite_test.go      # Testes do banco (centavos, migração, exclusão)
 │   ├── handlers/
 │   │   ├── handlers.go         # Rotas HTTP e formatação BRL
+│   │   ├── events.go           # Endpoint /events (SSE) para atualização em tempo real
+│   │   ├── broker.go           # Distribui avisos de mudança às telas conectadas
 │   │   ├── validation.go       # Validação compartilhada do formulário de lançamentos
 │   │   ├── validation_test.go  # Testes de validação
 │   │   └── handlers_test.go    # Testes dos handlers e do template
@@ -81,6 +83,8 @@ Para rodar a verificação estática e os testes:
 go vet ./...
 go test ./...
 ```
+
+> **Tempo real**: a tela se atualiza sozinha quando outro dispositivo cria, edita ou exclui um lançamento (Server-Sent Events em `/events`, sem dependências extras). Se você estiver digitando ou editando, a tela não recarrega: aparece um aviso "Atualizar agora". Após um deploy, a conexão cai e volta, e a tela recarrega para pegar a versão nova. Limite de 32 telas conectadas simultaneamente.
 
 > **Valores em centavos**: os valores são guardados como inteiros (centavos) para evitar erros de arredondamento. Bancos criados por versões anteriores (coluna `amount` em `REAL`) são convertidos automaticamente na primeira inicialização. Faça backup do arquivo `.db` antes de atualizar uma instalação existente.
 

@@ -66,6 +66,14 @@
         </div>
         {{end}}
 
+        <!-- Aviso de atualização em tempo real (exibido só se você estiver editando algo) -->
+        <div id="live-update-banner" class="hidden mt-4 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm items-center justify-between gap-3">
+            <span>Há novas atualizações nesta tela.</span>
+            <button type="button" onclick="location.reload()" class="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium cursor-pointer">
+                Atualizar agora
+            </button>
+        </div>
+
         <!-- Cards do Dashboard -->
         <section class="grid grid-cols-1 md:grid-cols-3 gap-4 my-8">
             <!-- Total de Receitas -->
@@ -480,6 +488,44 @@
                 closeEditModal();
             }
         });
+
+        // Tempo real (SSE): quando outra tela cria, edita ou exclui um lançamento, esta tela atualiza.
+        // Se você estiver no meio de uma edição, mostra um aviso em vez de recarregar e perder o que digitou.
+        (function () {
+            function isEditing() {
+                const modal = document.getElementById('edit-modal');
+                if (modal && !modal.classList.contains('hidden')) return true;
+                const form = document.querySelector('form[action="/transactions"]');
+                if (!form) return false;
+                return ['description', 'amount'].some(function (name) {
+                    const field = form.querySelector('[name="' + name + '"]');
+                    return field && field.value.trim() !== '';
+                });
+            }
+
+            function refresh() {
+                if (!isEditing()) {
+                    location.reload();
+                    return;
+                }
+                const banner = document.getElementById('live-update-banner');
+                banner.classList.remove('hidden');
+                banner.classList.add('flex');
+            }
+
+            const source = new EventSource('/events');
+            let wasDisconnected = false;
+
+            source.addEventListener('change', refresh);
+            // Conexão caiu (ex.: o servidor reiniciou por uma atualização): ao voltar, recarrega a tela.
+            source.onerror = function () { wasDisconnected = true; };
+            source.onopen = function () {
+                if (wasDisconnected) {
+                    wasDisconnected = false;
+                    refresh();
+                }
+            };
+        })();
     </script>
 </body>
 </html>
