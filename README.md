@@ -1,4 +1,4 @@
-# 🪙 Open Finance Go
+# 🪙 FinPi
 
 Uma aplicação web minimalista, ultraleve e open source para gerenciamento de finanças pessoais e controle de despesas.
 
@@ -32,21 +32,25 @@ A escolha dessa stack resolve esses dois problemas:
 ## 📁 Estrutura do Projeto
 
 ```text
-model b/
+finpi/
 ├── .github/workflows/
 │   └── build.yml               # Pipeline de compilação automática no GitHub Actions
 ├── internal/
 │   ├── database/
-│   │   └── sqlite.go           # Otimizações de WAL, pragmas e queries SQLite
+│   │   ├── sqlite.go           # Otimizações de WAL, pragmas, migração e queries SQLite
+│   │   └── sqlite_test.go      # Testes do banco (centavos, migração, exclusão)
 │   ├── handlers/
-│   │   └── handlers.go         # Lógica web, rotas HTTP e formatação BRL
+│   │   ├── handlers.go         # Rotas HTTP e formatação BRL
+│   │   ├── validation.go       # Validação compartilhada do formulário de lançamentos
+│   │   ├── validation_test.go  # Testes de validação
+│   │   └── handlers_test.go    # Testes dos handlers e do template
 │   └── models/
 │       └── models.go           # Modelos de dados e structs de tela
 ├── templates/
 │   └── index.html              # Interface web moderna com Tailwind CSS (embutida)
 ├── build-arm64.ps1             # Script para compilação cruzada no Windows
 ├── deploy.ps1                  # Deploy em 1 clique para o Raspberry Pi
-├── open-finance.service        # Unidade systemd para produção contínua
+├── finpi.service               # Unidade systemd para produção contínua
 ├── go.mod                      # Dependências do módulo Go
 ├── go.sum                      # Checksums criptográficos dos módulos
 ├── LICENSE                     # Licença MIT
@@ -71,6 +75,15 @@ go run main.go
 ```
 Acesse no navegador: `http://localhost:8080`
 
+Para rodar a verificação estática e os testes:
+
+```bash
+go vet ./...
+go test ./...
+```
+
+> **Valores em centavos**: os valores são guardados como inteiros (centavos) para evitar erros de arredondamento. Bancos criados por versões anteriores (coluna `amount` em `REAL`) são convertidos automaticamente na primeira inicialização. Faça backup do arquivo `.db` antes de atualizar uma instalação existente.
+
 ---
 
 ### 2. Compilação Cruzada (Cross-Compilation para Raspberry Pi 3B - ARM64)
@@ -82,13 +95,13 @@ Na sua máquina de desenvolvimento (ex: Windows ou Linux x86_64), você pode ger
 $env:GOOS = "linux"
 $env:GOARCH = "arm64"
 $env:CGO_ENABLED = "0"
-go build -ldflags="-s -w" -o open-finance .
+go build -ldflags="-s -w" -o finpi .
 ```
 *(Ou execute o script: `.\build-arm64.ps1`)*
 
 #### No Linux / macOS:
 ```bash
-GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o open-finance .
+GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o finpi .
 ```
 
 > **Dica**: A flag `-ldflags="-s -w"` remove símbolos de depuração e metadados DWARF, reduzindo o tamanho do binário de ~25 MB para apenas **~11 MB**.
@@ -105,28 +118,28 @@ Use o script [`deploy.ps1`](./deploy.ps1) no PowerShell para compilar, enviar e 
 
 #### Opção B: Manual via SCP e SSH
 
-1. Envie o arquivo compilado (`open-finance`) e a unidade de serviço para o seu Raspberry Pi:
+1. Envie o arquivo compilado (`finpi`) e a unidade de serviço para o seu Raspberry Pi:
 ```bash
-scp open-finance open-finance.service deividi@<IP_DO_PI>:/home/deividi/
+scp finpi finpi.service deividi@<IP_DO_PI>:/home/deividi/
 ```
 
 2. No Raspberry Pi, mova para a pasta de produção e configure o systemd:
 ```bash
 # Criar diretórios e mover binário
-sudo mkdir -p /opt/open-finance/data
-sudo mv /home/deividi/open-finance /opt/open-finance/open-finance
-sudo chmod +x /opt/open-finance/open-finance
-sudo chown -R deividi:deividi /opt/open-finance
+sudo mkdir -p /opt/finpi/data
+sudo mv /home/deividi/finpi /opt/finpi/finpi
+sudo chmod +x /opt/finpi/finpi
+sudo chown -R deividi:deividi /opt/finpi
 
 # Instalar serviço systemd
-sudo mv /home/deividi/open-finance.service /etc/systemd/system/open-finance.service
+sudo mv /home/deividi/finpi.service /etc/systemd/system/finpi.service
 sudo systemctl daemon-reload
-sudo systemctl enable --now open-finance
+sudo systemctl enable --now finpi
 ```
 
 Verifique o status do serviço:
 ```bash
-sudo systemctl status open-finance
+sudo systemctl status finpi
 ```
 
 ---

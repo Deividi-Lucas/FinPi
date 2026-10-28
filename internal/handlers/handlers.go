@@ -1,10 +1,13 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"html/template"
 	"io/fs"
+	"log"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -23,6 +26,7 @@ type Handler struct {
 func NewHandler(db *database.DB, templateFS fs.FS) (*Handler, error) {
 	funcMap := template.FuncMap{
 		"formatCurrency": formatCurrencyBRL,
+		"centsInput":     formatCentsInput,
 		"formatDate":     formatDateBR,
 	}
 
@@ -35,6 +39,25 @@ func NewHandler(db *database.DB, templateFS fs.FS) (*Handler, error) {
 		db:   db,
 		tmpl: tmpl,
 	}, nil
+}
+
+// serverError registra o erro real no log e devolve ao usuário apenas uma mensagem genérica.
+func serverError(w http.ResponseWriter, msg string, err error) {
+	log.Printf("[ERRO] %s: %v", msg, err)
+	http.Error(w, msg, http.StatusInternalServerError)
+}
+
+// dbError traduz o erro do banco: lançamento inexistente vira 404; o resto, 500.
+func dbError(w http.ResponseWriter, msg string, err error) {
+	if errors.Is(err, database.ErrNotFound) {
+		http.Error(w, "Lançamento não encontrado", http.StatusNotFound)
+		return
+	}
+	serverError(w, msg, err)
+}
+
+func redirectToMonth(w http.ResponseWriter, r *http.Request, month string) {
+	http.Redirect(w, r, "/?month="+url.QueryEscape(month), http.StatusSeeOther)
 }
 
 // Dashboard renderiza a tela principal com o resumo e histórico de transações.
@@ -52,13 +75,13 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 
 	summary, err := h.db.GetSummaryByMonth(selectedMonth)
 	if err != nil {
-		http.Error(w, "Erro ao carregar resumo financeiro: "+err.Error(), http.StatusInternalServerError)
+		serverError(w, "Erro ao carregar resumo financeiro", err)
 		return
 	}
 
 	transactions, err := h.db.GetTransactions(selectedMonth)
 	if err != nil {
-		http.Error(w, "Erro ao carregar lançamentos: "+err.Error(), http.StatusInternalServerError)
+		serverError(w, "Erro ao carregar lançamentos", err)
 		return
 	}
 
@@ -72,7 +95,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := h.tmpl.ExecuteTemplate(w, "index.html", data); err != nil {
-		http.Error(w, "Erro ao renderizar página: "+err.Error(), http.StatusInternalServerError)
+		serverError(w, "Erro ao renderizar página", err)
 	}
 }
 
@@ -88,48 +111,19 @@ func (h *Handler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	desc := strings.TrimSpace(r.FormValue("description"))
-	amountStr := strings.TrimSpace(r.FormValue("amount"))
-	txType := strings.TrimSpace(r.FormValue("type"))
-	category := strings.TrimSpace(r.FormValue("category"))
-	date := strings.TrimSpace(r.FormValue("date"))
-	redirectMonth := r.FormValue("month")
-
-	amount, err := strconv.ParseFloat(amountStr, 64)
-	if err != nil || amount <= 0 {
-		http.Error(w, "Valor numérico inválido", http.StatusBadRequest)
+	t, err := parseTransactionForm(r.PostForm)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if txType != "income" && txType != "expense" {
-		http.Error(w, "Tipo inválido: use 'income' ou 'expense'", http.StatusBadRequest)
+	if err := h.db.CreateTransaction(&t); err != nil {
+		serverError(w, "Erro ao gravar transação", err)
 		return
 	}
 
-	if desc == "" || date == "" {
-		http.Error(w, "Descrição e data são obrigatórios", http.StatusBadRequest)
-		return
-	}
-
-	t := &models.Transaction{
-		Description: desc,
-		Amount:      amount,
-		Type:        txType,
-		Category:    category,
-		Date:        date,
-	}
-
-	if err := h.db.CreateTransaction(t); err != nil {
-		http.Error(w, "Erro ao gravar transação: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Redireciona de volta para o mês da transação ou o mês atual selecionado
-	targetMonth := redirectMonth
-	if len(date) >= 7 {
-		targetMonth = date[:7]
-	}
-	http.Redirect(w, r, "/?month="+targetMonth, http.StatusSeeOther)
+	// Volta para o mês do lançamento (data já validada como AAAA-MM-DD).
+	redirectToMonth(w, r, t.Date[:7])
 }
 
 // UpdateTransaction processa a edição de um lançamento existente.
@@ -144,57 +138,26 @@ func (h *Handler) UpdateTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	idStr := strings.TrimSpace(r.FormValue("id"))
-	id, err := strconv.ParseInt(idStr, 10, 64)
+	id, err := strconv.ParseInt(strings.TrimSpace(r.PostForm.Get("id")), 10, 64)
 	if err != nil || id <= 0 {
 		http.Error(w, "ID inválido", http.StatusBadRequest)
 		return
 	}
 
-	desc := strings.TrimSpace(r.FormValue("description"))
-	amountStr := strings.TrimSpace(r.FormValue("amount"))
-	txType := strings.TrimSpace(r.FormValue("type"))
-	category := strings.TrimSpace(r.FormValue("category"))
-	date := strings.TrimSpace(r.FormValue("date"))
-	redirectMonth := r.FormValue("month")
+	t, err := parseTransactionForm(r.PostForm)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	t.ID = id
 
-	amount, err := strconv.ParseFloat(amountStr, 64)
-	if err != nil || amount <= 0 {
-		http.Error(w, "Valor numérico inválido", http.StatusBadRequest)
+	if err := h.db.UpdateTransaction(&t); err != nil {
+		dbError(w, "Erro ao atualizar transação", err)
 		return
 	}
 
-	if txType != "income" && txType != "expense" {
-		http.Error(w, "Tipo inválido: use 'income' ou 'expense'", http.StatusBadRequest)
-		return
-	}
-
-	if desc == "" || date == "" {
-		http.Error(w, "Descrição e data são obrigatórios", http.StatusBadRequest)
-		return
-	}
-
-	t := &models.Transaction{
-		ID:          id,
-		Description: desc,
-		Amount:      amount,
-		Type:        txType,
-		Category:    category,
-		Date:        date,
-	}
-
-	if err := h.db.UpdateTransaction(t); err != nil {
-		http.Error(w, "Erro ao atualizar transação: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	targetMonth := redirectMonth
-	if len(date) >= 7 {
-		targetMonth = date[:7]
-	}
-	http.Redirect(w, r, "/?month="+targetMonth, http.StatusSeeOther)
+	redirectToMonth(w, r, t.Date[:7])
 }
-
 
 // DeleteTransaction remove um lançamento existente pelo ID.
 func (h *Handler) DeleteTransaction(w http.ResponseWriter, r *http.Request) {
@@ -203,42 +166,39 @@ func (h *Handler) DeleteTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	idStr := r.FormValue("id")
-	month := r.FormValue("month")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Dados do formulário inválidos", http.StatusBadRequest)
+		return
+	}
+
+	id, err := strconv.ParseInt(strings.TrimSpace(r.PostForm.Get("id")), 10, 64)
+	if err != nil || id <= 0 {
 		http.Error(w, "ID inválido", http.StatusBadRequest)
 		return
 	}
 
 	if err := h.db.DeleteTransaction(id); err != nil {
-		http.Error(w, "Erro ao excluir transação: "+err.Error(), http.StatusInternalServerError)
+		dbError(w, "Erro ao excluir transação", err)
 		return
 	}
 
+	month := r.PostForm.Get("month")
 	if month == "" {
 		month = time.Now().Format("2006-01")
 	}
-	http.Redirect(w, r, "/?month="+month, http.StatusSeeOther)
+	redirectToMonth(w, r, month)
 }
 
 // Helpers de formatação
 
-func formatCurrencyBRL(val float64) string {
-	neg := false
-	if val < 0 {
-		neg = true
-		val = -val
+// formatCurrencyBRL formata centavos como moeda brasileira (ex: 123456 -> "R$ 1.234,56").
+func formatCurrencyBRL(cents int64) string {
+	neg := cents < 0
+	if neg {
+		cents = -cents
 	}
 
-	intPart := int64(val)
-	fracPart := int64((val-float64(intPart))*100 + 0.5)
-	if fracPart >= 100 {
-		intPart++
-		fracPart -= 100
-	}
-
-	s := fmt.Sprintf("%d", intPart)
+	s := strconv.FormatInt(cents/100, 10)
 	var formattedInt strings.Builder
 	n := len(s)
 	for i, c := range s {
@@ -248,11 +208,16 @@ func formatCurrencyBRL(val float64) string {
 		formattedInt.WriteRune(c)
 	}
 
-	res := fmt.Sprintf("R$ %s,%02d", formattedInt.String(), fracPart)
+	res := fmt.Sprintf("R$ %s,%02d", formattedInt.String(), cents%100)
 	if neg {
 		res = "-" + res
 	}
 	return res
+}
+
+// formatCentsInput formata centavos como número para campos de formulário (ex: 123456 -> "1234.56").
+func formatCentsInput(cents int64) string {
+	return fmt.Sprintf("%d.%02d", cents/100, cents%100)
 }
 
 func formatDateBR(dateStr string) string {

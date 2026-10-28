@@ -24,17 +24,23 @@ jobs:
     - name: Verify Dependencies
       run: go mod verify
 
+    - name: Vet
+      run: go vet ./...
+
+    - name: Test
+      run: go test ./...
+
     - name: Cross-Compile for Raspberry Pi (Linux ARM64)
       env:
         GOOS: linux
         GOARCH: arm64
         CGO_ENABLED: 0
       run: |
-        go build -v -ldflags="-s -w" -o open-finance .
+        go build -v -ldflags="-s -w" -o finpi .
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: open-finance-linux-arm64
-        path: open-finance
+        name: finpi-linux-arm64
+        path: finpi
         if-no-files-found: error

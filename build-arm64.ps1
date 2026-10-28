@@ -14,13 +14,12 @@ $env:CGO_ENABLED = "0"
 
 Write-Host "Compilando binario estatico para Linux ARM64..." -ForegroundColor Cyan
 
-go build -ldflags="-s -w" -o open-finance .
+go build -ldflags="-s -w" -o finpi .
 
 if ($LASTEXITCODE -eq 0) {
-    Copy-Item open-finance finpi -Force
-    Write-Host "Sucesso! Binario 'open-finance' gerado para ARM64 (Linux)." -ForegroundColor Green
-    Write-Host "Tamanho do binario: $((Get-Item open-finance).Length / 1MB | ForEach-Object { '{0:N2} MB' -f $_ })" -ForegroundColor Cyan
-    Write-Host "Para enviar ao Raspberry Pi: scp open-finance deividi@<IP_DO_PI>:/home/deividi/" -ForegroundColor Yellow
+    Write-Host "Sucesso! Binario 'finpi' gerado para ARM64 (Linux)." -ForegroundColor Green
+    Write-Host "Tamanho do binario: $((Get-Item finpi).Length / 1MB | ForEach-Object { '{0:N2} MB' -f $_ })" -ForegroundColor Cyan
+    Write-Host "Para enviar ao Raspberry Pi: scp finpi deividi@<IP_DO_PI>:/home/deividi/" -ForegroundColor Yellow
 } else {
     Write-Host "Erro durante a compilacao." -ForegroundColor Red
 }

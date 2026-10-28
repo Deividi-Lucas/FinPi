@@ -32,7 +32,7 @@ func main() {
 	host := flag.String("host", defaultHost, "Host/Interface de rede para bind")
 	flag.Parse()
 
-	log.Println("[INFO] Iniciando 🪙 Open Finance Go em modo produção embarcada...")
+	log.Println("[INFO] Iniciando 🪙 FinPi em modo produção embarcada...")
 
 	// 1. Inicializar Banco SQLite otimizado para Raspberry Pi
 	db, err := database.InitDB(*dbPath)
@@ -61,12 +61,12 @@ func main() {
 
 	addr := fmt.Sprintf("%s:%s", *host, *port)
 	server := &http.Server{
-		Addr:              addr,
-		Handler:           mux,
-		ReadTimeout:       5 * time.Second,
-		WriteTimeout:      10 * time.Second,
-		IdleTimeout:       60 * time.Second,
-		MaxHeaderBytes:    1 << 20, // 1 MB
+		Addr:           addr,
+		Handler:        mux,
+		ReadTimeout:    5 * time.Second,
+		WriteTimeout:   10 * time.Second,
+		IdleTimeout:    60 * time.Second,
+		MaxHeaderBytes: 1 << 20, // 1 MB
 	}
 
 	// 4. Graceful Shutdown (Tratamento de SIGINT / SIGTERM)
@@ -91,7 +91,7 @@ func main() {
 		log.Printf("[ERRO] Falha durante o shutdown gracioso: %v", err)
 	}
 
-	log.Println("[INFO] Open Finance Go finalizado com sucesso.")
+	log.Println("[INFO] FinPi finalizado com sucesso.")
 }
 
 func getEnv(key, fallback string) string {

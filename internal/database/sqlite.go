@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -9,6 +10,9 @@ import (
 
 	_ "modernc.org/sqlite" // Driver SQLite 100% puro Go sem CGO
 )
+
+// ErrNotFound indica que nenhum lançamento corresponde ao ID informado.
+var ErrNotFound = errors.New("lançamento não encontrado")
 
 type DB struct {
 	conn *sql.DB
@@ -29,11 +33,11 @@ func InitDB(dbPath string) (*DB, error) {
 
 	// Pragmas essenciais para Raspberry Pi (protege o cartão microSD e melhora concorrência)
 	pragmas := []string{
-		"PRAGMA journal_mode = WAL;",       // Write-Ahead Logging: reduz escritas síncronas no SD
-		"PRAGMA synchronous = NORMAL;",     // Seguro com WAL, evita fsync agressivo que desgasta o flash
-		"PRAGMA busy_timeout = 5000;",      // Aguarda até 5s em caso de bloqueio antes de falhar
-		"PRAGMA cache_size = -2000;",       // Limita o cache em memória a ~2MB (reduz uso de RAM)
-		"PRAGMA temp_store = MEMORY;",      // Tabelas temporárias leves em RAM em vez de disco
+		"PRAGMA journal_mode = WAL;",   // Write-Ahead Logging: reduz escritas síncronas no SD
+		"PRAGMA synchronous = NORMAL;", // Seguro com WAL, evita fsync agressivo que desgasta o flash
+		"PRAGMA busy_timeout = 5000;",  // Aguarda até 5s em caso de bloqueio antes de falhar
+		"PRAGMA cache_size = -2000;",   // Limita o cache em memória a ~2MB (reduz uso de RAM)
+		"PRAGMA temp_store = MEMORY;",  // Tabelas temporárias leves em RAM em vez de disco
 	}
 
 	for _, pragma := range pragmas {
@@ -51,22 +55,88 @@ func InitDB(dbPath string) (*DB, error) {
 	return &DB{conn: conn}, nil
 }
 
-func migrate(conn *sql.DB) error {
-	schema := `
-	CREATE TABLE IF NOT EXISTS transactions (
+const createTransactionsSQL = `
+	CREATE TABLE %s (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		description TEXT NOT NULL,
-		amount REAL NOT NULL,
+		amount_cents INTEGER NOT NULL,
 		type TEXT NOT NULL CHECK(type IN ('income', 'expense')),
 		category TEXT NOT NULL,
 		date TEXT NOT NULL,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-	);
+	)`
 
-	CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date);
-	`
-	_, err := conn.Exec(schema)
+const createIndexSQL = `CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date)`
+
+func migrate(conn *sql.DB) error {
+	cols, err := tableColumns(conn, "transactions")
+	if err != nil {
+		return err
+	}
+
+	switch {
+	case len(cols) == 0:
+		// Banco novo.
+		if _, err := conn.Exec(fmt.Sprintf(createTransactionsSQL, "transactions")); err != nil {
+			return err
+		}
+	case cols["amount"] && !cols["amount_cents"]:
+		// Banco da versão antiga (valor em REAL): converte para centavos em uma única transação.
+		if err := migrateRealToCents(conn); err != nil {
+			return fmt.Errorf("erro ao converter valores para centavos: %w", err)
+		}
+	}
+
+	_, err = conn.Exec(createIndexSQL)
 	return err
+}
+
+func tableColumns(conn *sql.DB, table string) (map[string]bool, error) {
+	rows, err := conn.Query(fmt.Sprintf("PRAGMA table_info(%s)", table))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	cols := map[string]bool{}
+	for rows.Next() {
+		var (
+			cid     int
+			name    string
+			typ     string
+			notNull int
+			dflt    sql.NullString
+			pk      int
+		)
+		if err := rows.Scan(&cid, &name, &typ, &notNull, &dflt, &pk); err != nil {
+			return nil, err
+		}
+		cols[name] = true
+	}
+	return cols, rows.Err()
+}
+
+func migrateRealToCents(conn *sql.DB) error {
+	tx, err := conn.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	steps := []string{
+		fmt.Sprintf(createTransactionsSQL, "transactions_new"),
+		`INSERT INTO transactions_new (id, description, amount_cents, type, category, date, created_at)
+		 SELECT id, description, CAST(ROUND(amount * 100) AS INTEGER), type, category, date, created_at
+		 FROM transactions`,
+		`DROP TABLE transactions`,
+		`ALTER TABLE transactions_new RENAME TO transactions`,
+	}
+	for _, stmt := range steps {
+		if _, err := tx.Exec(stmt); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 func (d *DB) Close() error {
@@ -76,11 +146,11 @@ func (d *DB) Close() error {
 // CreateTransaction insere um novo lançamento.
 func (d *DB) CreateTransaction(t *models.Transaction) error {
 	query := `
-		INSERT INTO transactions (description, amount, type, category, date, created_at)
+		INSERT INTO transactions (description, amount_cents, type, category, date, created_at)
 		VALUES (?, ?, ?, ?, ?, ?)
 	`
 	now := time.Now()
-	res, err := d.conn.Exec(query, t.Description, t.Amount, t.Type, t.Category, t.Date, now)
+	res, err := d.conn.Exec(query, t.Description, t.AmountCents, t.Type, t.Category, t.Date, now)
 	if err != nil {
 		return err
 	}
@@ -99,7 +169,7 @@ func (d *DB) GetTransactions(yearMonth string) ([]models.Transaction, error) {
 
 	if yearMonth != "" {
 		query = `
-			SELECT id, description, amount, type, category, date, created_at
+			SELECT id, description, amount_cents, type, category, date, created_at
 			FROM transactions
 			WHERE strftime('%Y-%m', date) = ?
 			ORDER BY date DESC, id DESC
@@ -107,7 +177,7 @@ func (d *DB) GetTransactions(yearMonth string) ([]models.Transaction, error) {
 		args = append(args, yearMonth)
 	} else {
 		query = `
-			SELECT id, description, amount, type, category, date, created_at
+			SELECT id, description, amount_cents, type, category, date, created_at
 			FROM transactions
 			ORDER BY date DESC, id DESC
 			LIMIT 100
@@ -123,7 +193,7 @@ func (d *DB) GetTransactions(yearMonth string) ([]models.Transaction, error) {
 	var list []models.Transaction
 	for rows.Next() {
 		var t models.Transaction
-		if err := rows.Scan(&t.ID, &t.Description, &t.Amount, &t.Type, &t.Category, &t.Date, &t.CreatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.Description, &t.AmountCents, &t.Type, &t.Category, &t.Date, &t.CreatedAt); err != nil {
 			return nil, err
 		}
 		list = append(list, t)
@@ -132,12 +202,12 @@ func (d *DB) GetTransactions(yearMonth string) ([]models.Transaction, error) {
 	return list, rows.Err()
 }
 
-// GetSummaryByMonth calcula Total de Receitas, Total de Despesas e Saldo para o mês fornecido.
+// GetSummaryByMonth calcula Total de Receitas, Total de Despesas e Saldo (em centavos) para o mês fornecido.
 func (d *DB) GetSummaryByMonth(yearMonth string) (models.Summary, error) {
 	query := `
-		SELECT 
-			COALESCE(SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END), 0) AS total_income,
-			COALESCE(SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END), 0) AS total_expense
+		SELECT
+			COALESCE(SUM(CASE WHEN type = 'income' THEN amount_cents ELSE 0 END), 0) AS total_income,
+			COALESCE(SUM(CASE WHEN type = 'expense' THEN amount_cents ELSE 0 END), 0) AS total_expense
 		FROM transactions
 		WHERE strftime('%Y-%m', date) = ?
 	`
@@ -154,27 +224,32 @@ func (d *DB) GetSummaryByMonth(yearMonth string) (models.Summary, error) {
 func (d *DB) UpdateTransaction(t *models.Transaction) error {
 	query := `
 		UPDATE transactions
-		SET description = ?, amount = ?, type = ?, category = ?, date = ?
+		SET description = ?, amount_cents = ?, type = ?, category = ?, date = ?
 		WHERE id = ?
 	`
-	res, err := d.conn.Exec(query, t.Description, t.Amount, t.Type, t.Category, t.Date, t.ID)
+	res, err := d.conn.Exec(query, t.Description, t.AmountCents, t.Type, t.Category, t.Date, t.ID)
 	if err != nil {
 		return err
 	}
-	rowsAffected, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if rowsAffected == 0 {
-		return fmt.Errorf("lançamento com id %d não encontrado", t.ID)
-	}
-	return nil
+	return requireAffected(res)
 }
 
 // DeleteTransaction exclui um lançamento pelo ID.
 func (d *DB) DeleteTransaction(id int64) error {
-	query := `DELETE FROM transactions WHERE id = ?`
-	_, err := d.conn.Exec(query, id)
-	return err
+	res, err := d.conn.Exec(`DELETE FROM transactions WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+	return requireAffected(res)
 }
 
+func requireAffected(res sql.Result) error {
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
