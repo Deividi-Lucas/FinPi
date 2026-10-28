@@ -48,3 +48,6 @@ go.work.sum
 
 # Documentos de planejamento (especificacoes e planos), apenas locais
 docs/superpowers/
+
+# Extratos bancarios reais (dados pessoais): guardar aqui, nunca commitar
+/extratos/
