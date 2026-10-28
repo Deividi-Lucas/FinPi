@@ -17,8 +17,10 @@ import (
 )
 
 type Handler struct {
-	db   *database.DB
-	tmpl *template.Template
+	db        *database.DB
+	tmpl      *template.Template
+	events    *Broker
+	heartbeat time.Duration
 }
 
 // NewHandler compila os templates HTML embutidos uma única vez na inicialização,
@@ -36,8 +38,10 @@ func NewHandler(db *database.DB, templateFS fs.FS) (*Handler, error) {
 	}
 
 	return &Handler{
-		db:   db,
-		tmpl: tmpl,
+		db:        db,
+		tmpl:      tmpl,
+		events:    NewBroker(maxEventClients),
+		heartbeat: defaultHeartbeat,
 	}, nil
 }
 
@@ -121,6 +125,7 @@ func (h *Handler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
 		serverError(w, "Erro ao gravar transação", err)
 		return
 	}
+	h.events.Publish()
 
 	// Volta para o mês do lançamento (data já validada como AAAA-MM-DD).
 	redirectToMonth(w, r, t.Date[:7])
@@ -155,6 +160,7 @@ func (h *Handler) UpdateTransaction(w http.ResponseWriter, r *http.Request) {
 		dbError(w, "Erro ao atualizar transação", err)
 		return
 	}
+	h.events.Publish()
 
 	redirectToMonth(w, r, t.Date[:7])
 }
@@ -181,6 +187,7 @@ func (h *Handler) DeleteTransaction(w http.ResponseWriter, r *http.Request) {
 		dbError(w, "Erro ao excluir transação", err)
 		return
 	}
+	h.events.Publish()
 
 	month := r.PostForm.Get("month")
 	if month == "" {
