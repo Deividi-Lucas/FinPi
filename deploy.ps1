@@ -24,7 +24,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "`n=== 2. Enviando novo binario para o Raspberry Pi ===" -ForegroundColor Cyan
-scp open-finance "$($User)@$($PiIP):/home/$($User)/open-finance_new"
+scp finpi "$($User)@$($PiIP):/home/$($User)/finpi_new"
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Falha ao enviar arquivo via SCP." -ForegroundColor Red
@@ -32,8 +32,8 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "`n=== 3. Atualizando e reiniciando o servico ===" -ForegroundColor Cyan
-# Se o serviço for finpi.service ou open-finance.service, atualiza o binário em uso
-ssh "$($User)@$($PiIP)" "if [ -d /opt/open-finance ]; then sudo mv /home/$($User)/open-finance_new /opt/open-finance/open-finance && sudo chmod +x /opt/open-finance/open-finance && sudo systemctl restart open-finance; else sudo mv /home/$($User)/open-finance_new /opt/finpi/finpi && sudo chmod +x /opt/finpi/finpi && sudo systemctl restart finpi; fi"
+# -t permite digitar a senha do sudo para reiniciar o serviço
+ssh -t "$($User)@$($PiIP)" "sudo mv /home/$($User)/finpi_new /opt/finpi/finpi && sudo chmod +x /opt/finpi/finpi && sudo systemctl restart finpi"
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "`nDeploy concluido com sucesso! O FinPi ja esta atualizado e rodando." -ForegroundColor Green
