@@ -503,3 +503,24 @@ func TestDashboard_NewTransactionFormKeepsMonthAndProjectedState(t *testing.T) {
 		t.Error("o formulário deve manter o mês e o interruptor de previstas")
 	}
 }
+
+func TestDashboard_EditPopupSupportsDrafts(t *testing.T) {
+	h, db := newTestHandler(t)
+	seed(t, db, 100)
+
+	body := getDashboard(h, "/?month=2026-10")
+
+	for _, want := range []string{
+		`id="edit-form"`,                                           // formulário da edição
+		`data-draft-prefix="finpi:draft:editar-lancamento:"`,       // prefixo da chave (um rascunho por lançamento)
+		`id="edit-form-error"`,                                     // erro exibido dentro do pop-up
+		`id="edit-draft-notice"`,                                   // aviso do rascunho
+		`onclick="discardEditDraft()"`,                             // botão Descartar
+		`class="edit-draft-dot`,                                    // indicador no lápis da linha
+		`action="/transactions/update"`,                            // continua enviando para a mesma rota
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("a página deveria conter %s", want)
+		}
+	}
+}

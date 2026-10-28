@@ -78,6 +78,11 @@ voltam preenchidos com o aviso "Rascunho restaurado" e o botão **Descartar**. O
 sucesso ou ao descartar; erros de validação aparecem dentro do pop-up. O rascunho é por navegador (não é
 compartilhado entre aparelhos) e, se o navegador bloquear o armazenamento, o pop-up funciona sem ele.
 
+A **edição** de um lançamento tem o mesmo comportamento, com um rascunho **por lançamento** (um pontinho âmbar
+no lápis da linha indica onde há alterações não salvas). Se o lançamento for alterado em outra tela depois do
+rascunho, o rascunho não é aplicado por cima: a edição abre com os valores atuais e um aviso. Rascunhos de edição
+com mais de 30 dias são limpos automaticamente.
+
 ---
 
 ## 🧾 Parcelas previstas
