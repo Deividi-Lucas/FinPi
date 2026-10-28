@@ -42,6 +42,15 @@
                 </div>
             </div>
 
+            <div class="flex flex-wrap items-center justify-center gap-2">
+            <button
+                type="button"
+                onclick="openCategoriesModal()"
+                class="inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-sm font-medium px-3 py-2 rounded-xl border border-slate-700 transition cursor-pointer"
+            >
+                Categorias
+            </button>
+
             <!-- Filtro de Mês -->
             <form method="GET" action="/" class="flex items-center gap-2 bg-slate-800/80 p-1.5 rounded-xl border border-slate-700">
                 <label for="month" class="text-xs font-medium text-slate-300 pl-2">Mês:</label>
@@ -65,6 +74,7 @@
                     Incluir previstas nos totais
                 </label>
             </form>
+            </div>
         </header>
 
         <!-- Mensagens de Erro / Alerta -->
@@ -517,6 +527,85 @@
         </div>
     </div>
 
+    <!-- Pop-up de Categorias -->
+    <div id="categories-modal" data-open="{{.ShowCategories}}" class="fixed inset-0 z-50 {{if .ShowCategories}}flex{{else}}hidden{{end}} items-center justify-center bg-black/60 backdrop-blur-sm p-4" onclick="closeCategoriesModal()">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl p-6 relative" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-5">
+                <h3 class="text-lg font-semibold text-white">Categorias</h3>
+                <button type="button" onclick="closeCategoriesModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer" title="Fechar">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            {{if .CategoryError}}
+            <div class="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm">{{.CategoryError}}</div>
+            {{end}}
+
+            <form method="POST" action="/categories" class="flex items-center gap-2 mb-5">
+                {{template "stateFields" .}}
+                <input
+                    type="text"
+                    name="name"
+                    required
+                    maxlength="40"
+                    placeholder="Nova categoria"
+                    class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
+                >
+                <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm px-4 py-2 rounded-xl transition cursor-pointer">Adicionar</button>
+            </form>
+
+            <ul class="divide-y divide-slate-800/60">
+                {{range .AllCategories}}
+                <li class="py-3 {{if .Hidden}}opacity-60{{end}}">
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                        <div class="min-w-0">
+                            <span class="font-medium text-slate-100">{{.Name}}</span>
+                            {{if .Hidden}}<span class="ml-2 px-2 py-0.5 rounded-md text-xs bg-slate-800 text-slate-400 border border-slate-700">oculta</span>{{end}}
+                            <span class="block text-xs text-slate-500">{{.Usage}} lançamento{{if ne .Usage 1}}s{{end}}</span>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-1 sm:flex-shrink-0">
+                            <button type="button" onclick="toggleRename({{.ID}})" class="px-2 py-1 rounded-lg text-xs text-slate-300 hover:bg-slate-800 transition cursor-pointer">Renomear</button>
+                            <form method="POST" action="/categories/visibility" class="inline">
+                                {{template "stateFields" $}}
+                                <input type="hidden" name="id" value="{{.ID}}">
+                                <input type="hidden" name="hidden" value="{{if .Hidden}}0{{else}}1{{end}}">
+                                <button type="submit" class="px-2 py-1 rounded-lg text-xs text-slate-300 hover:bg-slate-800 transition cursor-pointer">{{if .Hidden}}Exibir{{else}}Ocultar{{end}}</button>
+                            </form>
+                            <form method="POST" action="/categories/delete" class="inline" onsubmit="return confirm('Excluir esta categoria?');">
+                                {{template "stateFields" $}}
+                                <input type="hidden" name="id" value="{{.ID}}">
+                                <button
+                                    type="submit"
+                                    {{if gt .Usage 0}}disabled title="Em uso por lançamentos: renomeie ou oculte"{{else}}title="Excluir categoria"{{end}}
+                                    class="px-2 py-1 rounded-lg text-xs text-rose-400 hover:bg-rose-500/10 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                                >Excluir</button>
+                            </form>
+                        </div>
+                    </div>
+                    <form id="rename-{{.ID}}" method="POST" action="/categories/rename" class="hidden mt-2">
+                        {{template "stateFields" $}}
+                        <input type="hidden" name="id" value="{{.ID}}">
+                        <div class="flex items-center gap-2">
+                            <input
+                                type="text"
+                                name="name"
+                                required
+                                maxlength="40"
+                                value="{{.Name}}"
+                                class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 transition"
+                            >
+                            <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition cursor-pointer">Salvar</button>
+                            <button type="button" onclick="toggleRename({{.ID}})" class="text-xs text-slate-400 hover:text-slate-200 px-2 py-1.5 transition cursor-pointer">Cancelar</button>
+                        </div>
+                    </form>
+                </li>
+                {{end}}
+            </ul>
+        </div>
+    </div>
+
     <!-- Scripts de Interatividade -->
     <script>
         // "+ Nova categoria…": mostra o campo do nome e o torna obrigatório; qualquer outra opção o esconde.
@@ -567,9 +656,32 @@
             }
         }
 
+        function openCategoriesModal() {
+            const modal = document.getElementById('categories-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            modal.dataset.open = 'true';
+        }
+
+        function closeCategoriesModal() {
+            const modal = document.getElementById('categories-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            modal.dataset.open = 'false';
+            // Tira ?categorias=1 da URL para que um recarregamento não reabra o pop-up.
+            const url = new URL(location.href);
+            url.searchParams.delete('categorias');
+            history.replaceState(null, '', url);
+        }
+
+        function toggleRename(id) {
+            document.getElementById('rename-' + id).classList.toggle('hidden');
+        }
+
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
                 closeEditModal();
+                closeCategoriesModal();
             }
         });
 
@@ -579,6 +691,8 @@
             function isEditing() {
                 const modal = document.getElementById('edit-modal');
                 if (modal && !modal.classList.contains('hidden')) return true;
+                const categories = document.getElementById('categories-modal');
+                if (categories && !categories.classList.contains('hidden')) return true;
                 const form = document.querySelector('form[action="/transactions"]');
                 if (!form) return false;
                 return ['description', 'amount'].some(function (name) {
@@ -614,3 +728,4 @@
 </body>
 </html>
 
+{{define "stateFields"}}<input type="hidden" name="month" value="{{.SelectedMonth}}"><input type="hidden" name="previstas" value="{{if .IncludeProjected}}1{{end}}">{{end}}
