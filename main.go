@@ -16,6 +16,9 @@ import (
 	"finpi/internal/handlers"
 )
 
+// version é preenchida na compilação (-ldflags "-X main.version=build-N"); "dev" em builds locais.
+var version = "dev"
+
 // Embutir templates HTML diretamente no binário único
 //
 //go:embed templates/*
@@ -32,7 +35,7 @@ func main() {
 	host := flag.String("host", defaultHost, "Host/Interface de rede para bind")
 	flag.Parse()
 
-	log.Println("[INFO] Iniciando 🪙 FinPi em modo produção embarcada...")
+	log.Printf("[INFO] Iniciando 🪙 FinPi (%s) em modo produção embarcada...", version)
 
 	// 1. Inicializar Banco SQLite otimizado para Raspberry Pi
 	db, err := database.InitDB(*dbPath)
@@ -47,7 +50,7 @@ func main() {
 	}()
 
 	// 2. Inicializar Handlers com os templates embutidos
-	h, err := handlers.NewHandler(db, templateFS)
+	h, err := handlers.NewHandler(db, templateFS, version)
 	if err != nil {
 		log.Fatalf("[ERRO] Falha ao inicializar templates embutidos: %v", err)
 	}

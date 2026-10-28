@@ -28,4 +28,5 @@ type PageData struct {
 	Transactions  []Transaction
 	TodayDate     string // Data atual para preencher o formulário por padrão
 	ErrorMessage  string // Exibida no banner de alerta do template, quando preenchida
+	Version       string // Versão da build, exibida no rodapé
 }
