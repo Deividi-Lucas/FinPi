@@ -182,3 +182,151 @@ func (d *DB) CategoryExists(name string) (bool, error) {
 	err := d.conn.QueryRow(`SELECT COUNT(*) FROM categories WHERE name_key = ?`, textutil.Fold(name)).Scan(&n)
 	return n > 0, err
 }
+
+// CreateCategory cria uma categoria nova. Devolve ErrCategoryExists se o nome (normalizado) já existir.
+func (d *DB) CreateCategory(name string) (models.Category, error) {
+	clean, err := cleanCategoryName(name)
+	if err != nil {
+		return models.Category{}, err
+	}
+	exists, err := d.CategoryExists(clean)
+	if err != nil {
+		return models.Category{}, err
+	}
+	if exists {
+		return models.Category{}, ErrCategoryExists
+	}
+
+	res, err := d.conn.Exec(`INSERT INTO categories (name, name_key) VALUES (?, ?)`, clean, textutil.Fold(clean))
+	if err != nil {
+		return models.Category{}, err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return models.Category{}, err
+	}
+	return models.Category{ID: id, Name: clean}, nil
+}
+
+// GetOrCreateCategory devolve a categoria existente (mesmo oculta) ou cria uma nova.
+func (d *DB) GetOrCreateCategory(name string) (models.Category, error) {
+	clean, err := cleanCategoryName(name)
+	if err != nil {
+		return models.Category{}, err
+	}
+
+	var (
+		c      models.Category
+		hidden int
+	)
+	err = d.conn.QueryRow(`SELECT id, name, hidden FROM categories WHERE name_key = ?`, textutil.Fold(clean)).
+		Scan(&c.ID, &c.Name, &hidden)
+	switch {
+	case err == nil:
+		c.Hidden = hidden != 0
+		return c, nil
+	case errors.Is(err, sql.ErrNoRows):
+		return d.CreateCategory(clean)
+	default:
+		return models.Category{}, err
+	}
+}
+
+// RenameCategory renomeia a categoria e todos os lançamentos que a usam, tudo numa única transação.
+func (d *DB) RenameCategory(id int64, name string) error {
+	clean, err := cleanCategoryName(name)
+	if err != nil {
+		return err
+	}
+
+	tx, err := d.conn.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var oldKey string
+	err = tx.QueryRow(`SELECT name_key FROM categories WHERE id = ?`, id).Scan(&oldKey)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrCategoryNotFound
+	}
+	if err != nil {
+		return err
+	}
+
+	newKey := textutil.Fold(clean)
+	var others int
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM categories WHERE name_key = ? AND id <> ?`, newKey, id).Scan(&others); err != nil {
+		return err
+	}
+	if others > 0 {
+		return ErrCategoryExists
+	}
+
+	use, err := categoryUsage(tx)
+	if err != nil {
+		return err
+	}
+	if u := use[oldKey]; u != nil {
+		for _, variant := range u.variants {
+			if _, err := tx.Exec(`UPDATE transactions SET category = ? WHERE category = ?`, clean, variant); err != nil {
+				return err
+			}
+		}
+	}
+	if _, err := tx.Exec(`UPDATE categories SET name = ?, name_key = ? WHERE id = ?`, clean, newKey, id); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// SetCategoryHidden oculta ou reexibe a categoria na lista de escolha ao lançar.
+func (d *DB) SetCategoryHidden(id int64, hidden bool) error {
+	flag := 0
+	if hidden {
+		flag = 1
+	}
+	res, err := d.conn.Exec(`UPDATE categories SET hidden = ? WHERE id = ?`, flag, id)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrCategoryNotFound
+	}
+	return nil
+}
+
+// DeleteCategory exclui uma categoria sem lançamentos. Em uso, devolve *CategoryInUseError.
+func (d *DB) DeleteCategory(id int64) error {
+	tx, err := d.conn.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var name, key string
+	err = tx.QueryRow(`SELECT name, name_key FROM categories WHERE id = ?`, id).Scan(&name, &key)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrCategoryNotFound
+	}
+	if err != nil {
+		return err
+	}
+
+	use, err := categoryUsage(tx)
+	if err != nil {
+		return err
+	}
+	if u := use[key]; u != nil && u.count > 0 {
+		return &CategoryInUseError{Name: name, Count: u.count}
+	}
+
+	if _, err := tx.Exec(`DELETE FROM categories WHERE id = ?`, id); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
