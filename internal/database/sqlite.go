@@ -63,10 +63,27 @@ const createTransactionsSQL = `
 		type TEXT NOT NULL CHECK(type IN ('income', 'expense')),
 		category TEXT NOT NULL,
 		date TEXT NOT NULL,
+		priority TEXT NOT NULL DEFAULT '' CHECK(priority IN ('', 'essential', 'superfluous')),
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	)`
 
 const createIndexSQL = `CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions(date)`
+
+// priorityColumnSQL é a definição da coluna de classificação usada no ALTER de bancos antigos.
+const priorityColumnSQL = `priority TEXT NOT NULL DEFAULT '' CHECK(priority IN ('', 'essential', 'superfluous'))`
+
+// ensurePriorityColumn acrescenta a coluna priority a bancos antigos. Idempotente e sem alterar dados.
+func ensurePriorityColumn(conn *sql.DB, table string) error {
+	cols, err := tableColumns(conn, table)
+	if err != nil {
+		return err
+	}
+	if cols["priority"] {
+		return nil
+	}
+	_, err = conn.Exec(fmt.Sprintf(`ALTER TABLE %s ADD COLUMN %s`, table, priorityColumnSQL))
+	return err
+}
 
 func migrate(conn *sql.DB) error {
 	cols, err := tableColumns(conn, "transactions")
@@ -92,6 +109,11 @@ func migrate(conn *sql.DB) error {
 	}
 	if _, err := conn.Exec(createCategoriesSQL); err != nil {
 		return err
+	}
+	for _, table := range []string{"transactions", "categories"} {
+		if err := ensurePriorityColumn(conn, table); err != nil {
+			return fmt.Errorf("erro ao adicionar a coluna priority em %s: %w", table, err)
+		}
 	}
 	return seedCategories(conn)
 }
@@ -148,14 +170,35 @@ func (d *DB) Close() error {
 	return d.conn.Close()
 }
 
+// ErrInvalidPriority indica uma classificação fora de '', 'essential' e 'superfluous'.
+var ErrInvalidPriority = errors.New("prioridade inválida: use essential, superfluous ou vazio")
+
+// transactionColumns é a lista de colunas lidas por scanTransactions.
+const transactionColumns = `id, description, amount_cents, type, category, date, priority, created_at`
+
+func scanTransactions(rows *sql.Rows) ([]models.Transaction, error) {
+	var list []models.Transaction
+	for rows.Next() {
+		var t models.Transaction
+		if err := rows.Scan(&t.ID, &t.Description, &t.AmountCents, &t.Type, &t.Category, &t.Date, &t.Priority, &t.CreatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, t)
+	}
+	return list, rows.Err()
+}
+
 // CreateTransaction insere um novo lançamento.
 func (d *DB) CreateTransaction(t *models.Transaction) error {
+	if !models.ValidPriority(t.Priority) {
+		return ErrInvalidPriority
+	}
 	query := `
-		INSERT INTO transactions (description, amount_cents, type, category, date, created_at)
-		VALUES (?, ?, ?, ?, ?, ?)
+		INSERT INTO transactions (description, amount_cents, type, category, date, priority, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
 	`
 	now := time.Now()
-	res, err := d.conn.Exec(query, t.Description, t.AmountCents, t.Type, t.Category, t.Date, now)
+	res, err := d.conn.Exec(query, t.Description, t.AmountCents, t.Type, t.Category, t.Date, t.Priority, now)
 	if err != nil {
 		return err
 	}
@@ -174,7 +217,7 @@ func (d *DB) GetTransactions(yearMonth string) ([]models.Transaction, error) {
 
 	if yearMonth != "" {
 		query = `
-			SELECT id, description, amount_cents, type, category, date, created_at
+			SELECT ` + transactionColumns + `
 			FROM transactions
 			WHERE strftime('%Y-%m', date) = ?
 			ORDER BY date DESC, id DESC
@@ -182,7 +225,7 @@ func (d *DB) GetTransactions(yearMonth string) ([]models.Transaction, error) {
 		args = append(args, yearMonth)
 	} else {
 		query = `
-			SELECT id, description, amount_cents, type, category, date, created_at
+			SELECT ` + transactionColumns + `
 			FROM transactions
 			ORDER BY date DESC, id DESC
 			LIMIT 100
@@ -195,16 +238,7 @@ func (d *DB) GetTransactions(yearMonth string) ([]models.Transaction, error) {
 	}
 	defer rows.Close()
 
-	var list []models.Transaction
-	for rows.Next() {
-		var t models.Transaction
-		if err := rows.Scan(&t.ID, &t.Description, &t.AmountCents, &t.Type, &t.Category, &t.Date, &t.CreatedAt); err != nil {
-			return nil, err
-		}
-		list = append(list, t)
-	}
-
-	return list, rows.Err()
+	return scanTransactions(rows)
 }
 
 // GetInstallmentCandidates devolve os lançamentos cuja descrição pode conter uma parcela
@@ -212,7 +246,7 @@ func (d *DB) GetTransactions(yearMonth string) ([]models.Transaction, error) {
 // a validação do formato é feita em installments.Parse.
 func (d *DB) GetInstallmentCandidates() ([]models.Transaction, error) {
 	rows, err := d.conn.Query(`
-		SELECT id, description, amount_cents, type, category, date, created_at
+		SELECT ` + transactionColumns + `
 		FROM transactions
 		WHERE description LIKE '%/%' OR description LIKE '%parcela%'
 		ORDER BY date ASC, id ASC
@@ -222,15 +256,7 @@ func (d *DB) GetInstallmentCandidates() ([]models.Transaction, error) {
 	}
 	defer rows.Close()
 
-	var list []models.Transaction
-	for rows.Next() {
-		var t models.Transaction
-		if err := rows.Scan(&t.ID, &t.Description, &t.AmountCents, &t.Type, &t.Category, &t.Date, &t.CreatedAt); err != nil {
-			return nil, err
-		}
-		list = append(list, t)
-	}
-	return list, rows.Err()
+	return scanTransactions(rows)
 }
 
 // GetSummaryByMonth calcula Total de Receitas, Total de Despesas e Saldo (em centavos) para o mês fornecido.
@@ -253,12 +279,15 @@ func (d *DB) GetSummaryByMonth(yearMonth string) (models.Summary, error) {
 
 // UpdateTransaction atualiza os dados de um lançamento existente pelo ID.
 func (d *DB) UpdateTransaction(t *models.Transaction) error {
+	if !models.ValidPriority(t.Priority) {
+		return ErrInvalidPriority
+	}
 	query := `
 		UPDATE transactions
-		SET description = ?, amount_cents = ?, type = ?, category = ?, date = ?
+		SET description = ?, amount_cents = ?, type = ?, category = ?, date = ?, priority = ?
 		WHERE id = ?
 	`
-	res, err := d.conn.Exec(query, t.Description, t.AmountCents, t.Type, t.Category, t.Date, t.ID)
+	res, err := d.conn.Exec(query, t.Description, t.AmountCents, t.Type, t.Category, t.Date, t.Priority, t.ID)
 	if err != nil {
 		return err
 	}
