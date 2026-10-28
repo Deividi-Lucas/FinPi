@@ -238,11 +238,12 @@
                                         data-date="{{.Date}}"
                                         onclick="openEditModal(this)"
                                         title="Editar lançamento"
-                                        class="p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition cursor-pointer"
+                                        class="relative p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition cursor-pointer"
                                     >
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                         </svg>
+                                        <span class="edit-draft-dot hidden absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-amber-400" title="Há alterações não salvas (rascunho)"></span>
                                     </button>
                                     <form method="POST" action="/transactions/delete" onsubmit="return confirm('Deseja realmente excluir este lançamento?');" class="inline">
                                         <input type="hidden" name="id" value="{{.ID}}">
@@ -333,7 +334,14 @@
                 </button>
             </div>
 
-            <form method="POST" action="/transactions/update" class="space-y-4">
+            <div id="edit-draft-notice" class="hidden mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-sm items-center justify-between gap-3">
+                <span id="edit-draft-message">Rascunho restaurado.</span>
+                <button id="edit-discard-btn" type="button" onclick="discardEditDraft()" class="px-2 py-1 rounded-lg text-xs font-medium text-amber-100 hover:bg-amber-500/20 transition cursor-pointer">Descartar</button>
+            </div>
+
+            <div id="edit-form-error" role="alert" class="hidden mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm"></div>
+
+            <form id="edit-form" method="POST" action="/transactions/update" data-draft-prefix="finpi:draft:editar-lancamento:" class="space-y-4">
                 <input type="hidden" id="edit-id" name="id">
                 <input type="hidden" name="month" value="{{.SelectedMonth}}">
                 <input type="hidden" name="previstas" value="{{if .IncludeProjected}}1{{end}}">
@@ -659,32 +667,61 @@
             }
         }
 
-        function openEditModal(btn) {
-            document.getElementById('edit-id').value = btn.dataset.id;
-            document.getElementById('edit-description').value = btn.dataset.desc;
-            document.getElementById('edit-amount').value = parseFloat(btn.dataset.amount).toFixed(2);
-            document.getElementById('edit-type').value = btn.dataset.type;
+        // Preenche o formulário de edição com um conjunto de valores (original do lançamento ou descarte).
+        function fillEditForm(values) {
+            document.getElementById('edit-description').value = values.description;
+            document.getElementById('edit-amount').value = values.amount;
+            document.getElementById('edit-type').value = values.type;
             // A categoria atual pode estar oculta (ou ser antiga): garante que ela exista na lista.
             const categorySelect = document.getElementById('edit-category');
-            if (!Array.from(categorySelect.options).some(function (o) { return o.value === btn.dataset.category; })) {
+            if (!Array.from(categorySelect.options).some(function (o) { return o.value === values.category; })) {
                 categorySelect.insertBefore(
-                    new Option(btn.dataset.category, btn.dataset.category),
+                    new Option(values.category, values.category),
                     categorySelect.querySelector('option[value="__new__"]')
                 );
             }
-            categorySelect.value = btn.dataset.category;
+            categorySelect.value = values.category;
             toggleNewCategory(categorySelect);
-            document.getElementById('edit-date').value = btn.dataset.date;
+            document.getElementById('edit-date').value = values.date;
+        }
+
+        function openEditModal(btn) {
+            document.getElementById('edit-id').value = btn.dataset.id;
+            editingId = btn.dataset.id;
+            editOriginal = editSnapshot({
+                description: btn.dataset.desc,
+                amount: parseFloat(btn.dataset.amount).toFixed(2),
+                type: btn.dataset.type,
+                category: btn.dataset.category,
+                new_category: '',
+                date: btn.dataset.date
+            });
+            fillEditForm(editOriginal);
+            showEditError('');
+
+            // Rascunho deste lançamento: só é aplicado se o lançamento não mudou desde que ele foi salvo.
+            const draft = readEditDraft(editingId);
+            if (draft && JSON.stringify(draft.base) === JSON.stringify(editOriginal)) {
+                applyEditDraft(draft.fields);
+                showEditNotice('Rascunho restaurado.', true);
+            } else if (draft) {
+                removeEditDraft(editingId);
+                showEditNotice('Este lançamento foi alterado desde o seu rascunho; os valores atuais foram carregados.', false);
+            } else {
+                showEditNotice('', false);
+            }
 
             const modal = document.getElementById('edit-modal');
             modal.classList.remove('hidden');
             modal.classList.add('flex');
         }
 
+        // Fechar (X, Esc, clique fora ou Cancelar) nunca apaga o que foi digitado: o rascunho já está guardado.
         function closeEditModal() {
             const modal = document.getElementById('edit-modal');
             modal.classList.add('hidden');
             modal.classList.remove('flex');
+            editingId = null;
         }
 
         function handleBackdropClick(e) {
@@ -856,6 +893,153 @@
                 showNewFormError('Sem conexão com o servidor. Seu rascunho foi mantido.');
             } finally {
                 newFormSubmit.disabled = false;
+            }
+        });
+
+        // Rascunho da edição: um por lançamento (chave = prefixo + ID). Guarda só o que difere do original e um
+        // retrato do original (base): se o lançamento mudou depois, o rascunho não é aplicado por cima.
+        const editForm = document.getElementById('edit-form');
+        const editDraftNotice = document.getElementById('edit-draft-notice');
+        const editDraftMessage = document.getElementById('edit-draft-message');
+        const editDiscardBtn = document.getElementById('edit-discard-btn');
+        const editFormError = document.getElementById('edit-form-error');
+        const editFormSubmit = editForm.querySelector('button[type="submit"]');
+        const EDIT_DRAFT_PREFIX = editForm.dataset.draftPrefix;
+        const EDIT_FIELDS = ['description', 'amount', 'type', 'category', 'new_category', 'date'];
+        const EDIT_DRAFT_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // rascunhos com mais de 30 dias são limpos
+        let editingId = null;
+        let editOriginal = null;
+
+        function editSnapshot(source) {
+            const snapshot = {};
+            EDIT_FIELDS.forEach(function (name) { snapshot[name] = source[name]; });
+            return snapshot;
+        }
+
+        function readEditDraft(id) {
+            const store = draftStore();
+            if (!store) return null;
+            try {
+                const draft = JSON.parse(store.getItem(EDIT_DRAFT_PREFIX + id));
+                const valid = draft && typeof draft === 'object' && draft.base && draft.fields && Object.keys(draft.fields).length;
+                return valid ? draft : null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function removeEditDraft(id) {
+            const store = draftStore();
+            try { if (store) store.removeItem(EDIT_DRAFT_PREFIX + id); } catch (e) { /* ignora */ }
+            refreshEditDots();
+        }
+
+        // Pontinho no lápis das linhas que têm rascunho.
+        function refreshEditDots() {
+            document.querySelectorAll('.edit-draft-dot').forEach(function (dot) {
+                dot.classList.toggle('hidden', !readEditDraft(dot.parentElement.dataset.id));
+            });
+        }
+
+        // Remove rascunhos de edição antigos (ou ilegíveis), inclusive de lançamentos que já foram excluídos.
+        function pruneEditDrafts() {
+            const store = draftStore();
+            if (!store) return;
+            try {
+                const stale = [];
+                for (let i = 0; i < store.length; i++) {
+                    const key = store.key(i);
+                    if (!key || key.indexOf(EDIT_DRAFT_PREFIX) !== 0) continue;
+                    let savedAt = 0;
+                    try { savedAt = JSON.parse(store.getItem(key)).savedAt || 0; } catch (e) { /* ilegível: remove */ }
+                    if (Date.now() - savedAt > EDIT_DRAFT_MAX_AGE_MS) stale.push(key);
+                }
+                stale.forEach(function (key) { store.removeItem(key); });
+            } catch (e) { /* ignora */ }
+        }
+
+        function saveEditDraft() {
+            if (editingId === null) return;
+            const store = draftStore();
+            if (!store) return;
+            const fields = {};
+            EDIT_FIELDS.forEach(function (name) {
+                const value = editForm.elements[name].value;
+                if (value !== editOriginal[name]) fields[name] = value;
+            });
+            try {
+                if (Object.keys(fields).length) {
+                    store.setItem(EDIT_DRAFT_PREFIX + editingId, JSON.stringify({ savedAt: Date.now(), base: editOriginal, fields: fields }));
+                } else {
+                    store.removeItem(EDIT_DRAFT_PREFIX + editingId);
+                }
+            } catch (e) { /* sem espaço ou bloqueado: segue sem rascunho */ }
+            refreshEditDots();
+        }
+
+        function applyEditDraft(fields) {
+            EDIT_FIELDS.forEach(function (name) {
+                if (!(name in fields)) return;
+                const field = editForm.elements[name];
+                // Uma categoria que não existe mais fica de fora: mantém o valor original.
+                if (field.tagName === 'SELECT' && !Array.from(field.options).some(function (o) { return o.value === fields[name]; })) return;
+                field.value = fields[name];
+            });
+            toggleNewCategory(editForm.elements['category']);
+        }
+
+        function showEditNotice(message, withDiscard) {
+            editDraftMessage.textContent = message;
+            editDiscardBtn.classList.toggle('hidden', !withDiscard);
+            editDraftNotice.classList.toggle('hidden', !message);
+            editDraftNotice.classList.toggle('flex', !!message);
+        }
+
+        function showEditError(message) {
+            editFormError.textContent = message;
+            editFormError.classList.toggle('hidden', !message);
+        }
+
+        function discardEditDraft() {
+            if (editingId === null) return;
+            removeEditDraft(editingId);
+            fillEditForm(editOriginal);
+            showEditNotice('', false);
+            showEditError('');
+            document.getElementById('edit-description').focus();
+        }
+
+        editForm.addEventListener('input', saveEditDraft);
+        editForm.addEventListener('change', saveEditDraft);
+        pruneEditDrafts();
+        refreshEditDots();
+
+        // Envio sem sair da página: em erro, a mensagem aparece no pop-up e o rascunho continua guardado;
+        // em sucesso, o rascunho é apagado e a página recarrega no mês certo.
+        editForm.addEventListener('submit', async function (e) {
+            if (!window.fetch) return; // sem fetch: envio tradicional
+            e.preventDefault();
+            showEditError('');
+            const id = editingId;
+            editFormSubmit.disabled = true;
+            try {
+                const resp = await fetch(editForm.action, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams(new FormData(editForm)),
+                    credentials: 'same-origin'
+                });
+                if (resp.ok) {
+                    removeEditDraft(id);
+                    window.location.href = resp.url;
+                    return;
+                }
+                const text = (await resp.text()).trim();
+                showEditError(text || 'Não foi possível salvar as alterações. Seu rascunho foi mantido.');
+            } catch (err) {
+                showEditError('Sem conexão com o servidor. Seu rascunho foi mantido.');
+            } finally {
+                editFormSubmit.disabled = false;
             }
         });
 
