@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"finpi/internal/dashboard"
 	"finpi/internal/database"
 	"finpi/internal/installments"
 	"finpi/internal/models"
@@ -36,6 +37,15 @@ func NewHandler(db *database.DB, templateFS fs.FS, version string) (*Handler, er
 		"formatCurrency": formatCurrencyBRL,
 		"centsInput":     formatCentsInput,
 		"formatDate":     formatDateBR,
+		"plural": func(n int, one, many string) string {
+			if n == 1 {
+				return one
+			}
+			return many
+		},
+		"formatPercent": func(p float64) string {
+			return strings.Replace(strconv.FormatFloat(p, 'f', 1, 64), ".", ",", 1) + "%"
+		},
 	}
 
 	tmpl, err := template.New("").Funcs(funcMap).ParseFS(templateFS, "templates/*.html")
@@ -184,6 +194,8 @@ func (h *Handler) renderDashboard(w http.ResponseWriter, r *http.Request, status
 		serverError(w, "Erro ao carregar categorias", err)
 		return
 	}
+	dashboard.Annotate(transactions, categories)
+	stats := dashboard.Compute(transactions, categories)
 
 	data := models.PageData{
 		SelectedMonth: selectedMonth,
@@ -192,8 +204,9 @@ func (h *Handler) renderDashboard(w http.ResponseWriter, r *http.Request, status
 		Transactions:  transactions,
 		TodayDate:     now.Format("2006-01-02"),
 		Version:       h.version,
+		Stats:         stats,
 
-		Projected:        projected,
+		Projected:       projected,
 		ProjectedIncome:  projectedIncome,
 		ProjectedExpense: projectedExpense,
 		IncludeProjected: includeProjected,

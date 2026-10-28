@@ -54,7 +54,7 @@ func (h *Handler) finishCategoryAction(w http.ResponseWriter, r *http.Request, e
 	var inUse *database.CategoryInUseError
 	status := http.StatusInternalServerError
 	switch {
-	case errors.Is(err, database.ErrInvalidCategoryName):
+	case errors.Is(err, database.ErrInvalidCategoryName), errors.Is(err, database.ErrInvalidPriority):
 		status = http.StatusBadRequest
 	case errors.Is(err, database.ErrCategoryExists), errors.As(err, &inUse):
 		status = http.StatusConflict
@@ -101,6 +101,19 @@ func (h *Handler) SetCategoryVisibility(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	h.finishCategoryAction(w, r, h.db.SetCategoryHidden(id, r.PostForm.Get("hidden") == "1"))
+}
+
+// SetCategoryPriority classifica a categoria como essencial, supérfluo ou sem classificação (vazio).
+func (h *Handler) SetCategoryPriority(w http.ResponseWriter, r *http.Request) {
+	if !categoryForm(w, r) {
+		return
+	}
+	id, ok := categoryID(r)
+	if !ok {
+		http.Error(w, "ID inválido", http.StatusBadRequest)
+		return
+	}
+	h.finishCategoryAction(w, r, h.db.SetCategoryPriority(id, strings.TrimSpace(r.PostForm.Get("priority"))))
 }
 
 // DeleteCategory exclui uma categoria sem lançamentos.
