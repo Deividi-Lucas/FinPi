@@ -224,3 +224,106 @@ func TestNewHandler_EmptyVersionFallsBackToDev(t *testing.T) {
 		t.Errorf("version = %q, quer \"dev\" quando não informada", h.version)
 	}
 }
+
+func TestProjectedTotals_AndWithProjected(t *testing.T) {
+	p := []models.ProjectedInstallment{
+		{Type: "expense", AmountCents: 25000},
+		{Type: "expense", AmountCents: 5000},
+		{Type: "income", AmountCents: 10000},
+	}
+	income, expense := projectedTotals(p)
+	if income != 10000 || expense != 30000 {
+		t.Errorf("projectedTotals = %d, %d; quer 10000, 30000", income, expense)
+	}
+
+	base := models.Summary{TotalIncome: 100000, TotalExpense: 40000, Balance: 60000}
+	got := withProjected(base, income, expense)
+	if got.TotalIncome != 110000 || got.TotalExpense != 70000 || got.Balance != 40000 {
+		t.Errorf("withProjected = %+v", got)
+	}
+	if base.Balance != 60000 {
+		t.Error("withProjected não pode alterar o resumo original")
+	}
+}
+
+func seedInstallment(t *testing.T, db *database.DB) {
+	t.Helper()
+	tx := models.Transaction{Description: "Geladeira 3/10", AmountCents: 25000, Type: "expense", Category: "Casa", Date: "2026-10-15"}
+	if err := db.CreateTransaction(&tx); err != nil {
+		t.Fatalf("seedInstallment: %v", err)
+	}
+}
+
+func getDashboard(h *Handler, target string) string {
+	rec := httptest.NewRecorder()
+	h.Dashboard(rec, httptest.NewRequest(http.MethodGet, target, nil))
+	return rec.Body.String()
+}
+
+func TestDashboard_ShowsProjectedInstallmentsSeparately(t *testing.T) {
+	h, db := newTestHandler(t)
+	seedInstallment(t, db)
+
+	body := getDashboard(h, "/?month=2026-11")
+
+	if !strings.Contains(body, "Parcelas previstas") || !strings.Contains(body, "4/10") {
+		t.Error("novembro deveria listar a 4/10 como prevista")
+	}
+	if strings.Contains(body, "(com previstas)") {
+		t.Error("sem previstas=1 os totais não incluem as previstas")
+	}
+}
+
+func TestDashboard_IncludesProjectedInTotalsWhenAsked(t *testing.T) {
+	h, db := newTestHandler(t)
+	seedInstallment(t, db)
+
+	body := getDashboard(h, "/?month=2026-11&previstas=1")
+
+	if !strings.Contains(body, "(com previstas)") {
+		t.Error("com previstas=1 os cartões devem indicar '(com previstas)'")
+	}
+	if !strings.Contains(body, formatCurrencyBRL(25000)) {
+		t.Error("a despesa total deveria somar a parcela prevista de R$ 250,00")
+	}
+}
+
+func TestDashboard_HidesProjectedBlockWhenThereAreNone(t *testing.T) {
+	h, _ := newTestHandler(t)
+
+	if body := getDashboard(h, "/?month=2026-11"); strings.Contains(body, "Parcelas previstas") {
+		t.Error("sem parcelas o bloco não deve aparecer")
+	}
+}
+
+func TestDashboard_ShowsInstallmentBadgeAndRemaining(t *testing.T) {
+	h, db := newTestHandler(t)
+	seedInstallment(t, db)
+
+	body := getDashboard(h, "/?month=2026-10")
+
+	if !strings.Contains(body, "3/10") || !strings.Contains(body, "restam 7 parcelas") {
+		t.Error("o lançamento deveria mostrar o selo 3/10 e 'restam 7 parcelas'")
+	}
+}
+
+func TestMutations_PreserveProjectedToggleInRedirect(t *testing.T) {
+	h, db := newTestHandler(t)
+
+	form := validForm()
+	form.Set("previstas", "1")
+	if loc := post(h.CreateTransaction, "/transactions", form).Header().Get("Location"); loc != "/?month=2026-10&previstas=1" {
+		t.Errorf("criar: Location = %q", loc)
+	}
+
+	tx := seed(t, db, 100)
+	form.Set("id", strconv.FormatInt(tx.ID, 10))
+	if loc := post(h.UpdateTransaction, "/transactions/update", form).Header().Get("Location"); loc != "/?month=2026-10&previstas=1" {
+		t.Errorf("editar: Location = %q", loc)
+	}
+
+	del := url.Values{"id": {strconv.FormatInt(tx.ID, 10)}, "month": {"2026-10"}, "previstas": {"1"}}
+	if loc := post(h.DeleteTransaction, "/transactions/delete", del).Header().Get("Location"); loc != "/?month=2026-10&previstas=1" {
+		t.Errorf("excluir: Location = %q", loc)
+	}
+}

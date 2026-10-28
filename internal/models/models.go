@@ -39,6 +39,11 @@ type PageData struct {
 	TodayDate     string // Data atual para preencher o formulário por padrão
 	ErrorMessage  string // Exibida no banner de alerta do template, quando preenchida
 	Version       string // Versão da build, exibida no rodapé
+
+	Projected        []ProjectedInstallment // parcelas previstas do mês (calculadas, não gravadas)
+	ProjectedIncome  int64                  // soma das receitas previstas, em centavos
+	ProjectedExpense int64                  // soma das despesas previstas, em centavos
+	IncludeProjected bool                   // se os totais do mês somam as previstas (?previstas=1)
 }
 
 // ProjectedInstallment é uma parcela prevista: calculada a partir do histórico, nunca gravada.

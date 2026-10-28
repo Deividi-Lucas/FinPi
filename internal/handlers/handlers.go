@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"finpi/internal/database"
+	"finpi/internal/installments"
 	"finpi/internal/models"
 )
 
@@ -67,7 +68,11 @@ func dbError(w http.ResponseWriter, msg string, err error) {
 }
 
 func redirectToMonth(w http.ResponseWriter, r *http.Request, month string) {
-	http.Redirect(w, r, "/?month="+url.QueryEscape(month), http.StatusSeeOther)
+	target := "/?month=" + url.QueryEscape(month)
+	if r.PostForm.Get("previstas") == "1" {
+		target += "&previstas=1"
+	}
+	http.Redirect(w, r, target, http.StatusSeeOther)
 }
 
 // Dashboard renderiza a tela principal com o resumo e histórico de transações.
@@ -95,6 +100,20 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	includeProjected := r.URL.Query().Get("previstas") == "1"
+
+	candidates, err := h.db.GetInstallmentCandidates()
+	if err != nil {
+		serverError(w, "Erro ao carregar parcelas", err)
+		return
+	}
+	projected := installments.Project(candidates, selectedMonth)
+	projectedIncome, projectedExpense := projectedTotals(projected)
+	if includeProjected {
+		summary = withProjected(summary, projectedIncome, projectedExpense)
+	}
+	installments.Annotate(transactions)
+
 	data := models.PageData{
 		SelectedMonth: selectedMonth,
 		DisplayMonth:  formatDisplayMonth(selectedMonth),
@@ -102,6 +121,11 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		Transactions:  transactions,
 		TodayDate:     now.Format("2006-01-02"),
 		Version:       h.version,
+
+		Projected:        projected,
+		ProjectedIncome:  projectedIncome,
+		ProjectedExpense: projectedExpense,
+		IncludeProjected: includeProjected,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -201,6 +225,26 @@ func (h *Handler) DeleteTransaction(w http.ResponseWriter, r *http.Request) {
 		month = time.Now().Format("2006-01")
 	}
 	redirectToMonth(w, r, month)
+}
+
+// projectedTotals soma, em centavos, as receitas e as despesas previstas.
+func projectedTotals(p []models.ProjectedInstallment) (income, expense int64) {
+	for _, item := range p {
+		if item.Type == "income" {
+			income += item.AmountCents
+		} else {
+			expense += item.AmountCents
+		}
+	}
+	return income, expense
+}
+
+// withProjected devolve uma cópia do resumo somando as receitas e despesas previstas.
+func withProjected(s models.Summary, income, expense int64) models.Summary {
+	s.TotalIncome += income
+	s.TotalExpense += expense
+	s.Balance = s.TotalIncome - s.TotalExpense
+	return s
 }
 
 // Helpers de formatação
