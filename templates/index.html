@@ -77,6 +77,12 @@
             </div>
         </header>
 
+        {{with .ImportResult}}
+        <div id="import-result" class="mt-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm">
+            {{.Imported}} {{plural .Imported "lançamento importado" "lançamentos importados"}}{{if gt .Skipped 0}} &middot; {{.Skipped}} {{plural .Skipped "já existia e foi ignorado" "já existiam e foram ignorados"}}{{end}}.
+        </div>
+        {{end}}
+
         <!-- Mensagens de Erro / Alerta -->
         {{if .ErrorMessage}}
         <div class="mt-4 p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm flex items-center gap-2">
@@ -219,6 +225,13 @@
         <!-- Novo Lançamento (abre o pop-up) -->
         <div class="mb-8 flex items-center justify-end gap-3">
             <span id="draft-dot" class="hidden text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 px-2 py-1 rounded-lg">rascunho salvo</span>
+            <button
+                type="button"
+                onclick="openImportModal()"
+                class="inline-flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-100 font-medium text-sm px-5 py-2.5 rounded-xl border border-slate-700 active:scale-[0.98] transition cursor-pointer"
+            >
+                Importar extrato
+            </button>
             <button
                 type="button"
                 onclick="openNewModal()"
@@ -666,6 +679,33 @@
         </div>
     </div>
 
+    <!-- Pop-up de Importar extrato (a revisão fica na página enquanto o pop-up estiver fechado) -->
+    <div id="import-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 backdrop-blur-sm p-4" onclick="closeImportModal()">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl p-6 relative" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-5">
+                <h3 class="text-lg font-semibold text-white">Importar extrato</h3>
+                <button type="button" onclick="closeImportModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer" title="Fechar (a revisão é mantida)">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <div id="import-error" role="alert" class="hidden mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm"></div>
+
+            <div id="import-picker">
+                <p class="text-sm text-slate-400 mb-3">Envie o extrato do Mercado Pago (<strong>.xlsx</strong> ou <strong>.csv</strong>, sem abrir e salvar no Excel). Você revisa tudo antes de gravar.</p>
+                <form id="import-form" method="POST" action="/import/preview" enctype="multipart/form-data" class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                    {{template "stateFields" .}}
+                    <input type="file" name="file" accept=".xlsx,.csv" required class="flex-1 text-sm text-slate-300 file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border-0 file:bg-slate-800 file:text-slate-200 file:cursor-pointer">
+                    <button id="import-submit" type="submit" class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-medium text-sm px-5 py-2 rounded-xl transition cursor-pointer">Ler arquivo</button>
+                </form>
+            </div>
+
+            <div id="import-preview" class="mt-2"></div>
+        </div>
+    </div>
+
     <!-- Pop-up de Categorias -->
     <div id="categories-modal" data-open="{{.ShowCategories}}" class="fixed inset-0 z-50 {{if .ShowCategories}}flex{{else}}hidden{{end}} items-center justify-center bg-black/60 backdrop-blur-sm p-4" onclick="closeCategoriesModal()">
         <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl p-6 relative" onclick="event.stopPropagation()">
@@ -879,6 +919,7 @@
                 closeEditModal();
                 closeCategoriesModal();
                 closeNewModal();
+                closeImportModal();
             }
         });
 
@@ -1167,10 +1208,157 @@
             }
         });
 
+        // Importar extrato: o servidor lê o arquivo e devolve a revisão (nada é gravado até confirmar).
+        // Fechar o pop-up mantém a revisão na página; só "Descartar" ou recarregar a apagam.
+        const importModal = document.getElementById('import-modal');
+        const importForm = document.getElementById('import-form');
+        const importPicker = document.getElementById('import-picker');
+        const importPreview = document.getElementById('import-preview');
+        const importError = document.getElementById('import-error');
+        const importSubmit = document.getElementById('import-submit');
+
+        function formatBRL(cents) {
+            return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+
+        function showImportError(message) {
+            importError.textContent = message;
+            importError.classList.toggle('hidden', !message);
+        }
+
+        function hasPendingImport() {
+            return importPreview.childElementCount > 0;
+        }
+
+        function openImportModal() {
+            importModal.classList.remove('hidden');
+            importModal.classList.add('flex');
+        }
+
+        function closeImportModal() {
+            importModal.classList.add('hidden');
+            importModal.classList.remove('flex');
+        }
+
+        function discardImport() {
+            importPreview.innerHTML = '';
+            importPicker.classList.remove('hidden');
+            importForm.reset();
+            showImportError('');
+        }
+
+        // Totais das linhas marcadas e rótulo do botão de confirmar.
+        function refreshImportTotals() {
+            let count = 0, income = 0, expense = 0;
+            importPreview.querySelectorAll('[data-import-row]').forEach(function (row) {
+                const box = row.querySelector('input[data-sel]');
+                if (!box.checked || box.disabled) return;
+                const amount = Number(row.dataset.amount);
+                count++;
+                if (amount > 0) income += amount; else expense -= amount;
+            });
+            const set = function (selector, text) {
+                importPreview.querySelectorAll(selector).forEach(function (el) { el.textContent = text; });
+            };
+            set('[data-import-count]', String(count));
+            set('[data-import-count-label]', String(count));
+            set('[data-import-income]', formatBRL(income));
+            set('[data-import-expense]', formatBRL(expense));
+            const confirmBtn = importPreview.querySelector('[data-import-confirm]');
+            if (confirmBtn) confirmBtn.disabled = count === 0;
+        }
+
+        importForm.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            showImportError('');
+            if (!window.fetch) { showImportError('Este navegador não suporta o envio do extrato.'); return; }
+            if (!importForm.elements['file'].files.length) { showImportError('Escolha um arquivo .xlsx ou .csv.'); return; }
+            importSubmit.disabled = true;
+            try {
+                const resp = await fetch(importForm.action, { method: 'POST', body: new FormData(importForm), credentials: 'same-origin' });
+                const text = await resp.text();
+                if (resp.ok) {
+                    importPreview.innerHTML = text;
+                    importPicker.classList.add('hidden');
+                    refreshImportTotals();
+                } else {
+                    showImportError(text.trim() || 'Não foi possível ler o arquivo.');
+                }
+            } catch (err) {
+                showImportError('Sem conexão com o servidor.');
+            } finally {
+                importSubmit.disabled = false;
+            }
+        });
+
+        // Trocar a categoria de uma linha leva junto as demais com a mesma descrição (ex.: vários "Rendimentos").
+        importPreview.addEventListener('change', function (e) {
+            const row = e.target.closest('[data-import-row]');
+            if (!row) return;
+            if (e.target.matches('select[data-cat]')) {
+                importPreview.querySelectorAll('[data-import-row]').forEach(function (other) {
+                    const select = other.querySelector('select[data-cat]');
+                    if (other === row || other.dataset.desc !== row.dataset.desc || select.disabled) return;
+                    if (Array.from(select.options).some(function (o) { return o.value === e.target.value; })) select.value = e.target.value;
+                });
+            }
+            refreshImportTotals();
+        });
+
+        importPreview.addEventListener('click', async function (e) {
+            if (e.target.closest('[data-import-discard]')) { discardImport(); return; }
+            const confirmBtn = e.target.closest('[data-import-confirm]');
+            if (!confirmBtn) return;
+
+            const rows = Array.from(importPreview.querySelectorAll('[data-import-row]'));
+            const params = new URLSearchParams();
+            params.set('n', String(rows.length));
+            importPreview.querySelectorAll('input[type="hidden"]').forEach(function (input) { params.set(input.name, input.value); });
+            rows.forEach(function (row, i) {
+                const box = row.querySelector('input[data-sel]');
+                params.set('sel_' + i, box.checked && !box.disabled ? '1' : '');
+                params.set('date_' + i, row.dataset.date);
+                params.set('desc_' + i, row.dataset.desc);
+                params.set('amount_' + i, row.dataset.amount);
+                params.set('ref_' + i, row.dataset.ref);
+                params.set('cat_' + i, row.querySelector('select[data-cat]').value);
+            });
+
+            showImportError('');
+            confirmBtn.disabled = true;
+            try {
+                const resp = await fetch('/import/confirm', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: params,
+                    credentials: 'same-origin'
+                });
+                if (resp.ok) {
+                    window.location.href = resp.url;
+                    return;
+                }
+                showImportError((await resp.text()).trim() || 'Não foi possível importar. A revisão foi mantida.');
+            } catch (err) {
+                showImportError('Sem conexão com o servidor. A revisão foi mantida.');
+            }
+            refreshImportTotals();
+        });
+
+        // O aviso "N lançamentos importados" vem na URL; tira os parâmetros para um recarregamento não repeti-lo.
+        (function () {
+            const url = new URL(location.href);
+            if (url.searchParams.has('importados')) {
+                url.searchParams.delete('importados');
+                url.searchParams.delete('ignorados');
+                history.replaceState(null, '', url);
+            }
+        })();
+
         // Tempo real (SSE): quando outra tela cria, edita ou exclui um lançamento, esta tela atualiza.
         // Se você estiver no meio de uma edição, mostra um aviso em vez de recarregar e perder o que digitou.
         (function () {
             function isEditing() {
+                if (hasPendingImport()) return true; // revisão de extrato em andamento: não recarregar
                 const modal = document.getElementById('edit-modal');
                 if (modal && !modal.classList.contains('hidden')) return true;
                 const categories = document.getElementById('categories-modal');
