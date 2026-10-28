@@ -30,3 +30,13 @@ type PageData struct {
 	ErrorMessage  string // Exibida no banner de alerta do template, quando preenchida
 	Version       string // Versão da build, exibida no rodapé
 }
+
+// ProjectedInstallment é uma parcela prevista: calculada a partir do histórico, nunca gravada.
+type ProjectedInstallment struct {
+	Name        string
+	Type        string // "income" ou "expense"
+	Number      int
+	Total       int
+	Date        string // AAAA-MM-DD
+	AmountCents int64
+}
