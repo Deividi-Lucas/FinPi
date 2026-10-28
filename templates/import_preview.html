@@ -1,0 +1,63 @@
+{{define "importPreview"}}
+<div class="space-y-4">
+    <div class="p-4 rounded-xl bg-slate-800/60 border border-slate-700 text-sm text-slate-300">
+        <p class="font-medium text-slate-100 break-all">{{.FileName}}</p>
+        <p class="mt-1 text-xs text-slate-400">
+            {{len .Preview.Rows}} {{plural (len .Preview.Rows) "linha" "linhas"}} &middot; {{formatDate .Preview.FirstDate}} a {{formatDate .Preview.LastDate}}
+            &middot; créditos {{formatCurrency .Preview.Credits}} &middot; débitos {{formatCurrency .Preview.Debits}}
+        </p>
+        {{if .Preview.SummaryMismatch}}
+        <p class="mt-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs">
+            Atenção: a soma das linhas não bate com o resumo do arquivo (créditos {{formatCurrency .Preview.FileCredits}}, débitos {{formatCurrency .Preview.FileDebits}}). Confira antes de importar.
+        </p>
+        {{end}}
+        <p class="mt-2 text-xs text-slate-500">Nada foi gravado ainda. Revise, ajuste as categorias e confirme.</p>
+    </div>
+
+    <div class="overflow-x-auto rounded-xl border border-slate-800">
+        <table class="w-full text-left text-xs text-slate-300">
+            <thead class="bg-slate-900/60 uppercase tracking-wider text-slate-400 border-b border-slate-800">
+                <tr>
+                    <th class="px-3 py-2"></th>
+                    <th class="px-3 py-2">Data</th>
+                    <th class="px-3 py-2">Descrição</th>
+                    <th class="px-3 py-2 text-right">Valor</th>
+                    <th class="px-3 py-2">Categoria</th>
+                    <th class="px-3 py-2">Situação</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/60">
+                {{range .Preview.Rows}}
+                <tr data-import-row data-date="{{.Date}}" data-desc="{{.Description}}" data-amount="{{.SignedCents}}" data-ref="{{.ExternalID}}" class="{{if .Locked}}opacity-50{{end}}">
+                    <td class="px-3 py-2"><input type="checkbox" data-sel {{if .Selected}}checked{{end}} {{if .Locked}}disabled{{end}} class="cursor-pointer"></td>
+                    <td class="px-3 py-2 whitespace-nowrap text-slate-400">{{formatDate .Date}}</td>
+                    <td class="px-3 py-2 text-slate-100">{{.Description}}</td>
+                    <td class="px-3 py-2 whitespace-nowrap text-right font-semibold {{if eq .Type "income"}}text-emerald-400{{else}}text-rose-400{{end}}">{{if eq .Type "income"}}+{{else}}-{{end}} {{formatCurrency .AmountCents}}</td>
+                    <td class="px-3 py-2">
+                        {{$cat := .Category}}
+                        <select data-cat {{if .Locked}}disabled{{end}} class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-100 cursor-pointer">
+                            {{range $.Options}}<option value="{{.}}" {{if eq . $cat}}selected{{end}}>{{.}}</option>{{end}}
+                        </select>
+                    </td>
+                    <td class="px-3 py-2 whitespace-nowrap">
+                        {{if eq .Status "novo"}}<span class="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">Novo</span>
+                        {{else if eq .Status "ja_importado"}}<span class="px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700">Já importado</span>
+                        {{else if eq .Status "possivel_duplicado"}}<span class="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/20" title="Já existe um lançamento seu com a mesma data, valor e tipo">Possível duplicado</span>
+                        {{else}}<span class="px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-300 border border-sky-500/20" title="Tipo de transação ainda não conhecido: confira antes de importar">Tipo novo</span>{{end}}
+                    </td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pt-2">
+        <p class="text-xs text-slate-400"><span data-import-count>0</span> selecionadas &middot; receitas <span data-import-income>R$ 0,00</span> &middot; despesas <span data-import-expense>R$ 0,00</span></p>
+        <div class="flex items-center justify-end gap-3">
+            {{template "stateFields" .}}
+            <button type="button" data-import-discard class="px-4 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition cursor-pointer">Descartar</button>
+            <button type="button" data-import-confirm class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium text-sm px-5 py-2 rounded-xl transition cursor-pointer">Importar <span data-import-count-label>0</span> lançamentos</button>
+        </div>
+    </div>
+</div>
+{{end}}

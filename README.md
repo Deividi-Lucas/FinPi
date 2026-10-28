@@ -50,6 +50,11 @@ finpi/
 │   │   └── handlers_test.go    # Testes dos handlers e do template
 │   ├── dashboard/
 │   │   └── dashboard.go        # Cálculo puro do dashboard do mês (maior/menor gasto, essencial × supérfluo)
+│   ├── statement/
+│   │   ├── parse.go            # Leitura do extrato (cabeçalho, datas, valores)
+│   │   ├── csv.go              # Leitor de CSV (separador e codificação)
+│   │   ├── xlsx.go             # Leitor de XLSX (biblioteca padrão, sem dependências)
+│   │   └── preview.go          # Revisão: situação de cada linha e categoria sugerida
 │   ├── installments/
 │   │   ├── parse.go            # Lê a parcela da descrição (3/10, parcela 3 de 10)
 │   │   ├── project.go          # Projeta as parcelas previstas dos meses seguintes
@@ -116,6 +121,19 @@ A classificação vem da **categoria**: no menu **Categorias**, escolha Essencia
 gasto que foge da regra, use o campo **Prioridade** ao lançar ou editar (a opção padrão é "Seguir a categoria").
 Receitas não são classificadas. Nada é classificado automaticamente: enquanto houver gastos sem classificação, um
 aviso na seção leva direto ao menu de categorias. Em empate de valor, o maior/menor gasto é o mais recente.
+
+---
+
+## 🏦 Importar extrato
+
+O botão **Importar extrato** lê o extrato do **Mercado Pago** (`.xlsx` ou `.csv`, **sem abrir e salvar no Excel**:
+o Excel destrói o identificador das transações e o sistema recusa o arquivo). Nada é gravado antes da **revisão**:
+cada linha mostra a categoria sugerida pelo histórico (você pode trocar; as linhas com a mesma descrição acompanham),
+e uma situação: *Novo*, *Já importado*, *Possível duplicado* (já existe um lançamento seu com a mesma data, valor e
+tipo) ou *Tipo novo* (tipo de transação ainda não conhecido). Só as linhas *Novas* vêm marcadas. Reimportar o mesmo
+extrato não duplica nada. Fechar o pop-up mantém a revisão; **Descartar** ou recarregar a página a apagam.
+Transferências entre as suas próprias contas contam como despesa/receita: desmarque-as na revisão.
+Guarde os arquivos reais em `extratos/` (ignorada pelo git).
 
 ---
 
