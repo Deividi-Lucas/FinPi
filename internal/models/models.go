@@ -12,7 +12,10 @@ type Transaction struct {
 	Date        string    `json:"date"`         // Formato YYYY-MM-DD
 	CreatedAt   time.Time `json:"created_at"`
 
-	Installment *InstallmentInfo `json:"-"` // dados de exibição da parcela; não é gravado
+	Priority string `json:"priority"` // "", "essential" ou "superfluous"; vazio segue a categoria
+
+	Installment       *InstallmentInfo `json:"-"` // dados de exibição da parcela; não é gravado
+	EffectivePriority string           `json:"-"` // classificação efetiva (própria ou da categoria); não é gravada
 }
 
 // InstallmentInfo reúne os dados de exibição de um lançamento parcelado.
@@ -49,6 +52,8 @@ type PageData struct {
 	AllCategories  []Category // todas, ocultas inclusive (pop-up de categorias)
 	ShowCategories bool       // abre o pop-up de categorias ao carregar
 	CategoryError  string     // erro exibido dentro do pop-up de categorias
+
+	Stats MonthStats // números do dashboard do mês
 }
 
 // ProjectedInstallment é uma parcela prevista: calculada a partir do histórico, nunca gravada.
@@ -67,4 +72,49 @@ type Category struct {
 	Name   string
 	Hidden bool // oculta: não aparece na lista de escolha ao lançar
 	Usage  int  // quantidade de lançamentos que usam a categoria
+
+	Priority string // "", "essential" ou "superfluous"
+}
+
+// Classificação das despesas.
+const (
+	PriorityEssential   = "essential"   // não se vive sem
+	PrioritySuperfluous = "superfluous" // se vive sem
+)
+
+// ValidPriority aceita "" (sem classificação / segue a categoria), "essential" e "superfluous".
+func ValidPriority(p string) bool {
+	return p == "" || p == PriorityEssential || p == PrioritySuperfluous
+}
+
+// PriorityGroup soma as despesas de uma classificação no mês.
+type PriorityGroup struct {
+	Key     string  // "essential", "superfluous" ou "unclassified"
+	Label   string  // texto da tela
+	Cents   int64   // soma em centavos
+	Count   int     // quantidade de despesas
+	Percent float64 // do total de despesas, com uma casa decimal
+}
+
+// MonthStats reúne os números do dashboard do mês (calculados, nunca gravados).
+type MonthStats struct {
+	TotalCount   int
+	IncomeCount  int
+	ExpenseCount int
+	ExpenseTotal int64
+	Largest      *Transaction    // maior despesa lançada (nil sem despesas)
+	Smallest     *Transaction    // menor despesa lançada (nil sem despesas)
+	Groups       []PriorityGroup // essencial, supérfluo, sem classificação (nessa ordem)
+}
+
+// Essential, Superfluous e Unclassified devolvem cada grupo (valor zero se Groups estiver vazio).
+func (s MonthStats) Essential() PriorityGroup    { return s.group(0) }
+func (s MonthStats) Superfluous() PriorityGroup  { return s.group(1) }
+func (s MonthStats) Unclassified() PriorityGroup { return s.group(2) }
+
+func (s MonthStats) group(i int) PriorityGroup {
+	if i < len(s.Groups) {
+		return s.Groups[i]
+	}
+	return PriorityGroup{}
 }
