@@ -11,6 +11,16 @@ type Transaction struct {
 	Category    string    `json:"category"`     // ex: Alimentação, Moradia, Salário, etc.
 	Date        string    `json:"date"`         // Formato YYYY-MM-DD
 	CreatedAt   time.Time `json:"created_at"`
+
+	Installment *InstallmentInfo `json:"-"` // dados de exibição da parcela; não é gravado
+}
+
+// InstallmentInfo reúne os dados de exibição de um lançamento parcelado.
+type InstallmentInfo struct {
+	Number         int
+	Total          int
+	Remaining      int   // parcelas que ainda faltam depois desta
+	RemainingCents int64 // Remaining x valor desta parcela
 }
 
 // Summary armazena os totais consolidados (em centavos) para exibição no dashboard.
