@@ -117,9 +117,38 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	h.renderDashboard(w, r, http.StatusOK, "", r.URL.Query().Get("categorias") == "1")
+}
 
+// requestMonth lê o mês (AAAA-MM) da URL ou, em envios de formulário, do corpo.
+func requestMonth(r *http.Request) string {
+	if m := r.URL.Query().Get("month"); m != "" {
+		return m
+	}
+	return r.PostForm.Get("month")
+}
+
+// wantsProjected diz se os totais devem somar as parcelas previstas (?previstas=1, na URL ou no formulário).
+func wantsProjected(r *http.Request) bool {
+	return r.URL.Query().Get("previstas") == "1" || r.PostForm.Get("previstas") == "1"
+}
+
+// visibleCategories filtra as categorias que aparecem nas listas de escolha ao lançar.
+func visibleCategories(all []models.Category) []models.Category {
+	var out []models.Category
+	for _, c := range all {
+		if !c.Hidden {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// renderDashboard monta e renderiza a página. Em erros do menu de categorias, devolve o status
+// correspondente com a mensagem dentro do pop-up (aberto).
+func (h *Handler) renderDashboard(w http.ResponseWriter, r *http.Request, status int, categoryError string, showCategories bool) {
 	now := time.Now()
-	selectedMonth := r.URL.Query().Get("month")
+	selectedMonth := requestMonth(r)
 	if selectedMonth == "" {
 		selectedMonth = now.Format("2006-01")
 	}
@@ -136,7 +165,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	includeProjected := r.URL.Query().Get("previstas") == "1"
+	includeProjected := wantsProjected(r)
 
 	candidates, err := h.db.GetInstallmentCandidates()
 	if err != nil {
@@ -150,6 +179,12 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	}
 	installments.Annotate(transactions)
 
+	categories, err := h.db.ListCategories()
+	if err != nil {
+		serverError(w, "Erro ao carregar categorias", err)
+		return
+	}
+
 	data := models.PageData{
 		SelectedMonth: selectedMonth,
 		DisplayMonth:  formatDisplayMonth(selectedMonth),
@@ -162,9 +197,15 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		ProjectedIncome:  projectedIncome,
 		ProjectedExpense: projectedExpense,
 		IncludeProjected: includeProjected,
+
+		Categories:     visibleCategories(categories),
+		AllCategories:  categories,
+		ShowCategories: showCategories,
+		CategoryError:  categoryError,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(status)
 	if err := h.tmpl.ExecuteTemplate(w, "index.html", data); err != nil {
 		serverError(w, "Erro ao renderizar página", err)
 	}

@@ -44,6 +44,11 @@ type PageData struct {
 	ProjectedIncome  int64                  // soma das receitas previstas, em centavos
 	ProjectedExpense int64                  // soma das despesas previstas, em centavos
 	IncludeProjected bool                   // se os totais do mês somam as previstas (?previstas=1)
+
+	Categories     []Category // categorias visíveis (listas de escolha ao lançar)
+	AllCategories  []Category // todas, ocultas inclusive (pop-up de categorias)
+	ShowCategories bool       // abre o pop-up de categorias ao carregar
+	CategoryError  string     // erro exibido dentro do pop-up de categorias
 }
 
 // ProjectedInstallment é uma parcela prevista: calculada a partir do histórico, nunca gravada.

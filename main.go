@@ -61,6 +61,10 @@ func main() {
 	mux.HandleFunc("/transactions", h.CreateTransaction)
 	mux.HandleFunc("/transactions/update", h.UpdateTransaction)
 	mux.HandleFunc("/transactions/delete", h.DeleteTransaction)
+	mux.HandleFunc("/categories", h.CreateCategory)
+	mux.HandleFunc("/categories/rename", h.RenameCategory)
+	mux.HandleFunc("/categories/visibility", h.SetCategoryVisibility)
+	mux.HandleFunc("/categories/delete", h.DeleteCategory)
 	mux.HandleFunc("/events", h.Events) // atualização em tempo real (SSE)
 
 	addr := fmt.Sprintf("%s:%s", *host, *port)
