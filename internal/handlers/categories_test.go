@@ -200,3 +200,26 @@ func TestDashboard_OpensCategoriesModalFromQuery(t *testing.T) {
 		t.Error("por padrão o pop-up fica fechado")
 	}
 }
+
+func TestDashboard_CategorySelectsComeFromDatabase(t *testing.T) {
+	h, db := newTestHandler(t)
+	post(h.CreateCategory, "/categories", url.Values{"name": {"Pets"}})
+	if err := db.SetCategoryHidden(findCat(t, db, "Lazer").ID, true); err != nil {
+		t.Fatal(err)
+	}
+
+	body := getDashboard(h, "/?month=2026-10")
+
+	if !strings.Contains(body, `<option value="Pets">Pets</option>`) {
+		t.Error("a categoria criada deveria aparecer na lista de escolha")
+	}
+	if strings.Contains(body, `<option value="Lazer">`) {
+		t.Error("categoria oculta não deve aparecer na lista de escolha")
+	}
+	if !strings.Contains(body, `<option value="__new__">`) {
+		t.Error("a lista deveria oferecer '+ Nova categoria…'")
+	}
+	if !strings.Contains(body, `name="new_category"`) {
+		t.Error("deveria existir o campo do nome da nova categoria")
+	}
+}

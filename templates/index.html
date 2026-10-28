@@ -197,21 +197,24 @@
                 <!-- Categoria -->
                 <div>
                     <label class="block text-xs font-medium text-slate-300 mb-1">Categoria</label>
-                    <select 
-                        name="category" 
-                        required 
+                    <select
+                        name="category"
+                        required
+                        onchange="toggleNewCategory(this)"
                         class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
                     >
-                        <option value="Alimentação">Alimentação</option>
-                        <option value="Moradia">Moradia</option>
-                        <option value="Transporte">Transporte</option>
-                        <option value="Salário">Salário</option>
-                        <option value="Lazer">Lazer</option>
-                        <option value="Saúde">Saúde</option>
-                        <option value="Investimentos">Investimentos</option>
-                        <option value="Educação">Educação</option>
-                        <option value="Outros">Outros</option>
+                        {{range .Categories}}
+                        <option value="{{.Name}}">{{.Name}}</option>
+                        {{end}}
+                        <option value="__new__">+ Nova categoria…</option>
                     </select>
+                    <input
+                        type="text"
+                        name="new_category"
+                        maxlength="40"
+                        placeholder="Nome da nova categoria"
+                        class="hidden mt-2 w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
+                    >
                 </div>
 
                 <!-- Data -->
@@ -459,22 +462,26 @@
                     <!-- Categoria -->
                     <div>
                         <label class="block text-xs font-medium text-slate-300 mb-1">Categoria</label>
-                        <select 
+                        <select
                             id="edit-category"
-                            name="category" 
-                            required 
+                            name="category"
+                            required
+                            onchange="toggleNewCategory(this)"
                             class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
                         >
-                            <option value="Alimentação">Alimentação</option>
-                            <option value="Moradia">Moradia</option>
-                            <option value="Transporte">Transporte</option>
-                            <option value="Salário">Salário</option>
-                            <option value="Lazer">Lazer</option>
-                            <option value="Saúde">Saúde</option>
-                            <option value="Investimentos">Investimentos</option>
-                            <option value="Educação">Educação</option>
-                            <option value="Outros">Outros</option>
+                            {{range .Categories}}
+                            <option value="{{.Name}}">{{.Name}}</option>
+                            {{end}}
+                            <option value="__new__">+ Nova categoria…</option>
                         </select>
+                        <input
+                            type="text"
+                            id="edit-new-category"
+                            name="new_category"
+                            maxlength="40"
+                            placeholder="Nome da nova categoria"
+                            class="hidden mt-2 w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
+                        >
                     </div>
 
                     <!-- Data -->
@@ -512,12 +519,35 @@
 
     <!-- Scripts de Interatividade -->
     <script>
+        // "+ Nova categoria…": mostra o campo do nome e o torna obrigatório; qualquer outra opção o esconde.
+        function toggleNewCategory(select) {
+            const input = select.parentElement.querySelector('input[name="new_category"]');
+            if (!input) return;
+            const isNew = select.value === '__new__';
+            input.classList.toggle('hidden', !isNew);
+            input.required = isNew;
+            if (isNew) {
+                input.focus();
+            } else {
+                input.value = '';
+            }
+        }
+
         function openEditModal(btn) {
             document.getElementById('edit-id').value = btn.dataset.id;
             document.getElementById('edit-description').value = btn.dataset.desc;
             document.getElementById('edit-amount').value = parseFloat(btn.dataset.amount).toFixed(2);
             document.getElementById('edit-type').value = btn.dataset.type;
-            document.getElementById('edit-category').value = btn.dataset.category;
+            // A categoria atual pode estar oculta (ou ser antiga): garante que ela exista na lista.
+            const categorySelect = document.getElementById('edit-category');
+            if (!Array.from(categorySelect.options).some(function (o) { return o.value === btn.dataset.category; })) {
+                categorySelect.insertBefore(
+                    new Option(btn.dataset.category, btn.dataset.category),
+                    categorySelect.querySelector('option[value="__new__"]')
+                );
+            }
+            categorySelect.value = btn.dataset.category;
+            toggleNewCategory(categorySelect);
             document.getElementById('edit-date').value = btn.dataset.date;
 
             const modal = document.getElementById('edit-modal');
