@@ -64,6 +64,7 @@ const createTransactionsSQL = `
 		category TEXT NOT NULL,
 		date TEXT NOT NULL,
 		priority TEXT NOT NULL DEFAULT '' CHECK(priority IN ('', 'essential', 'superfluous')),
+		external_id TEXT NOT NULL DEFAULT '',
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	)`
 
@@ -72,18 +73,25 @@ const createIndexSQL = `CREATE INDEX IF NOT EXISTS idx_transactions_date ON tran
 // priorityColumnSQL é a definição da coluna de classificação usada no ALTER de bancos antigos.
 const priorityColumnSQL = `priority TEXT NOT NULL DEFAULT '' CHECK(priority IN ('', 'essential', 'superfluous'))`
 
-// ensurePriorityColumn acrescenta a coluna priority a bancos antigos. Idempotente e sem alterar dados.
-func ensurePriorityColumn(conn *sql.DB, table string) error {
+// ensureColumn acrescenta uma coluna a bancos antigos. Idempotente e sem alterar dados.
+// definition é a definição completa (nome incluído), ex.: "priority TEXT NOT NULL DEFAULT ''".
+func ensureColumn(conn *sql.DB, table, column, definition string) error {
 	cols, err := tableColumns(conn, table)
 	if err != nil {
 		return err
 	}
-	if cols["priority"] {
+	if cols[column] {
 		return nil
 	}
-	_, err = conn.Exec(fmt.Sprintf(`ALTER TABLE %s ADD COLUMN %s`, table, priorityColumnSQL))
+	_, err = conn.Exec(fmt.Sprintf(`ALTER TABLE %s ADD COLUMN %s`, table, definition))
 	return err
 }
+
+// externalIDColumnSQL guarda o identificador de origem de lançamentos importados ("" = lançado à mão).
+const externalIDColumnSQL = `external_id TEXT NOT NULL DEFAULT ''`
+
+// Índice único parcial: o mesmo lançamento importado não entra duas vezes, mesmo com envios simultâneos.
+const createExternalIDIndexSQL = `CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_external_id ON transactions(external_id) WHERE external_id <> ''`
 
 func migrate(conn *sql.DB) error {
 	cols, err := tableColumns(conn, "transactions")
@@ -111,9 +119,15 @@ func migrate(conn *sql.DB) error {
 		return err
 	}
 	for _, table := range []string{"transactions", "categories"} {
-		if err := ensurePriorityColumn(conn, table); err != nil {
+		if err := ensureColumn(conn, table, "priority", priorityColumnSQL); err != nil {
 			return fmt.Errorf("erro ao adicionar a coluna priority em %s: %w", table, err)
 		}
+	}
+	if err := ensureColumn(conn, "transactions", "external_id", externalIDColumnSQL); err != nil {
+		return fmt.Errorf("erro ao adicionar a coluna external_id: %w", err)
+	}
+	if _, err := conn.Exec(createExternalIDIndexSQL); err != nil {
+		return fmt.Errorf("erro ao criar o índice de external_id: %w", err)
 	}
 	return seedCategories(conn)
 }
