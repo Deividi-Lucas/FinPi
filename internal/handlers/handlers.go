@@ -16,6 +16,7 @@ import (
 	"finpi/internal/database"
 	"finpi/internal/installments"
 	"finpi/internal/models"
+	"finpi/internal/statement"
 )
 
 type Handler struct {
@@ -197,6 +198,15 @@ func (h *Handler) renderDashboard(w http.ResponseWriter, r *http.Request, status
 	dashboard.Annotate(transactions, categories)
 	stats := dashboard.Compute(transactions, categories)
 
+	var importResult *models.ImportResult
+	if v := r.URL.Query().Get("importados"); v != "" {
+		imported, err1 := strconv.Atoi(v)
+		skipped, _ := strconv.Atoi(r.URL.Query().Get("ignorados"))
+		if err1 == nil && imported >= 0 && imported <= statement.MaxRows && skipped >= 0 && skipped <= statement.MaxRows {
+			importResult = &models.ImportResult{Imported: imported, Skipped: skipped}
+		}
+	}
+
 	data := models.PageData{
 		SelectedMonth: selectedMonth,
 		DisplayMonth:  formatDisplayMonth(selectedMonth),
@@ -205,6 +215,7 @@ func (h *Handler) renderDashboard(w http.ResponseWriter, r *http.Request, status
 		TodayDate:     now.Format("2006-01-02"),
 		Version:       h.version,
 		Stats:         stats,
+		ImportResult:  importResult,
 
 		Projected:       projected,
 		ProjectedIncome:  projectedIncome,

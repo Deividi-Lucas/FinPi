@@ -66,6 +66,8 @@ func main() {
 	mux.HandleFunc("/categories/visibility", h.SetCategoryVisibility)
 	mux.HandleFunc("/categories/priority", h.SetCategoryPriority)
 	mux.HandleFunc("/categories/delete", h.DeleteCategory)
+	mux.HandleFunc("/import/preview", h.ImportPreview)
+	mux.HandleFunc("/import/confirm", h.ImportConfirm)
 	mux.HandleFunc("/events", h.Events) // atualização em tempo real (SSE)
 
 	addr := fmt.Sprintf("%s:%s", *host, *port)
