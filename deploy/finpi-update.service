@@ -1,0 +1,18 @@
+[Unit]
+Description=FinPi - Atualizacao automatica a partir das releases do GitHub
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/finpi-update
+TimeoutStartSec=10min
+
+# Hardening: o updater só precisa escrever em /opt/finpi
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/opt/finpi
+
+MemoryMax=100M
