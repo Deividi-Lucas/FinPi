@@ -67,6 +67,42 @@ func dbError(w http.ResponseWriter, msg string, err error) {
 	serverError(w, msg, err)
 }
 
+// newCategoryOption é o valor do <select> que indica "criar categoria nova" (nome em new_category).
+const newCategoryOption = "__new__"
+
+var errUnknownCategory = errors.New("categoria inexistente")
+
+// resolveCategory confere a categoria do lançamento. Com "__new__", cria a categoria (ou reutiliza a
+// existente, ignorando caixa e acentos) e passa a usar o nome canônico. Ocultas continuam válidas.
+func (h *Handler) resolveCategory(form url.Values, t *models.Transaction) error {
+	if t.Category == newCategoryOption {
+		c, err := h.db.GetOrCreateCategory(form.Get("new_category"))
+		if err != nil {
+			return err
+		}
+		t.Category = c.Name
+		return nil
+	}
+
+	ok, err := h.db.CategoryExists(t.Category)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return errUnknownCategory
+	}
+	return nil
+}
+
+// categoryFormError traduz erros de categoria no envio do lançamento: entrada inválida vira 400.
+func categoryFormError(w http.ResponseWriter, err error) {
+	if errors.Is(err, errUnknownCategory) || errors.Is(err, database.ErrInvalidCategoryName) {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	serverError(w, "Erro ao validar categoria", err)
+}
+
 func redirectToMonth(w http.ResponseWriter, r *http.Request, month string) {
 	target := "/?month=" + url.QueryEscape(month)
 	if r.PostForm.Get("previstas") == "1" {
@@ -152,6 +188,11 @@ func (h *Handler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := h.resolveCategory(r.PostForm, &t); err != nil {
+		categoryFormError(w, err)
+		return
+	}
+
 	if err := h.db.CreateTransaction(&t); err != nil {
 		serverError(w, "Erro ao gravar transação", err)
 		return
@@ -186,6 +227,11 @@ func (h *Handler) UpdateTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	t.ID = id
+
+	if err := h.resolveCategory(r.PostForm, &t); err != nil {
+		categoryFormError(w, err)
+		return
+	}
 
 	if err := h.db.UpdateTransaction(&t); err != nil {
 		dbError(w, "Erro ao atualizar transação", err)

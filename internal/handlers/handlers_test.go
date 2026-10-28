@@ -327,3 +327,133 @@ func TestMutations_PreserveProjectedToggleInRedirect(t *testing.T) {
 		t.Errorf("excluir: Location = %q", loc)
 	}
 }
+
+func categoryExists(t *testing.T, db *database.DB, name string) bool {
+	t.Helper()
+	ok, err := db.CategoryExists(name)
+	if err != nil {
+		t.Fatalf("CategoryExists: %v", err)
+	}
+	return ok
+}
+
+func TestCreateTransaction_UnknownCategoryReturns400(t *testing.T) {
+	h, db := newTestHandler(t)
+	form := validForm()
+	form.Set("category", "Inventada")
+
+	rec := post(h.CreateTransaction, "/transactions", form)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, quer 400", rec.Code)
+	}
+	if list, _ := db.GetTransactions("2026-10"); len(list) != 0 {
+		t.Errorf("categoria inexistente não pode gravar: %+v", list)
+	}
+}
+
+func TestCreateTransaction_NewCategoryIsCreatedAndUsed(t *testing.T) {
+	h, db := newTestHandler(t)
+	form := validForm()
+	form.Set("category", "__new__")
+	form.Set("new_category", "  Pets ")
+
+	rec := post(h.CreateTransaction, "/transactions", form)
+
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, quer 303", rec.Code)
+	}
+	if !categoryExists(t, db, "Pets") {
+		t.Error("a nova categoria deveria ter sido criada")
+	}
+	list, _ := db.GetTransactions("2026-10")
+	if len(list) != 1 || list[0].Category != "Pets" {
+		t.Errorf("lançamento deveria usar a nova categoria: %+v", list)
+	}
+}
+
+func TestCreateTransaction_NewCategoryReusesExistingIgnoringCaseAndAccents(t *testing.T) {
+	h, db := newTestHandler(t)
+	form := validForm()
+	form.Set("category", "__new__")
+	form.Set("new_category", "saude")
+
+	post(h.CreateTransaction, "/transactions", form)
+
+	list, _ := db.GetTransactions("2026-10")
+	if len(list) != 1 || list[0].Category != "Saúde" {
+		t.Errorf("deveria usar a categoria existente 'Saúde': %+v", list)
+	}
+	cats, _ := db.ListCategories()
+	if len(cats) != 9 {
+		t.Errorf("não pode criar duplicata: %d categorias", len(cats))
+	}
+}
+
+func TestCreateTransaction_BlankNewCategoryReturns400(t *testing.T) {
+	h, db := newTestHandler(t)
+	form := validForm()
+	form.Set("category", "__new__")
+	form.Set("new_category", "   ")
+
+	if rec := post(h.CreateTransaction, "/transactions", form); rec.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, quer 400", rec.Code)
+	}
+	if list, _ := db.GetTransactions("2026-10"); len(list) != 0 {
+		t.Errorf("nada deveria ser gravado: %+v", list)
+	}
+}
+
+func TestCreateTransaction_InvalidTransactionDoesNotCreateCategory(t *testing.T) {
+	h, db := newTestHandler(t)
+	form := validForm()
+	form.Set("amount", "abc")
+	form.Set("category", "__new__")
+	form.Set("new_category", "Pets")
+
+	if rec := post(h.CreateTransaction, "/transactions", form); rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, quer 400", rec.Code)
+	}
+	if categoryExists(t, db, "Pets") {
+		t.Error("lançamento inválido não pode criar categoria")
+	}
+}
+
+func TestUpdateTransaction_KeepsHiddenCategory(t *testing.T) {
+	h, db := newTestHandler(t)
+	cats, _ := db.ListCategories()
+	for _, c := range cats {
+		if c.Name == "Lazer" {
+			if err := db.SetCategoryHidden(c.ID, true); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	tx := seed(t, db, 100)
+
+	form := validForm()
+	form.Set("id", strconv.FormatInt(tx.ID, 10))
+	form.Set("category", "Lazer")
+	rec := post(h.UpdateTransaction, "/transactions/update", form)
+
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, quer 303 (categoria oculta continua válida)", rec.Code)
+	}
+	list, _ := db.GetTransactions("2026-10")
+	if list[0].Category != "Lazer" {
+		t.Errorf("categoria oculta deveria ser mantida: %+v", list[0])
+	}
+}
+
+func TestUpdateTransaction_UnknownCategoryReturns400(t *testing.T) {
+	h, db := newTestHandler(t)
+	tx := seed(t, db, 100)
+
+	form := validForm()
+	form.Set("id", strconv.FormatInt(tx.ID, 10))
+	form.Set("category", "Inventada")
+
+	if rec := post(h.UpdateTransaction, "/transactions/update", form); rec.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, quer 400", rec.Code)
+	}
+}
