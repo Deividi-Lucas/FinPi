@@ -75,5 +75,13 @@ func parseTransactionForm(form url.Values) (models.Transaction, error) {
 
 	t.AmountCents = cents
 	t.Category = strings.TrimSpace(form.Get("category"))
+
+	t.Priority = strings.TrimSpace(form.Get("priority"))
+	if !models.ValidPriority(t.Priority) {
+		return t, errors.New("prioridade inválida: use 'essential' ou 'superfluous'")
+	}
+	if t.Type == "income" {
+		t.Priority = "" // receitas não são classificadas
+	}
 	return t, nil
 }

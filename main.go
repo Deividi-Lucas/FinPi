@@ -64,6 +64,7 @@ func main() {
 	mux.HandleFunc("/categories", h.CreateCategory)
 	mux.HandleFunc("/categories/rename", h.RenameCategory)
 	mux.HandleFunc("/categories/visibility", h.SetCategoryVisibility)
+	mux.HandleFunc("/categories/priority", h.SetCategoryPriority)
 	mux.HandleFunc("/categories/delete", h.DeleteCategory)
 	mux.HandleFunc("/events", h.Events) // atualização em tempo real (SSE)
 

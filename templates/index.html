@@ -153,6 +153,69 @@
         </section>
 
 
+        <!-- Dashboard do mês -->
+        <section id="month-dashboard" class="mb-8">
+            <h2 class="text-base font-semibold text-white mb-3">Dashboard do mês</h2>
+            {{if eq .Stats.TotalCount 0}}
+            <p class="p-6 rounded-2xl bg-slate-800/40 border border-slate-800 text-sm text-slate-500 text-center">Sem lançamentos neste mês.</p>
+            {{else}}
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="p-5 rounded-2xl bg-slate-800/40 border border-slate-800">
+                    <p class="text-xs uppercase tracking-wider text-slate-400">Transações</p>
+                    <p class="mt-2 text-2xl font-extrabold text-white">{{.Stats.TotalCount}}</p>
+                    <p class="mt-1 text-xs text-slate-500">{{.Stats.IncomeCount}} {{plural .Stats.IncomeCount "receita" "receitas"}} &middot; {{.Stats.ExpenseCount}} {{plural .Stats.ExpenseCount "despesa" "despesas"}}</p>
+                </div>
+                <div class="p-5 rounded-2xl bg-slate-800/40 border border-slate-800">
+                    <p class="text-xs uppercase tracking-wider text-slate-400">Maior gasto</p>
+                    {{with .Stats.Largest}}
+                    <p class="mt-2 text-2xl font-extrabold text-rose-400">{{formatCurrency .AmountCents}}</p>
+                    <p class="mt-1 text-xs text-slate-300 truncate">{{.Description}}</p>
+                    <p class="text-xs text-slate-500">{{formatDate .Date}} &middot; {{.Category}}</p>
+                    {{else}}
+                    <p class="mt-2 text-sm text-slate-500">Sem despesas neste mês.</p>
+                    {{end}}
+                </div>
+                <div class="p-5 rounded-2xl bg-slate-800/40 border border-slate-800">
+                    <p class="text-xs uppercase tracking-wider text-slate-400">Menor gasto</p>
+                    {{with .Stats.Smallest}}
+                    <p class="mt-2 text-2xl font-extrabold text-rose-400">{{formatCurrency .AmountCents}}</p>
+                    <p class="mt-1 text-xs text-slate-300 truncate">{{.Description}}</p>
+                    <p class="text-xs text-slate-500">{{formatDate .Date}} &middot; {{.Category}}</p>
+                    {{else}}
+                    <p class="mt-2 text-sm text-slate-500">Sem despesas neste mês.</p>
+                    {{end}}
+                </div>
+            </div>
+
+            {{if gt .Stats.ExpenseCount 0}}
+            <div class="mt-4 p-5 rounded-2xl bg-slate-800/40 border border-slate-800">
+                <p class="text-xs uppercase tracking-wider text-slate-400 mb-3">Despesas: essencial &times; supérfluo</p>
+                <div class="flex h-3 w-full overflow-hidden rounded-full bg-slate-800" role="img" aria-label="Divisão das despesas por classificação">
+                    {{range .Stats.Groups}}{{if gt .Cents 0}}<div class="{{if eq .Key "essential"}}bg-sky-500{{else if eq .Key "superfluous"}}bg-violet-500{{else}}bg-slate-500{{end}}" style="width: {{printf "%.1f" .Percent}}%"></div>{{end}}{{end}}
+                </div>
+                <ul class="mt-4 space-y-2 text-sm">
+                    {{range .Stats.Groups}}
+                    <li class="flex items-center justify-between gap-3">
+                        <span class="flex items-center gap-2 text-slate-300">
+                            <span class="w-2.5 h-2.5 rounded-full {{if eq .Key "essential"}}bg-sky-500{{else if eq .Key "superfluous"}}bg-violet-500{{else}}bg-slate-500{{end}}"></span>
+                            {{.Label}}
+                            <span class="text-xs text-slate-500">{{.Count}} {{plural .Count "gasto" "gastos"}}</span>
+                        </span>
+                        <span class="text-slate-100 font-medium">{{formatCurrency .Cents}} <span class="text-xs text-slate-400">({{formatPercent .Percent}})</span></span>
+                    </li>
+                    {{end}}
+                </ul>
+                {{with .Stats.Unclassified}}{{if gt .Count 0}}
+                <div class="mt-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-sm flex items-center justify-between gap-3">
+                    <span>{{.Count}} {{plural .Count "gasto" "gastos"}} ({{formatCurrency .Cents}}) ainda sem classificação.</span>
+                    <button type="button" onclick="openCategoriesModal()" class="px-2 py-1 rounded-lg text-xs font-medium text-amber-100 hover:bg-amber-500/20 transition cursor-pointer whitespace-nowrap">Classificar categorias</button>
+                </div>
+                {{end}}{{end}}
+            </div>
+            {{end}}
+            {{end}}
+        </section>
+
         <!-- Novo Lançamento (abre o pop-up) -->
         <div class="mb-8 flex items-center justify-end gap-3">
             <span id="draft-dot" class="hidden text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 px-2 py-1 rounded-lg">rascunho salvo</span>
@@ -211,6 +274,7 @@
                                 <span class="px-2.5 py-1 rounded-md text-xs bg-slate-800 text-slate-300 border border-slate-700">
                                     {{.Category}}
                                 </span>
+                                {{if eq .EffectivePriority "essential"}}<span data-priority-badge="essential" class="ml-1 px-2 py-0.5 rounded-md text-xs bg-sky-500/10 text-sky-300 border border-sky-500/20">Essencial</span>{{else if eq .EffectivePriority "superfluous"}}<span data-priority-badge="superfluous" class="ml-1 px-2 py-0.5 rounded-md text-xs bg-violet-500/10 text-violet-300 border border-violet-500/20">Supérfluo</span>{{end}}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 {{if eq .Type "income"}}
@@ -236,6 +300,7 @@
                                         data-type="{{.Type}}"
                                         data-category="{{.Category}}"
                                         data-date="{{.Date}}"
+                                        data-priority="{{.Priority}}"
                                         onclick="openEditModal(this)"
                                         title="Editar lançamento"
                                         class="relative p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition cursor-pointer"
@@ -380,8 +445,9 @@
                         <label class="block text-xs font-medium text-slate-300 mb-1">Tipo</label>
                         <select 
                             id="edit-type"
-                            name="type" 
-                            required 
+                            name="type"
+                            onchange="syncPriorityField(this.form)"
+                            required
                             class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
                         >
                             <option value="expense">Despesa</option>
@@ -402,7 +468,7 @@
                             class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
                         >
                             {{range .Categories}}
-                            <option value="{{.Name}}">{{.Name}}</option>
+                            <option value="{{.Name}}" data-priority="{{.Priority}}">{{.Name}}</option>
                             {{end}}
                             <option value="__new__">+ Nova categoria…</option>
                         </select>
@@ -427,6 +493,20 @@
                             class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
                         >
                     </div>
+                </div>
+
+                <!-- Prioridade (só para despesas) -->
+                <div data-priority-field>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Prioridade</label>
+                    <select
+                        id="edit-priority"
+                        name="priority"
+                        class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
+                    >
+                        <option value="">Seguir a categoria</option>
+                        <option value="essential">Essencial</option>
+                        <option value="superfluous">Supérfluo</option>
+                    </select>
                 </div>
 
                 <!-- Botões de Ação do Modal -->
@@ -508,6 +588,7 @@
                     <label class="block text-xs font-medium text-slate-300 mb-1">Tipo</label>
                     <select
                         name="type"
+                        onchange="syncPriorityField(this.form)"
                         required
                         class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
                     >
@@ -526,7 +607,7 @@
                         class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
                     >
                         {{range .Categories}}
-                        <option value="{{.Name}}">{{.Name}}</option>
+                        <option value="{{.Name}}" data-priority="{{.Priority}}">{{.Name}}</option>
                         {{end}}
                         <option value="__new__">+ Nova categoria…</option>
                     </select>
@@ -549,6 +630,19 @@
                         required
                         class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
                     >
+                </div>
+
+                <!-- Prioridade (só para despesas) -->
+                <div class="sm:col-span-2" data-priority-field>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Prioridade</label>
+                    <select
+                        name="priority"
+                        class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
+                    >
+                        <option value="">Seguir a categoria</option>
+                        <option value="essential">Essencial</option>
+                        <option value="superfluous">Supérfluo</option>
+                    </select>
                 </div>
 
                 <!-- Botões -->
@@ -608,9 +702,19 @@
                         <div class="min-w-0">
                             <span class="font-medium text-slate-100">{{.Name}}</span>
                             {{if .Hidden}}<span class="ml-2 px-2 py-0.5 rounded-md text-xs bg-slate-800 text-slate-400 border border-slate-700">oculta</span>{{end}}
+                            {{if eq .Priority "essential"}}<span class="ml-2 px-2 py-0.5 rounded-md text-xs bg-sky-500/10 text-sky-300 border border-sky-500/20">Essencial</span>{{else if eq .Priority "superfluous"}}<span class="ml-2 px-2 py-0.5 rounded-md text-xs bg-violet-500/10 text-violet-300 border border-violet-500/20">Supérfluo</span>{{end}}
                             <span class="block text-xs text-slate-500">{{.Usage}} lançamento{{if ne .Usage 1}}s{{end}}</span>
                         </div>
                         <div class="flex flex-wrap items-center gap-1 sm:flex-shrink-0">
+                            <form method="POST" action="/categories/priority" class="inline">
+                                {{template "stateFields" $}}
+                                <input type="hidden" name="id" value="{{.ID}}">
+                                <select name="priority" onchange="this.form.submit()" title="Classificação das despesas desta categoria" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-200 cursor-pointer">
+                                    <option value="" {{if eq .Priority ""}}selected{{end}}>Sem classificação</option>
+                                    <option value="essential" {{if eq .Priority "essential"}}selected{{end}}>Essencial</option>
+                                    <option value="superfluous" {{if eq .Priority "superfluous"}}selected{{end}}>Supérfluo</option>
+                                </select>
+                            </form>
                             <button type="button" onclick="toggleRename({{.ID}})" class="px-2 py-1 rounded-lg text-xs text-slate-300 hover:bg-slate-800 transition cursor-pointer">Renomear</button>
                             <form method="POST" action="/categories/visibility" class="inline">
                                 {{template "stateFields" $}}
@@ -665,6 +769,22 @@
             } else {
                 input.value = '';
             }
+            syncPriorityField(select.form);
+        }
+
+        // Campo "Prioridade": só vale para despesas (some em receitas e é zerado) e a primeira opção mostra
+        // a classificação da categoria escolhida ("Seguir a categoria (Essencial)").
+        const PRIORITY_LABELS = { essential: 'Essencial', superfluous: 'Supérfluo' };
+        function syncPriorityField(form) {
+            const field = form.querySelector('[data-priority-field]');
+            if (!field) return;
+            const select = field.querySelector('select[name="priority"]');
+            const isIncome = form.elements['type'].value === 'income';
+            field.classList.toggle('hidden', isIncome);
+            if (isIncome) select.value = '';
+            const option = form.elements['category'].selectedOptions[0];
+            const fromCategory = option ? PRIORITY_LABELS[option.dataset.priority] : '';
+            select.options[0].textContent = fromCategory ? 'Seguir a categoria (' + fromCategory + ')' : 'Seguir a categoria';
         }
 
         // Preenche o formulário de edição com um conjunto de valores (original do lançamento ou descarte).
@@ -681,6 +801,7 @@
                 );
             }
             categorySelect.value = values.category;
+            document.getElementById('edit-priority').value = values.priority || '';
             toggleNewCategory(categorySelect);
             document.getElementById('edit-date').value = values.date;
         }
@@ -694,7 +815,8 @@
                 type: btn.dataset.type,
                 category: btn.dataset.category,
                 new_category: '',
-                date: btn.dataset.date
+                date: btn.dataset.date,
+                priority: btn.dataset.priority || ''
             });
             fillEditForm(editOriginal);
             showEditError('');
@@ -769,7 +891,7 @@
         const newFormError = document.getElementById('new-form-error');
         const newFormSubmit = document.getElementById('new-form-submit');
         const DRAFT_KEY = newForm.dataset.draftKey;
-        const DRAFT_FIELDS = ['description', 'amount', 'type', 'category', 'new_category', 'date'];
+        const DRAFT_FIELDS = ['description', 'amount', 'type', 'category', 'new_category', 'date', 'priority'];
         // Valores iniciais do formulário: só o que difere deles entra no rascunho (ex.: a data padrão não).
         const draftInitial = {};
         DRAFT_FIELDS.forEach(function (name) { draftInitial[name] = newForm.elements[name].value; });
@@ -843,6 +965,7 @@
             showNewFormError('');
             const draft = readDraft();
             if (draft) applyDraft(draft);
+            syncPriorityField(newForm);
             showDraftNotice(!!draft);
             newModal.classList.remove('hidden');
             newModal.classList.add('flex');
@@ -867,6 +990,7 @@
         newForm.addEventListener('input', saveDraft);
         newForm.addEventListener('change', saveDraft);
         refreshDraftDot();
+        syncPriorityField(newForm);
 
         // Envio sem sair da página: em erro, a mensagem aparece no pop-up e o rascunho continua guardado;
         // em sucesso, o rascunho é apagado e a página recarrega no mês certo.
@@ -905,7 +1029,7 @@
         const editFormError = document.getElementById('edit-form-error');
         const editFormSubmit = editForm.querySelector('button[type="submit"]');
         const EDIT_DRAFT_PREFIX = editForm.dataset.draftPrefix;
-        const EDIT_FIELDS = ['description', 'amount', 'type', 'category', 'new_category', 'date'];
+        const EDIT_FIELDS = ['description', 'amount', 'type', 'category', 'new_category', 'date', 'priority'];
         const EDIT_DRAFT_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // rascunhos com mais de 30 dias são limpos
         let editingId = null;
         let editOriginal = null;

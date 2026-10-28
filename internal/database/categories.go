@@ -43,7 +43,8 @@ const createCategoriesSQL = `
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		name TEXT NOT NULL,
 		name_key TEXT NOT NULL UNIQUE,
-		hidden INTEGER NOT NULL DEFAULT 0
+		hidden INTEGER NOT NULL DEFAULT 0,
+		priority TEXT NOT NULL DEFAULT '' CHECK(priority IN ('', 'essential', 'superfluous'))
 	)`
 
 // cleanCategoryName remove espaços das pontas, colapsa os internos e valida o tamanho (1 a 40 caracteres).
@@ -151,7 +152,7 @@ func (d *DB) ListCategories() ([]models.Category, error) {
 		return nil, err
 	}
 
-	rows, err := d.conn.Query(`SELECT id, name, name_key, hidden FROM categories ORDER BY name_key`)
+	rows, err := d.conn.Query(`SELECT id, name, name_key, hidden, priority FROM categories ORDER BY name_key`)
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +165,7 @@ func (d *DB) ListCategories() ([]models.Category, error) {
 			key    string
 			hidden int
 		)
-		if err := rows.Scan(&c.ID, &c.Name, &key, &hidden); err != nil {
+		if err := rows.Scan(&c.ID, &c.Name, &key, &hidden, &c.Priority); err != nil {
 			return nil, err
 		}
 		c.Hidden = hidden != 0
@@ -219,8 +220,8 @@ func (d *DB) GetOrCreateCategory(name string) (models.Category, error) {
 		c      models.Category
 		hidden int
 	)
-	err = d.conn.QueryRow(`SELECT id, name, hidden FROM categories WHERE name_key = ?`, textutil.Fold(clean)).
-		Scan(&c.ID, &c.Name, &hidden)
+	err = d.conn.QueryRow(`SELECT id, name, hidden, priority FROM categories WHERE name_key = ?`, textutil.Fold(clean)).
+		Scan(&c.ID, &c.Name, &hidden, &c.Priority)
 	switch {
 	case err == nil:
 		c.Hidden = hidden != 0
@@ -287,6 +288,25 @@ func (d *DB) SetCategoryHidden(id int64, hidden bool) error {
 		flag = 1
 	}
 	res, err := d.conn.Exec(`UPDATE categories SET hidden = ? WHERE id = ?`, flag, id)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrCategoryNotFound
+	}
+	return nil
+}
+
+// SetCategoryPriority define a classificação da categoria ("" remove). Valor fora da lista dá ErrInvalidPriority.
+func (d *DB) SetCategoryPriority(id int64, priority string) error {
+	if !models.ValidPriority(priority) {
+		return ErrInvalidPriority
+	}
+	res, err := d.conn.Exec(`UPDATE categories SET priority = ? WHERE id = ?`, priority, id)
 	if err != nil {
 		return err
 	}

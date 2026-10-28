@@ -48,6 +48,8 @@ finpi/
 │   │   ├── validation.go       # Validação compartilhada do formulário de lançamentos
 │   │   ├── validation_test.go  # Testes de validação
 │   │   └── handlers_test.go    # Testes dos handlers e do template
+│   ├── dashboard/
+│   │   └── dashboard.go        # Cálculo puro do dashboard do mês (maior/menor gasto, essencial × supérfluo)
 │   ├── installments/
 │   │   ├── parse.go            # Lê a parcela da descrição (3/10, parcela 3 de 10)
 │   │   ├── project.go          # Projeta as parcelas previstas dos meses seguintes
@@ -101,6 +103,19 @@ O botão **Categorias** (no cabeçalho) abre o menu para criar, **renomear** (os
 **ocultar** (some da lista ao lançar, mas continua nos lançamentos antigos) e **excluir** (só categorias sem
 lançamentos). Ao lançar, escolha **+ Nova categoria…** para criar uma na hora. Nomes são únicos ignorando
 maiúsculas e acentos ("saude" e "Saúde" são a mesma categoria).
+
+---
+
+## 📊 Dashboard do mês
+
+Abaixo dos cartões de resumo, a seção **Dashboard do mês** mostra a quantidade de transações, o **maior** e o
+**menor** gasto e a divisão das despesas em **Essencial** (não se vive sem), **Supérfluo** (se vive sem) e **Sem
+classificação**. Segue o mês selecionado; parcelas previstas não entram na conta.
+
+A classificação vem da **categoria**: no menu **Categorias**, escolha Essencial ou Supérfluo em cada uma. Para um
+gasto que foge da regra, use o campo **Prioridade** ao lançar ou editar (a opção padrão é "Seguir a categoria").
+Receitas não são classificadas. Nada é classificado automaticamente: enquanto houver gastos sem classificação, um
+aviso na seção leva direto ao menu de categorias. Em empate de valor, o maior/menor gasto é o mais recente.
 
 ---
 

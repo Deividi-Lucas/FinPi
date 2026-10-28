@@ -210,7 +210,7 @@ func TestDashboard_CategorySelectsComeFromDatabase(t *testing.T) {
 
 	body := getDashboard(h, "/?month=2026-10")
 
-	if !strings.Contains(body, `<option value="Pets">Pets</option>`) {
+	if !strings.Contains(body, `<option value="Pets" data-priority="">Pets</option>`) {
 		t.Error("a categoria criada deveria aparecer na lista de escolha")
 	}
 	if strings.Contains(body, `<option value="Lazer">`) {
