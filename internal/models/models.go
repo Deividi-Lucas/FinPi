@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"strconv"
+	"time"
+)
 
 // Transaction representa um lançamento financeiro no banco de dados.
 type Transaction struct {
@@ -12,7 +15,8 @@ type Transaction struct {
 	Date        string    `json:"date"`         // Formato YYYY-MM-DD
 	CreatedAt   time.Time `json:"created_at"`
 
-	Priority string `json:"priority"` // "", "essential" ou "superfluous"; vazio segue a categoria
+	Priority   string `json:"priority"` // "", "essential" ou "superfluous"; vazio segue a categoria
+	ExternalID string `json:"-"`        // identificador de origem (importação); usado só na gravação em lote
 
 	Installment       *InstallmentInfo `json:"-"` // dados de exibição da parcela; não é gravado
 	EffectivePriority string           `json:"-"` // classificação efetiva (própria ou da categoria); não é gravada
@@ -54,6 +58,20 @@ type PageData struct {
 	CategoryError  string     // erro exibido dentro do pop-up de categorias
 
 	Stats MonthStats // números do dashboard do mês
+
+	ImportResult *ImportResult // aviso após importar um extrato (nil = sem aviso)
+}
+
+// ImportResult é o resultado de uma importação, exibido num aviso após o redirecionamento.
+type ImportResult struct {
+	Imported int
+	Skipped  int
+}
+
+// TransactionKey identifica um lançamento por data, valor (módulo, em centavos) e tipo.
+// Usada para achar possíveis duplicados entre lançamentos manuais e linhas de extrato.
+func TransactionKey(date string, cents int64, typ string) string {
+	return date + "|" + strconv.FormatInt(cents, 10) + "|" + typ
 }
 
 // ProjectedInstallment é uma parcela prevista: calculada a partir do histórico, nunca gravada.
