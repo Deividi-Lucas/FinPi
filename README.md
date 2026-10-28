@@ -146,9 +146,40 @@ sudo systemctl status finpi
 
 ## 🔄 Implantação Contínua (CI/CD Automático)
 
-Este repositório pode ser integrado a workflows do **GitHub Actions** para compilação automática a cada `git push` na branch `main`.
+O deploy é *pull-based*: o Raspberry Pi busca sozinho a última release, sem expor nenhuma porta nem guardar segredos no GitHub.
 
-Com o agente do GitHub Actions *Self-Hosted Runner* instalado no Raspberry Pi ou via Webhooks com Tailscale, a aplicação atualiza o seu executável nativo em poucos segundos, garantindo uma atualização transparente sem interromper o banco de dados.
+```text
+PR aprovado e mergeado na main
+   └─> GitHub Actions: vet + testes + build ARM64 ──> Release "build-N" (binário + SHA256SUMS)
+                                                          │
+   Raspberry Pi (timer a cada 5 min) <────────────────────┘
+   └─> baixa, confere checksum, faz backup do banco, troca o binário, reinicia
+       └─> se o app não responder: volta o binário e o banco anteriores
+```
+
+### Instalando o atualizador no Pi (uma vez)
+
+Copie a pasta `deploy/` para o Pi e execute:
+
+```bash
+sudo bash deploy/install-updater.sh
+```
+
+Isso instala `finpi-update` em `/usr/local/sbin` e ativa o `finpi-update.timer`. Requisitos no Pi: `curl`, `python3`, `flock` e `sha256sum`.
+
+### Operação
+
+```bash
+systemctl list-timers finpi-update.timer     # próxima verificação
+journalctl -u finpi-update -n 50 --no-pager  # histórico das atualizações
+sudo systemctl start finpi-update            # verificar agora, sem esperar o timer
+cat /opt/finpi/VERSION                       # versão instalada
+ls /opt/finpi/backups                        # backups automáticos (últimos 14)
+```
+
+- Se uma versão falhar e sofrer rollback, ela é marcada em `/opt/finpi/FAILED_VERSION` e **não é tentada de novo**; o próximo merge gera uma nova release.
+- O script do atualizador é uma cópia em `/usr/local/sbin`: mudanças em `deploy/finpi-update.sh` só valem depois de rodar `install-updater.sh` de novo.
+- O teste do atualizador (`bash deploy/test-finpi-update.sh`) roda no CI a cada PR.
 
 ---
 
