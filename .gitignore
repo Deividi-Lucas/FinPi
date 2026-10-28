@@ -45,3 +45,6 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Documentos de planejamento (especificacoes e planos), apenas locais
+docs/superpowers/

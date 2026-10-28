@@ -151,3 +151,23 @@ func TestInitDB_MigratesLegacyRealAmounts(t *testing.T) {
 		db.Close()
 	}
 }
+
+func TestGetInstallmentCandidates_FiltersByMarker(t *testing.T) {
+	db := openTestDB(t)
+	for _, desc := range []string{"Geladeira 3/10", "Sofá Parcela 2 de 5", "Mercado"} {
+		mustCreate(t, db, models.Transaction{Description: desc, AmountCents: 100, Type: "expense", Category: "Casa", Date: "2026-10-05"})
+	}
+
+	list, err := db.GetInstallmentCandidates()
+	if err != nil {
+		t.Fatalf("GetInstallmentCandidates: %v", err)
+	}
+	if len(list) != 2 {
+		t.Fatalf("esperava 2 candidatos, veio %d: %+v", len(list), list)
+	}
+	for _, tx := range list {
+		if tx.Description == "Mercado" {
+			t.Errorf("lançamento comum não deveria ser candidato: %+v", tx)
+		}
+	}
+}

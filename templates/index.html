@@ -53,6 +53,17 @@
                     onchange="this.form.submit()"
                     class="bg-slate-900 text-slate-200 text-sm font-medium rounded-lg px-3 py-1.5 border border-slate-700 focus:outline-none focus:border-emerald-500 cursor-pointer"
                 >
+                <label class="flex items-center gap-1.5 text-xs font-medium text-slate-300 pl-2 pr-2 cursor-pointer">
+                    <input
+                        type="checkbox"
+                        name="previstas"
+                        value="1"
+                        {{if .IncludeProjected}}checked{{end}}
+                        onchange="this.form.submit()"
+                        class="accent-emerald-500 cursor-pointer"
+                    >
+                    Incluir previstas nos totais
+                </label>
             </form>
         </header>
 
@@ -91,7 +102,7 @@
                         {{formatCurrency .Summary.TotalIncome}}
                     </span>
                 </div>
-                <p class="text-xs text-slate-500 mt-2">{{.DisplayMonth}}</p>
+                <p class="text-xs text-slate-500 mt-2">{{.DisplayMonth}}{{if and .IncludeProjected .Projected}} (com previstas){{end}}</p>
             </div>
 
             <!-- Total de Despesas -->
@@ -109,7 +120,7 @@
                         {{formatCurrency .Summary.TotalExpense}}
                     </span>
                 </div>
-                <p class="text-xs text-slate-500 mt-2">{{.DisplayMonth}}</p>
+                <p class="text-xs text-slate-500 mt-2">{{.DisplayMonth}}{{if and .IncludeProjected .Projected}} (com previstas){{end}}</p>
             </div>
 
             <!-- Saldo Atual -->
@@ -127,7 +138,7 @@
                         {{formatCurrency .Summary.Balance}}
                     </span>
                 </div>
-                <p class="text-xs text-slate-500 mt-2">Diferença entre receitas e despesas</p>
+                <p class="text-xs text-slate-500 mt-2">Diferença entre receitas e despesas{{if and .IncludeProjected .Projected}} (com previstas){{end}}</p>
             </div>
         </section>
 
@@ -142,6 +153,7 @@
             
             <form method="POST" action="/transactions" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
                 <input type="hidden" name="month" value="{{.SelectedMonth}}">
+                <input type="hidden" name="previstas" value="{{if .IncludeProjected}}1{{end}}">
                 
                 <!-- Descrição -->
                 <div class="lg:col-span-2">
@@ -261,6 +273,12 @@
                             </td>
                             <td class="px-6 py-4 font-medium text-slate-100">
                                 {{.Description}}
+                                {{with .Installment}}
+                                <span class="ml-2 px-2 py-0.5 rounded-md text-xs font-medium bg-sky-500/10 text-sky-300 border border-sky-500/20">{{.Number}}/{{.Total}}</span>
+                                {{if gt .Remaining 0}}
+                                <span class="block text-xs font-normal text-slate-500 mt-0.5">restam {{.Remaining}} {{if eq .Remaining 1}}parcela{{else}}parcelas{{end}} &bull; {{formatCurrency .RemainingCents}}</span>
+                                {{end}}
+                                {{end}}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <span class="px-2.5 py-1 rounded-md text-xs bg-slate-800 text-slate-300 border border-slate-700">
@@ -302,6 +320,7 @@
                                     <form method="POST" action="/transactions/delete" onsubmit="return confirm('Deseja realmente excluir este lançamento?');" class="inline">
                                         <input type="hidden" name="id" value="{{.ID}}">
                                         <input type="hidden" name="month" value="{{$.SelectedMonth}}">
+                                        <input type="hidden" name="previstas" value="{{if $.IncludeProjected}}1{{end}}">
                                         <button 
                                             type="submit" 
                                             title="Excluir lançamento"
@@ -330,6 +349,39 @@
             </div>
         </section>
 
+        {{if .Projected}}
+        <!-- Parcelas previstas (calculadas, não gravadas) -->
+        <section class="mt-8 bg-slate-800/40 border border-dashed border-sky-500/30 rounded-2xl overflow-hidden shadow-sm">
+            <div class="p-6 border-b border-slate-800 flex items-center justify-between gap-3">
+                <h2 class="text-lg font-semibold text-slate-100">Parcelas previstas ({{len .Projected}})</h2>
+                <span class="text-xs text-slate-400">Calculadas pelo histórico; some quando a parcela real é lançada</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm text-slate-300">
+                    <tbody class="divide-y divide-slate-800/60">
+                        {{range .Projected}}
+                        <tr>
+                            <td class="px-6 py-3 whitespace-nowrap text-xs text-slate-400">{{formatDate .Date}}</td>
+                            <td class="px-6 py-3 font-medium text-slate-100">
+                                {{.Name}}
+                                <span class="ml-2 px-2 py-0.5 rounded-md text-xs font-medium bg-sky-500/10 text-sky-300 border border-sky-500/20">{{.Number}}/{{.Total}}</span>
+                                <span class="ml-1 px-2 py-0.5 rounded-md text-xs bg-slate-800 text-slate-400 border border-slate-700">prevista</span>
+                            </td>
+                            <td class="px-6 py-3 whitespace-nowrap text-right font-semibold {{if eq .Type "income"}}text-emerald-400{{else}}text-rose-400{{end}}">
+                                {{if eq .Type "income"}}+{{else}}-{{end}} {{formatCurrency .AmountCents}}
+                            </td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+            <div class="px-6 py-4 border-t border-slate-800 text-sm text-slate-300 flex flex-wrap justify-end gap-x-6 gap-y-1">
+                {{if gt .ProjectedExpense 0}}<span>Despesas previstas: <strong class="text-rose-400">{{formatCurrency .ProjectedExpense}}</strong></span>{{end}}
+                {{if gt .ProjectedIncome 0}}<span>Receitas previstas: <strong class="text-emerald-400">{{formatCurrency .ProjectedIncome}}</strong></span>{{end}}
+            </div>
+        </section>
+        {{end}}
+
         <!-- Footer Informativo -->
         <footer class="mt-12 text-center text-xs text-slate-500">
             <p>🪙 FinPi &bull; Binário único em Go &bull; Armazenamento SQLite WAL &bull; Otimizado para Raspberry Pi 3</p>
@@ -357,6 +409,7 @@
             <form method="POST" action="/transactions/update" class="space-y-4">
                 <input type="hidden" id="edit-id" name="id">
                 <input type="hidden" name="month" value="{{.SelectedMonth}}">
+                <input type="hidden" name="previstas" value="{{if .IncludeProjected}}1{{end}}">
 
                 <!-- Descrição -->
                 <div>

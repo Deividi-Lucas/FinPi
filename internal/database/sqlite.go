@@ -202,6 +202,32 @@ func (d *DB) GetTransactions(yearMonth string) ([]models.Transaction, error) {
 	return list, rows.Err()
 }
 
+// GetInstallmentCandidates devolve os lançamentos cuja descrição pode conter uma parcela
+// ("3/10" ou "parcela 3 de 10"), do mais antigo para o mais recente. É um pré-filtro barato:
+// a validação do formato é feita em installments.Parse.
+func (d *DB) GetInstallmentCandidates() ([]models.Transaction, error) {
+	rows, err := d.conn.Query(`
+		SELECT id, description, amount_cents, type, category, date, created_at
+		FROM transactions
+		WHERE description LIKE '%/%' OR description LIKE '%parcela%'
+		ORDER BY date ASC, id ASC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var list []models.Transaction
+	for rows.Next() {
+		var t models.Transaction
+		if err := rows.Scan(&t.ID, &t.Description, &t.AmountCents, &t.Type, &t.Category, &t.Date, &t.CreatedAt); err != nil {
+			return nil, err
+		}
+		list = append(list, t)
+	}
+	return list, rows.Err()
+}
+
 // GetSummaryByMonth calcula Total de Receitas, Total de Despesas e Saldo (em centavos) para o mês fornecido.
 func (d *DB) GetSummaryByMonth(yearMonth string) (models.Summary, error) {
 	query := `

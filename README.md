@@ -46,6 +46,10 @@ finpi/
 │   │   ├── validation.go       # Validação compartilhada do formulário de lançamentos
 │   │   ├── validation_test.go  # Testes de validação
 │   │   └── handlers_test.go    # Testes dos handlers e do template
+│   ├── installments/
+│   │   ├── parse.go            # Lê a parcela da descrição (3/10, parcela 3 de 10)
+│   │   ├── project.go          # Projeta as parcelas previstas dos meses seguintes
+│   │   └── annotate.go         # Selo e restante dos lançamentos parcelados
 │   └── models/
 │       └── models.go           # Modelos de dados e structs de tela
 ├── templates/
@@ -59,6 +63,16 @@ finpi/
 ├── Makefile                    # Targets de automação de build
 └── main.go                     # Entrypoint com embed.FS e Graceful Shutdown
 ```
+
+---
+
+## 🧾 Parcelas previstas
+
+Escreva o número da parcela na descrição (`Geladeira 3/10` ou `Geladeira parcela 3 de 10`). O FinPi mostra o
+selo `3/10`, quanto ainda resta e, nos meses seguintes, um bloco **Parcelas previstas** calculado pelo histórico
+(nada é gravado; a previsão some quando você lança a parcela real). Por padrão as previstas ficam fora dos
+totais; marque **Incluir previstas nos totais** para somá-las (`?previstas=1`). A parcela deve ficar no fim da
+descrição, com `1 <= N <= M <= 60`.
 
 ---
 
