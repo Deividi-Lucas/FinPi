@@ -152,107 +152,21 @@
             </div>
         </section>
 
-        <!-- Formulário de Novo Lançamento -->
-        <section class="bg-slate-800/40 border border-slate-800 rounded-2xl p-6 mb-8 shadow-sm">
-            <h2 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+
+        <!-- Novo Lançamento (abre o pop-up) -->
+        <div class="mb-8 flex items-center justify-end gap-3">
+            <span id="draft-dot" class="hidden text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 px-2 py-1 rounded-lg">rascunho salvo</span>
+            <button
+                type="button"
+                onclick="openNewModal()"
+                class="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm px-5 py-2.5 rounded-xl shadow-lg shadow-emerald-600/20 active:scale-[0.98] transition cursor-pointer"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                 </svg>
-                Novo Lançamento
-            </h2>
-            
-            <form method="POST" action="/transactions" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
-                <input type="hidden" name="month" value="{{.SelectedMonth}}">
-                <input type="hidden" name="previstas" value="{{if .IncludeProjected}}1{{end}}">
-                
-                <!-- Descrição -->
-                <div class="lg:col-span-2">
-                    <label class="block text-xs font-medium text-slate-300 mb-1">Descrição</label>
-                    <input 
-                        type="text" 
-                        name="description" 
-                        required 
-                        placeholder="Ex: Mercado, Salário, Internet" 
-                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
-                    >
-                </div>
-
-                <!-- Valor -->
-                <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">Valor (R$)</label>
-                    <input 
-                        type="number" 
-                        step="0.01" 
-                        min="0.01" 
-                        name="amount" 
-                        required 
-                        placeholder="0,00" 
-                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
-                    >
-                </div>
-
-                <!-- Tipo -->
-                <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">Tipo</label>
-                    <select 
-                        name="type" 
-                        required 
-                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
-                    >
-                        <option value="expense">Despesa</option>
-                        <option value="income">Receita</option>
-                    </select>
-                </div>
-
-                <!-- Categoria -->
-                <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">Categoria</label>
-                    <select
-                        name="category"
-                        required
-                        onchange="toggleNewCategory(this)"
-                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
-                    >
-                        {{range .Categories}}
-                        <option value="{{.Name}}">{{.Name}}</option>
-                        {{end}}
-                        <option value="__new__">+ Nova categoria…</option>
-                    </select>
-                    <input
-                        type="text"
-                        name="new_category"
-                        maxlength="40"
-                        placeholder="Nome da nova categoria"
-                        class="hidden mt-2 w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
-                    >
-                </div>
-
-                <!-- Data -->
-                <div>
-                    <label class="block text-xs font-medium text-slate-300 mb-1">Data</label>
-                    <input 
-                        type="date" 
-                        name="date" 
-                        value="{{.TodayDate}}" 
-                        required 
-                        class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
-                    >
-                </div>
-
-                <!-- Botão de Salvar -->
-                <div class="sm:col-span-2 lg:col-span-6 flex justify-end">
-                    <button 
-                        type="submit" 
-                        class="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm px-6 py-2.5 rounded-xl shadow-lg shadow-emerald-600/20 active:scale-[0.98] transition cursor-pointer"
-                    >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                        </svg>
-                        Registrar Lançamento
-                    </button>
-                </div>
-            </form>
-        </section>
+                Novo lançamento
+            </button>
+        </div>
 
         <!-- Tabela de Histórico / Listagem -->
         <section class="bg-slate-800/40 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
@@ -527,6 +441,129 @@
         </div>
     </div>
 
+    <!-- Pop-up de Novo Lançamento (o rascunho fica guardado no navegador) -->
+    <div id="new-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 backdrop-blur-sm p-4" onclick="closeNewModal()">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl p-6 relative" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-5">
+                <h3 class="text-lg font-semibold text-white flex items-center gap-2">
+                    <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Novo Lançamento
+                </h3>
+                <button type="button" onclick="closeNewModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer" title="Fechar (o rascunho é mantido)">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <div id="draft-notice" class="hidden mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-sm items-center justify-between gap-3">
+                <span>Rascunho restaurado.</span>
+                <button type="button" onclick="discardDraft()" class="px-2 py-1 rounded-lg text-xs font-medium text-amber-100 hover:bg-amber-500/20 transition cursor-pointer">Descartar</button>
+            </div>
+
+            <div id="new-form-error" role="alert" class="hidden mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm"></div>
+
+            <form id="new-form" method="POST" action="/transactions" data-draft-key="finpi:draft:novo-lancamento" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <input type="hidden" name="month" value="{{.SelectedMonth}}">
+                <input type="hidden" name="previstas" value="{{if .IncludeProjected}}1{{end}}">
+
+                <!-- Descrição -->
+                <div class="sm:col-span-2">
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Descrição</label>
+                    <input
+                        type="text"
+                        name="description"
+                        required
+                        placeholder="Ex: Mercado, Salário, Internet"
+                        class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
+                    >
+                </div>
+
+                <!-- Valor -->
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Valor (R$)</label>
+                    <input
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        name="amount"
+                        required
+                        placeholder="0,00"
+                        class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
+                    >
+                </div>
+
+                <!-- Tipo -->
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Tipo</label>
+                    <select
+                        name="type"
+                        required
+                        class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
+                    >
+                        <option value="expense">Despesa</option>
+                        <option value="income">Receita</option>
+                    </select>
+                </div>
+
+                <!-- Categoria -->
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Categoria</label>
+                    <select
+                        name="category"
+                        required
+                        onchange="toggleNewCategory(this)"
+                        class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
+                    >
+                        {{range .Categories}}
+                        <option value="{{.Name}}">{{.Name}}</option>
+                        {{end}}
+                        <option value="__new__">+ Nova categoria…</option>
+                    </select>
+                    <input
+                        type="text"
+                        name="new_category"
+                        maxlength="40"
+                        placeholder="Nome da nova categoria"
+                        class="hidden mt-2 w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
+                    >
+                </div>
+
+                <!-- Data -->
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Data</label>
+                    <input
+                        type="date"
+                        name="date"
+                        value="{{.TodayDate}}"
+                        required
+                        class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
+                    >
+                </div>
+
+                <!-- Botões -->
+                <div class="sm:col-span-2 flex items-center justify-end gap-3 pt-4 border-t border-slate-800 mt-2">
+                    <button
+                        type="button"
+                        onclick="closeNewModal()"
+                        class="px-4 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition cursor-pointer"
+                    >
+                        Fechar
+                    </button>
+                    <button
+                        id="new-form-submit"
+                        type="submit"
+                        class="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium text-sm px-5 py-2 rounded-xl shadow-lg shadow-emerald-600/20 active:scale-[0.98] transition cursor-pointer"
+                    >
+                        Registrar Lançamento
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Pop-up de Categorias -->
     <div id="categories-modal" data-open="{{.ShowCategories}}" class="fixed inset-0 z-50 {{if .ShowCategories}}flex{{else}}hidden{{end}} items-center justify-center bg-black/60 backdrop-blur-sm p-4" onclick="closeCategoriesModal()">
         <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl p-6 relative" onclick="event.stopPropagation()">
@@ -682,6 +719,143 @@
             if (e.key === 'Escape') {
                 closeEditModal();
                 closeCategoriesModal();
+                closeNewModal();
+            }
+        });
+
+        // Novo lançamento em pop-up, com rascunho guardado no navegador (sobrevive a fechar o pop-up,
+        // recarregar a página e fechar a aba). O rascunho só some ao enviar com sucesso ou ao descartar.
+        const newModal = document.getElementById('new-modal');
+        const newForm = document.getElementById('new-form');
+        const draftNotice = document.getElementById('draft-notice');
+        const draftDot = document.getElementById('draft-dot');
+        const newFormError = document.getElementById('new-form-error');
+        const newFormSubmit = document.getElementById('new-form-submit');
+        const DRAFT_KEY = newForm.dataset.draftKey;
+        const DRAFT_FIELDS = ['description', 'amount', 'type', 'category', 'new_category', 'date'];
+        // Valores iniciais do formulário: só o que difere deles entra no rascunho (ex.: a data padrão não).
+        const draftInitial = {};
+        DRAFT_FIELDS.forEach(function (name) { draftInitial[name] = newForm.elements[name].value; });
+
+        // localStorage pode estar indisponível (aba privativa, bloqueio): o pop-up funciona sem rascunho.
+        function draftStore() {
+            try { return window.localStorage; } catch (e) { return null; }
+        }
+
+        function readDraft() {
+            const store = draftStore();
+            if (!store) return null;
+            try {
+                const draft = JSON.parse(store.getItem(DRAFT_KEY));
+                return draft && typeof draft === 'object' && Object.keys(draft).length ? draft : null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function refreshDraftDot() {
+            draftDot.classList.toggle('hidden', !readDraft());
+        }
+
+        function saveDraft() {
+            const store = draftStore();
+            if (!store) return;
+            const draft = {};
+            DRAFT_FIELDS.forEach(function (name) {
+                const value = newForm.elements[name].value;
+                if (value !== draftInitial[name]) draft[name] = value;
+            });
+            try {
+                if (Object.keys(draft).length) {
+                    store.setItem(DRAFT_KEY, JSON.stringify(draft));
+                } else {
+                    store.removeItem(DRAFT_KEY);
+                }
+            } catch (e) { /* sem espaço ou bloqueado: segue sem rascunho */ }
+            refreshDraftDot();
+        }
+
+        function clearDraftStorage() {
+            const store = draftStore();
+            try { if (store) store.removeItem(DRAFT_KEY); } catch (e) { /* ignora */ }
+            refreshDraftDot();
+        }
+
+        function applyDraft(draft) {
+            DRAFT_FIELDS.forEach(function (name) {
+                if (!(name in draft)) return;
+                const field = newForm.elements[name];
+                // Uma categoria que não existe mais (excluída/oculta) fica de fora: mantém o padrão.
+                if (field.tagName === 'SELECT' && !Array.from(field.options).some(function (o) { return o.value === draft[name]; })) return;
+                field.value = draft[name];
+            });
+            toggleNewCategory(newForm.elements['category']);
+        }
+
+        function showDraftNotice(show) {
+            draftNotice.classList.toggle('hidden', !show);
+            draftNotice.classList.toggle('flex', show);
+        }
+
+        function showNewFormError(message) {
+            newFormError.textContent = message;
+            newFormError.classList.toggle('hidden', !message);
+        }
+
+        function openNewModal() {
+            showNewFormError('');
+            const draft = readDraft();
+            if (draft) applyDraft(draft);
+            showDraftNotice(!!draft);
+            newModal.classList.remove('hidden');
+            newModal.classList.add('flex');
+            newForm.elements['description'].focus();
+        }
+
+        // Fechar (X, Esc ou clique fora) nunca apaga o que foi digitado: o rascunho já está guardado.
+        function closeNewModal() {
+            newModal.classList.add('hidden');
+            newModal.classList.remove('flex');
+        }
+
+        function discardDraft() {
+            clearDraftStorage();
+            newForm.reset();
+            toggleNewCategory(newForm.elements['category']);
+            showDraftNotice(false);
+            showNewFormError('');
+            newForm.elements['description'].focus();
+        }
+
+        newForm.addEventListener('input', saveDraft);
+        newForm.addEventListener('change', saveDraft);
+        refreshDraftDot();
+
+        // Envio sem sair da página: em erro, a mensagem aparece no pop-up e o rascunho continua guardado;
+        // em sucesso, o rascunho é apagado e a página recarrega no mês certo.
+        newForm.addEventListener('submit', async function (e) {
+            if (!window.fetch) return; // sem fetch: envio tradicional
+            e.preventDefault();
+            showNewFormError('');
+            newFormSubmit.disabled = true;
+            try {
+                const resp = await fetch(newForm.action, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams(new FormData(newForm)),
+                    credentials: 'same-origin'
+                });
+                if (resp.ok) {
+                    clearDraftStorage();
+                    window.location.href = resp.url;
+                    return;
+                }
+                const text = (await resp.text()).trim();
+                showNewFormError(text || 'Não foi possível salvar o lançamento. Seu rascunho foi mantido.');
+            } catch (err) {
+                showNewFormError('Sem conexão com o servidor. Seu rascunho foi mantido.');
+            } finally {
+                newFormSubmit.disabled = false;
             }
         });
 
@@ -693,12 +867,10 @@
                 if (modal && !modal.classList.contains('hidden')) return true;
                 const categories = document.getElementById('categories-modal');
                 if (categories && !categories.classList.contains('hidden')) return true;
-                const form = document.querySelector('form[action="/transactions"]');
-                if (!form) return false;
-                return ['description', 'amount'].some(function (name) {
-                    const field = form.querySelector('[name="' + name + '"]');
-                    return field && field.value.trim() !== '';
-                });
+                // Pop-up de novo lançamento aberto: mostra o aviso em vez de recarregar. Fechado, o que foi
+                // digitado já está no rascunho guardado, então recarregar é seguro.
+                const newModal = document.getElementById('new-modal');
+                return !!(newModal && !newModal.classList.contains('hidden'));
             }
 
             function refresh() {

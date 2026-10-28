@@ -70,6 +70,16 @@ finpi/
 
 ---
 
+## 📝 Novo lançamento
+
+O botão **Novo lançamento** abre um pop-up. O que você digita é guardado como **rascunho** no próprio navegador:
+fechar o pop-up (X, Esc ou clique fora), recarregar a página ou fechar a aba não perde nada. Ao reabrir, os campos
+voltam preenchidos com o aviso "Rascunho restaurado" e o botão **Descartar**. O rascunho só some ao enviar com
+sucesso ou ao descartar; erros de validação aparecem dentro do pop-up. O rascunho é por navegador (não é
+compartilhado entre aparelhos) e, se o navegador bloquear o armazenamento, o pop-up funciona sem ele.
+
+---
+
 ## 🧾 Parcelas previstas
 
 Escreva o número da parcela na descrição (`Geladeira 3/10` ou `Geladeira parcela 3 de 10`). O FinPi mostra o

@@ -457,3 +457,49 @@ func TestUpdateTransaction_UnknownCategoryReturns400(t *testing.T) {
 		t.Errorf("status = %d, quer 400", rec.Code)
 	}
 }
+
+func TestDashboard_NewTransactionIsAPopupWithDraftSupport(t *testing.T) {
+	h, _ := newTestHandler(t)
+
+	body := getDashboard(h, "/?month=2026-10")
+
+	for _, want := range []string{
+		`onclick="openNewModal()"`,                      // botão que abre o pop-up
+		`id="new-modal"`,                                // o pop-up
+		`id="new-form"`,                                 // o formulário dentro dele
+		`action="/transactions"`,                        // continua enviando para a mesma rota
+		`data-draft-key="finpi:draft:novo-lancamento"`,  // chave do rascunho no navegador
+		`id="new-form-error"`,                           // erro exibido dentro do pop-up
+		`id="draft-notice"`,                             // aviso "Rascunho restaurado"
+		`onclick="discardDraft()"`,                      // botão Descartar
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("a página deveria conter %s", want)
+		}
+	}
+}
+
+func TestDashboard_NewTransactionPopupStartsClosed(t *testing.T) {
+	h, _ := newTestHandler(t)
+
+	body := getDashboard(h, "/?month=2026-10")
+
+	if !strings.Contains(body, `id="new-modal" class="fixed inset-0 z-50 hidden`) {
+		t.Error("o pop-up de novo lançamento deve começar fechado")
+	}
+}
+
+func TestDashboard_NewTransactionFormKeepsMonthAndProjectedState(t *testing.T) {
+	h, _ := newTestHandler(t)
+
+	body := getDashboard(h, "/?month=2026-11&previstas=1")
+
+	idx := strings.Index(body, `id="new-form"`)
+	if idx < 0 {
+		t.Fatal("formulário de novo lançamento ausente")
+	}
+	form := body[idx : idx+1500]
+	if !strings.Contains(form, `name="month" value="2026-11"`) || !strings.Contains(form, `name="previstas" value="1"`) {
+		t.Error("o formulário deve manter o mês e o interruptor de previstas")
+	}
+}
