@@ -87,8 +87,13 @@ func migrate(conn *sql.DB) error {
 		}
 	}
 
-	_, err = conn.Exec(createIndexSQL)
-	return err
+	if _, err := conn.Exec(createIndexSQL); err != nil {
+		return err
+	}
+	if _, err := conn.Exec(createCategoriesSQL); err != nil {
+		return err
+	}
+	return seedCategories(conn)
 }
 
 func tableColumns(conn *sql.DB, table string) (map[string]bool, error) {

@@ -67,6 +67,42 @@ func dbError(w http.ResponseWriter, msg string, err error) {
 	serverError(w, msg, err)
 }
 
+// newCategoryOption é o valor do <select> que indica "criar categoria nova" (nome em new_category).
+const newCategoryOption = "__new__"
+
+var errUnknownCategory = errors.New("categoria inexistente")
+
+// resolveCategory confere a categoria do lançamento. Com "__new__", cria a categoria (ou reutiliza a
+// existente, ignorando caixa e acentos) e passa a usar o nome canônico. Ocultas continuam válidas.
+func (h *Handler) resolveCategory(form url.Values, t *models.Transaction) error {
+	if t.Category == newCategoryOption {
+		c, err := h.db.GetOrCreateCategory(form.Get("new_category"))
+		if err != nil {
+			return err
+		}
+		t.Category = c.Name
+		return nil
+	}
+
+	ok, err := h.db.CategoryExists(t.Category)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return errUnknownCategory
+	}
+	return nil
+}
+
+// categoryFormError traduz erros de categoria no envio do lançamento: entrada inválida vira 400.
+func categoryFormError(w http.ResponseWriter, err error) {
+	if errors.Is(err, errUnknownCategory) || errors.Is(err, database.ErrInvalidCategoryName) {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	serverError(w, "Erro ao validar categoria", err)
+}
+
 func redirectToMonth(w http.ResponseWriter, r *http.Request, month string) {
 	target := "/?month=" + url.QueryEscape(month)
 	if r.PostForm.Get("previstas") == "1" {
@@ -81,9 +117,38 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	h.renderDashboard(w, r, http.StatusOK, "", r.URL.Query().Get("categorias") == "1")
+}
 
+// requestMonth lê o mês (AAAA-MM) da URL ou, em envios de formulário, do corpo.
+func requestMonth(r *http.Request) string {
+	if m := r.URL.Query().Get("month"); m != "" {
+		return m
+	}
+	return r.PostForm.Get("month")
+}
+
+// wantsProjected diz se os totais devem somar as parcelas previstas (?previstas=1, na URL ou no formulário).
+func wantsProjected(r *http.Request) bool {
+	return r.URL.Query().Get("previstas") == "1" || r.PostForm.Get("previstas") == "1"
+}
+
+// visibleCategories filtra as categorias que aparecem nas listas de escolha ao lançar.
+func visibleCategories(all []models.Category) []models.Category {
+	var out []models.Category
+	for _, c := range all {
+		if !c.Hidden {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// renderDashboard monta e renderiza a página. Em erros do menu de categorias, devolve o status
+// correspondente com a mensagem dentro do pop-up (aberto).
+func (h *Handler) renderDashboard(w http.ResponseWriter, r *http.Request, status int, categoryError string, showCategories bool) {
 	now := time.Now()
-	selectedMonth := r.URL.Query().Get("month")
+	selectedMonth := requestMonth(r)
 	if selectedMonth == "" {
 		selectedMonth = now.Format("2006-01")
 	}
@@ -100,7 +165,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	includeProjected := r.URL.Query().Get("previstas") == "1"
+	includeProjected := wantsProjected(r)
 
 	candidates, err := h.db.GetInstallmentCandidates()
 	if err != nil {
@@ -114,6 +179,12 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	}
 	installments.Annotate(transactions)
 
+	categories, err := h.db.ListCategories()
+	if err != nil {
+		serverError(w, "Erro ao carregar categorias", err)
+		return
+	}
+
 	data := models.PageData{
 		SelectedMonth: selectedMonth,
 		DisplayMonth:  formatDisplayMonth(selectedMonth),
@@ -126,9 +197,15 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		ProjectedIncome:  projectedIncome,
 		ProjectedExpense: projectedExpense,
 		IncludeProjected: includeProjected,
+
+		Categories:     visibleCategories(categories),
+		AllCategories:  categories,
+		ShowCategories: showCategories,
+		CategoryError:  categoryError,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(status)
 	if err := h.tmpl.ExecuteTemplate(w, "index.html", data); err != nil {
 		serverError(w, "Erro ao renderizar página", err)
 	}
@@ -149,6 +226,11 @@ func (h *Handler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
 	t, err := parseTransactionForm(r.PostForm)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := h.resolveCategory(r.PostForm, &t); err != nil {
+		categoryFormError(w, err)
 		return
 	}
 
@@ -186,6 +268,11 @@ func (h *Handler) UpdateTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	t.ID = id
+
+	if err := h.resolveCategory(r.PostForm, &t); err != nil {
+		categoryFormError(w, err)
+		return
+	}
 
 	if err := h.db.UpdateTransaction(&t); err != nil {
 		dbError(w, "Erro ao atualizar transação", err)

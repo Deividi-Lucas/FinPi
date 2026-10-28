@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"finpi/internal/textutil"
 )
 
 const (
@@ -46,20 +48,7 @@ func Parse(description string) (Info, bool) {
 	return Info{}, false
 }
 
-var accents = strings.NewReplacer(
-	"á", "a", "à", "a", "â", "a", "ã", "a", "ä", "a",
-	"é", "e", "è", "e", "ê", "e", "ë", "e",
-	"í", "i", "ì", "i", "î", "i", "ï", "i",
-	"ó", "o", "ò", "o", "ô", "o", "õ", "o", "ö", "o",
-	"ú", "u", "ù", "u", "û", "u", "ü", "u",
-	"ç", "c",
-)
-
-func normalize(s string) string {
-	return strings.Join(strings.Fields(accents.Replace(strings.ToLower(s))), " ")
-}
-
 // Key identifica a série de uma parcela: nome normalizado + tipo + total de parcelas.
 func Key(info Info, txType string) string {
-	return normalize(info.Name) + "|" + txType + "|" + strconv.Itoa(info.Total)
+	return textutil.Fold(info.Name) + "|" + txType + "|" + strconv.Itoa(info.Total)
 }

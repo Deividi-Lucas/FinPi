@@ -38,9 +38,11 @@ finpi/
 ├── internal/
 │   ├── database/
 │   │   ├── sqlite.go           # Otimizações de WAL, pragmas, migração e queries SQLite
+│   │   ├── categories.go       # Categorias: criar, renomear, ocultar e excluir
 │   │   └── sqlite_test.go      # Testes do banco (centavos, migração, exclusão)
 │   ├── handlers/
 │   │   ├── handlers.go         # Rotas HTTP e formatação BRL
+│   │   ├── categories.go       # Rotas do menu de categorias
 │   │   ├── events.go           # Endpoint /events (SSE) para atualização em tempo real
 │   │   ├── broker.go           # Distribui avisos de mudança às telas conectadas
 │   │   ├── validation.go       # Validação compartilhada do formulário de lançamentos
@@ -50,6 +52,8 @@ finpi/
 │   │   ├── parse.go            # Lê a parcela da descrição (3/10, parcela 3 de 10)
 │   │   ├── project.go          # Projeta as parcelas previstas dos meses seguintes
 │   │   └── annotate.go         # Selo e restante dos lançamentos parcelados
+│   ├── textutil/
+│   │   └── fold.go             # Normalização de texto (sem acentos nem maiúsculas)
 │   └── models/
 │       └── models.go           # Modelos de dados e structs de tela
 ├── templates/
@@ -73,6 +77,15 @@ selo `3/10`, quanto ainda resta e, nos meses seguintes, um bloco **Parcelas prev
 (nada é gravado; a previsão some quando você lança a parcela real). Por padrão as previstas ficam fora dos
 totais; marque **Incluir previstas nos totais** para somá-las (`?previstas=1`). A parcela deve ficar no fim da
 descrição, com `1 <= N <= M <= 60`.
+
+---
+
+## 🏷️ Categorias
+
+O botão **Categorias** (no cabeçalho) abre o menu para criar, **renomear** (os lançamentos antigos acompanham),
+**ocultar** (some da lista ao lançar, mas continua nos lançamentos antigos) e **excluir** (só categorias sem
+lançamentos). Ao lançar, escolha **+ Nova categoria…** para criar uma na hora. Nomes são únicos ignorando
+maiúsculas e acentos ("saude" e "Saúde" são a mesma categoria).
 
 ---
 
