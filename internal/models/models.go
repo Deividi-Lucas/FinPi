@@ -55,3 +55,11 @@ type ProjectedInstallment struct {
 	Date        string // AAAA-MM-DD
 	AmountCents int64
 }
+
+// Category é uma categoria de lançamentos.
+type Category struct {
+	ID     int64
+	Name   string
+	Hidden bool // oculta: não aparece na lista de escolha ao lançar
+	Usage  int  // quantidade de lançamentos que usam a categoria
+}
