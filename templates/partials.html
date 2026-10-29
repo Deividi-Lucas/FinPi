@@ -21,6 +21,33 @@
             }
         }
     </script>
+    <script>
+        // Mantém a rolagem: depois de salvar, a página recarrega; guardamos a posição e voltamos a ela.
+        (function () {
+            var KEY = 'finpi:scroll';
+            function save() {
+                try { sessionStorage.setItem(KEY, JSON.stringify({ p: location.pathname, y: window.scrollY, t: Date.now() })); } catch (e) {}
+            }
+            // Para navegações feitas por script (fetch + redirecionamento).
+            window.finpiGo = function (url) { save(); window.location.href = url; };
+            // Para envios normais de formulário POST (a verificação do defaultPrevented respeita o "Cancelar" do confirm).
+            document.addEventListener('submit', function (e) {
+                if (!e.defaultPrevented && e.target.method && e.target.method.toLowerCase() === 'post') save();
+            });
+            try {
+                var raw = sessionStorage.getItem(KEY);
+                if (raw) {
+                    sessionStorage.removeItem(KEY);
+                    var s = JSON.parse(raw);
+                    if (s && s.p === location.pathname && Date.now() - s.t < 60000 && !location.hash) {
+                        var go = function () { window.scrollTo(0, s.y); };
+                        document.addEventListener('DOMContentLoaded', go);
+                        window.addEventListener('load', function () { requestAnimationFrame(go); });
+                    }
+                }
+            } catch (e) {}
+        })();
+    </script>
 {{end}}
 
 {{define "liveBanner"}}
