@@ -100,3 +100,61 @@ func TestMoveToBook_UndoSkipsWhatChangedAfterwards(t *testing.T) {
 		t.Errorf("UndoLatestBatch = %d, %d, %v (quer 0 restaurado e 1 pulado)", restored, skipped, err)
 	}
 }
+
+func TestMoveToBook_CopiesPriorityOfCreatedCategory(t *testing.T) {
+	pessoal, pj := twoBooks(t)
+	cat, err := pessoal.CreateCategory("Impostos")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := pessoal.SetCategoryPriority(cat.ID, models.PriorityEssential); err != nil {
+		t.Fatal(err)
+	}
+	tx := mustCreate(t, pessoal, models.Transaction{Description: "DAS", AmountCents: 100, Type: "expense", Category: "Impostos", Date: "2026-10-05"})
+	if _, _, err := pessoal.MoveToBook([]int64{tx.ID}, pj.BookID()); err != nil {
+		t.Fatal(err)
+	}
+	cats, err := pj.ListCategories()
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, c := range cats {
+		if c.Name == "Impostos" {
+			found = true
+			if c.Priority != models.PriorityEssential {
+				t.Errorf("Priority = %q, quero %q", c.Priority, models.PriorityEssential)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("categoria Impostos não foi criada no destino")
+	}
+}
+
+func TestUndoLatestBatch_RecreatesDeletedCategoryInOrigin(t *testing.T) {
+	pessoal, pj := twoBooks(t)
+	cat, err := pessoal.CreateCategory("Impostos")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx := mustCreate(t, pessoal, models.Transaction{Description: "DAS", AmountCents: 100, Type: "expense", Category: "Impostos", Date: "2026-10-05"})
+	if _, _, err := pessoal.MoveToBook([]int64{tx.ID}, pj.BookID()); err != nil {
+		t.Fatal(err)
+	}
+	if err := pessoal.DeleteCategory(cat.ID); err != nil {
+		t.Fatal(err)
+	}
+	restored, _, err := pessoal.UndoLatestBatch()
+	if err != nil || restored != 1 {
+		t.Fatalf("UndoLatestBatch = %d, %v", restored, err)
+	}
+	ok, err := pessoal.CategoryExists("Impostos")
+	if err != nil || !ok {
+		t.Fatalf("CategoryExists = %v, %v; quero true", ok, err)
+	}
+	list, err := pessoal.GetTransactions("2026-10")
+	if err != nil || len(list) != 1 {
+		t.Fatalf("lançamento não voltou ao Pessoal: %v %v", list, err)
+	}
+}

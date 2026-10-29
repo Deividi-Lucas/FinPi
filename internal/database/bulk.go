@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"finpi/internal/models"
+	"finpi/internal/textutil"
 )
 
 const createBatchesSQL = `
@@ -301,6 +302,17 @@ func (d *DB) LatestUndoableBatch() (*UndoableBatch, error) {
 	return &b, nil
 }
 
+// ensureCategoryInBook recria a categoria no livro caso ela tenha sido excluída depois do lote, para que o
+// lançamento restaurado nunca fique sem categoria. Nome legado inválido é ignorado em silêncio.
+func ensureCategoryInBook(tx *sql.Tx, bookID int64, category string) error {
+	clean, err := cleanCategoryName(category)
+	if err != nil {
+		return nil
+	}
+	_, err = tx.Exec(`INSERT OR IGNORE INTO categories (book_id, name, name_key) VALUES (?, ?, ?)`, bookID, clean, textutil.Fold(clean))
+	return err
+}
+
 // UndoLatestBatch desfaz o lote mais recente ainda não desfeito, numa transação. Só restaura o que continua
 // exatamente como o lote deixou (edição) ou o que ainda não existe (exclusão); o resto é pulado.
 func (d *DB) UndoLatestBatch() (restored, skipped int, err error) {
@@ -373,6 +385,9 @@ func (d *DB) UndoLatestBatch() (restored, skipped int, err error) {
 				skipped++
 				continue
 			}
+			if err := ensureCategoryInBook(tx, it.before.BookID, it.before.Category); err != nil {
+				return 0, 0, err
+			}
 			if _, err := tx.Exec(`UPDATE transactions SET description = ?, category = ?, date = ?, priority = ?, book_id = ? WHERE id = ?`,
 				it.before.Description, it.before.Category, it.before.Date, it.before.Priority, it.before.BookID, it.before.ID); err != nil {
 				return 0, 0, err
@@ -399,6 +414,9 @@ func (d *DB) UndoLatestBatch() (restored, skipped int, err error) {
 		created, err := time.Parse(time.RFC3339Nano, it.before.CreatedAt)
 		if err != nil {
 			return 0, 0, fmt.Errorf("data de criação inválida no lote: %w", err)
+		}
+		if err := ensureCategoryInBook(tx, it.before.BookID, it.before.Category); err != nil {
+			return 0, 0, err
 		}
 		if _, err := tx.Exec(`INSERT INTO transactions (`+loadColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			it.before.ID, it.before.Description, it.before.AmountCents, it.before.Type, it.before.Category,

@@ -360,6 +360,7 @@ func (h *Handler) BulkUndo(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Método não permitido", http.StatusMethodNotAllowed)
 		return
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxBulkBody)
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Dados do formulário inválidos", http.StatusBadRequest)
 		return

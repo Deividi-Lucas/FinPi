@@ -99,3 +99,11 @@ func TestReport_InvalidBookIsNotCarriedInLinks(t *testing.T) {
 		t.Errorf("livro inválido não deveria entrar nos links: %.300s", body)
 	}
 }
+
+func TestCreateBook_RejectsOversizedBody(t *testing.T) {
+	h, _ := newTestHandler(t)
+	rec := post(h.CreateBook, "/livros", url.Values{"name": {strings.Repeat("a", 100<<10)}, "color": {"sky"}})
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status %d, quero 400", rec.Code)
+	}
+}

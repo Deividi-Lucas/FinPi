@@ -1,6 +1,7 @@
 package database
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 
@@ -64,7 +65,13 @@ func (d *DB) MoveToBook(ids []int64, dest int64) (applied, skipped int, err erro
 			if err != nil {
 				return 0, 0, err
 			}
-			if _, err := tx.Exec(`INSERT INTO categories (book_id, name, name_key) VALUES (?, ?, ?)`, dest, clean, textutil.Fold(clean)); err != nil {
+			// a classificação acompanha a categoria de mesmo nome do livro de origem (se houver)
+			var priority string
+			err = tx.QueryRow(`SELECT priority FROM categories WHERE book_id = ? AND name_key = ?`, d.book, textutil.Fold(clean)).Scan(&priority)
+			if err != nil && !errors.Is(err, sql.ErrNoRows) {
+				return 0, 0, err
+			}
+			if _, err := tx.Exec(`INSERT INTO categories (book_id, name, name_key, priority) VALUES (?, ?, ?, ?)`, dest, clean, textutil.Fold(clean), priority); err != nil {
 				return 0, 0, err
 			}
 			known[textutil.Fold(clean)] = clean

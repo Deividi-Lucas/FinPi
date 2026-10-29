@@ -16,6 +16,7 @@ func bookForm(w http.ResponseWriter, r *http.Request) bool {
 		http.Error(w, "Método não permitido", http.StatusMethodNotAllowed)
 		return false
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Dados do formulário inválidos", http.StatusBadRequest)
 		return false
