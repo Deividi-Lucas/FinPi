@@ -38,11 +38,15 @@ finpi/
 ├── internal/
 │   ├── database/
 │   │   ├── sqlite.go           # Otimizações de WAL, pragmas, migração e queries SQLite
-│   │   ├── categories.go       # Categorias: criar, renomear, ocultar e excluir
+│   │   ├── categories.go       # Categorias (por livro): criar, renomear, ocultar e excluir
+│   │   ├── books.go            # Livros: cadastro, arquivar, escopo por livro e migração para o livro Pessoal
+│   │   ├── move.go             # Mover lançamentos entre livros (prévia, categoria no destino, desfazer)
 │   │   └── sqlite_test.go      # Testes do banco (centavos, migração, exclusão)
 │   ├── handlers/
 │   │   ├── handlers.go         # Rotas HTTP e formatação BRL
 │   │   ├── categories.go       # Rotas do menu de categorias
+│   │   ├── books.go            # Rotas dos livros (/livros, /livros/editar, /livros/arquivar)
+│   │   ├── book_scope.go       # Resolve o livro do pedido (?livro=) e escopa os handlers
 │   │   ├── events.go           # Endpoint /events (SSE) para atualização em tempo real
 │   │   ├── broker.go           # Distribui avisos de mudança às telas conectadas
 │   │   ├── validation.go       # Validação compartilhada do formulário de lançamentos
@@ -58,7 +62,8 @@ finpi/
 │   ├── installments/
 │   │   ├── parse.go            # Lê a parcela da descrição (3/10, parcela 3 de 10)
 │   │   ├── project.go          # Projeta as parcelas previstas dos meses seguintes
-│   │   └── annotate.go         # Selo e restante dos lançamentos parcelados
+│   │   ├── annotate.go         # Selo e restante dos lançamentos parcelados
+│   │   └── partial.go          # Detecta séries de parcelas só em parte selecionadas (aviso ao mover)
 │   ├── bulk/
 │   │   └── bulk.go             # Cálculo das edições em lote (categoria, prioridade, data e descrição)
 │   ├── report/
@@ -176,6 +181,28 @@ a **maior fonte** e quanto ela pesa nas entradas (dependência), em quantos **me
 receita média por mês. A tabela lista cada fonte por **Descrição** (todas, inclusive as de uma só entrada) ou por
 **Categoria**, com vezes, total, média, % das entradas, meses com entrada e a data da última. Só lançamentos reais
 entram (as parcelas previstas ficam de fora).
+
+---
+
+## 📚 Livros
+
+**Livros** são conjuntos separados de lançamentos e categorias (por exemplo **Pessoal** e **PJ**). Todo o resto vale
+**por livro**: dashboard, relatório, filtros, parcelas, edição múltipla e desfazer só enxergam o livro aberto.
+
+- **Seletor:** no cabeçalho, cada livro tem uma **cor**; o livro aberto vai na URL (`?livro=`) e, sem ela, abre o
+  **Pessoal**.
+- **Gerenciar** (`/livros`, `/livros/editar`, `/livros/arquivar`): criar um livro **vazio** ou **copiando as categorias**
+  de outro, **renomear**, trocar a **cor** e **arquivar/reativar**. Livros nunca são excluídos e sempre há pelo menos um
+  livro ativo. Arquivar o livro aberto leva de volta ao Pessoal.
+- **Categorias por livro:** cada livro tem as suas (nomes únicos dentro do livro); criar "Impostos" no PJ não cria no
+  Pessoal.
+- **Mover lançamentos:** na edição múltipla, **Mover…** escolhe o livro de destino (`/bulk/...` com `acao=mover`). A
+  **prévia** mostra a categoria de cada lançamento no destino e **(nova)** quando ela será criada; se a seleção
+  contém só parte de uma série de parcelas, aparece um aviso. **Desfazer** a movimentação é feito a partir do livro de origem.
+- **Importar extrato:** vai para o livro aberto e a tela mostra "Importando para o livro X". A checagem de duplicados pelo
+  identificador de origem é **global**: o mesmo extrato não entra duas vezes, nem em outro livro.
+- **Migração:** os dados existentes viram o livro **Pessoal** automaticamente na primeira abertura; a tabela de categorias é
+  reconstruída numa transação, e o atualizador faz **backup do banco** antes de trocar o binário.
 
 ---
 
