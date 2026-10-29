@@ -50,25 +50,27 @@ type snapshot struct {
 	Priority    string `json:"priority"`
 	ExternalID  string `json:"external_id"`
 	CreatedAt   string `json:"created_at"`
+	BookID      int64  `json:"book_id"`
 }
 
 func snapshotOf(t models.Transaction) snapshot {
 	return snapshot{
 		ID: t.ID, Description: t.Description, AmountCents: t.AmountCents, Type: t.Type, Category: t.Category,
-		Date: t.Date, Priority: t.Priority, ExternalID: t.ExternalID, CreatedAt: t.CreatedAt.UTC().Format(time.RFC3339Nano),
+		Date: t.Date, Priority: t.Priority, ExternalID: t.ExternalID, CreatedAt: t.CreatedAt.UTC().Format(time.RFC3339Nano), BookID: t.BookID,
 	}
 }
 
 // sameState compara todos os campos, menos a data de criação.
 func (s snapshot) sameState(o snapshot) bool {
 	return s.ID == o.ID && s.Description == o.Description && s.AmountCents == o.AmountCents && s.Type == o.Type &&
-		s.Category == o.Category && s.Date == o.Date && s.Priority == o.Priority && s.ExternalID == o.ExternalID
+		s.Category == o.Category && s.Date == o.Date && s.Priority == o.Priority && s.ExternalID == o.ExternalID && s.BookID == o.BookID
 }
 
-const loadColumns = `id, description, amount_cents, type, category, date, priority, external_id, created_at`
+const loadColumns = `id, description, amount_cents, type, category, date, priority, external_id, created_at, book_id`
 
 // loadTransactions lê os lançamentos que existem entre os ids (com o identificador de origem).
-func loadTransactions(q queryer, ids []int64) (map[int64]models.Transaction, error) {
+// Com book > 0 só alcança os daquele livro; com book == 0, os de qualquer livro.
+func loadTransactions(q queryer, ids []int64, book int64) (map[int64]models.Transaction, error) {
 	out := map[int64]models.Transaction{}
 	if len(ids) == 0 {
 		return out, nil
@@ -78,14 +80,19 @@ func loadTransactions(q queryer, ids []int64) (map[int64]models.Transaction, err
 	for i, id := range ids {
 		args[i] = id
 	}
-	rows, err := q.Query(`SELECT `+loadColumns+` FROM transactions WHERE id IN (`+marks+`)`, args...)
+	query := `SELECT ` + loadColumns + ` FROM transactions WHERE id IN (` + marks + `)`
+	if book > 0 {
+		query += ` AND book_id = ?`
+		args = append(args, book)
+	}
+	rows, err := q.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var t models.Transaction
-		if err := rows.Scan(&t.ID, &t.Description, &t.AmountCents, &t.Type, &t.Category, &t.Date, &t.Priority, &t.ExternalID, &t.CreatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.Description, &t.AmountCents, &t.Type, &t.Category, &t.Date, &t.Priority, &t.ExternalID, &t.CreatedAt, &t.BookID); err != nil {
 			return nil, err
 		}
 		out[t.ID] = t
@@ -95,7 +102,7 @@ func loadTransactions(q queryer, ids []int64) (map[int64]models.Transaction, err
 
 // GetTransactionsByIDs devolve os lançamentos que existem, do mais recente para o mais antigo.
 func (d *DB) GetTransactionsByIDs(ids []int64) ([]models.Transaction, error) {
-	m, err := loadTransactions(d.conn, ids)
+	m, err := loadTransactions(d.conn, ids, d.book)
 	if err != nil {
 		return nil, err
 	}
@@ -120,8 +127,8 @@ type batchItem struct {
 // recordBatch grava o lote e seus itens e descarta os lotes velhos (por quantidade e por idade).
 func (d *DB) recordBatch(tx *sql.Tx, action, summary string, items []batchItem) error {
 	now := d.now().UTC()
-	res, err := tx.Exec(`INSERT INTO batches (created_at, action, summary, count) VALUES (?, ?, ?, ?)`,
-		now.Format(time.RFC3339), action, summary, len(items))
+	res, err := tx.Exec(`INSERT INTO batches (created_at, action, summary, count, book_id) VALUES (?, ?, ?, ?, ?)`,
+		now.Format(time.RFC3339), action, summary, len(items), d.book)
 	if err != nil {
 		return err
 	}
@@ -152,7 +159,7 @@ func (d *DB) recordBatch(tx *sql.Tx, action, summary string, items []batchItem) 
 
 func (d *DB) purgeBatches(tx *sql.Tx, now time.Time) error {
 	cutoff := now.Add(-batchMaxAge).Format(time.RFC3339)
-	rows, err := tx.Query(`SELECT id FROM batches WHERE created_at < ? OR id NOT IN (SELECT id FROM batches ORDER BY id DESC LIMIT ?)`, cutoff, maxBatches)
+	rows, err := tx.Query(`SELECT id FROM batches WHERE created_at < ? OR (book_id = ? AND id NOT IN (SELECT id FROM batches WHERE book_id = ? ORDER BY id DESC LIMIT ?))`, cutoff, d.book, d.book, maxBatches)
 	if err != nil {
 		return err
 	}
@@ -187,7 +194,7 @@ func (d *DB) ApplyEdits(summary string, ids []int64, edit func(models.Transactio
 	}
 	defer tx.Rollback()
 
-	current, err := loadTransactions(tx, ids)
+	current, err := loadTransactions(tx, ids, d.book)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -214,6 +221,7 @@ func (d *DB) ApplyEdits(summary string, ids []int64, edit func(models.Transactio
 			return 0, 0, err
 		}
 		a := after
+		a.BookID = before.BookID
 		items = append(items, batchItem{before: before, after: &a})
 	}
 	if len(items) == 0 {
@@ -236,7 +244,7 @@ func (d *DB) ApplyDeletes(summary string, ids []int64) (applied, skipped int, er
 	}
 	defer tx.Rollback()
 
-	current, err := loadTransactions(tx, ids)
+	current, err := loadTransactions(tx, ids, d.book)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -279,7 +287,7 @@ func (d *DB) LatestUndoableBatch() (*UndoableBatch, error) {
 		b       UndoableBatch
 		created string
 	)
-	err := d.conn.QueryRow(`SELECT id, action, summary, count, created_at FROM batches WHERE undone_at IS NULL ORDER BY id DESC LIMIT 1`).
+	err := d.conn.QueryRow(`SELECT id, action, summary, count, created_at FROM batches WHERE undone_at IS NULL AND book_id = ? ORDER BY id DESC LIMIT 1`, d.book).
 		Scan(&b.ID, &b.Action, &b.Summary, &b.Count, &created)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
@@ -306,7 +314,7 @@ func (d *DB) UndoLatestBatch() (restored, skipped int, err error) {
 		id     int64
 		action string
 	)
-	err = tx.QueryRow(`SELECT id, action FROM batches WHERE undone_at IS NULL ORDER BY id DESC LIMIT 1`).Scan(&id, &action)
+	err = tx.QueryRow(`SELECT id, action FROM batches WHERE undone_at IS NULL AND book_id = ? ORDER BY id DESC LIMIT 1`, d.book).Scan(&id, &action)
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, 0, ErrNoBatch
 	}
@@ -341,6 +349,9 @@ func (d *DB) UndoLatestBatch() (restored, skipped int, err error) {
 				rows.Close()
 				return 0, 0, err
 			}
+			if a.BookID == 0 {
+				a.BookID = d.book
+			}
 			it.after = &a
 		}
 		items = append(items, it)
@@ -348,7 +359,7 @@ func (d *DB) UndoLatestBatch() (restored, skipped int, err error) {
 	rows.Close()
 
 	for _, it := range items {
-		cur, err := loadTransactions(tx, []int64{it.before.ID})
+		cur, err := loadTransactions(tx, []int64{it.before.ID}, 0)
 		if err != nil {
 			return 0, 0, err
 		}
@@ -359,8 +370,8 @@ func (d *DB) UndoLatestBatch() (restored, skipped int, err error) {
 				skipped++
 				continue
 			}
-			if _, err := tx.Exec(`UPDATE transactions SET description = ?, category = ?, date = ?, priority = ? WHERE id = ?`,
-				it.before.Description, it.before.Category, it.before.Date, it.before.Priority, it.before.ID); err != nil {
+			if _, err := tx.Exec(`UPDATE transactions SET description = ?, category = ?, date = ?, priority = ?, book_id = ? WHERE id = ?`,
+				it.before.Description, it.before.Category, it.before.Date, it.before.Priority, it.before.BookID, it.before.ID); err != nil {
 				return 0, 0, err
 			}
 			restored++
@@ -386,9 +397,9 @@ func (d *DB) UndoLatestBatch() (restored, skipped int, err error) {
 		if err != nil {
 			return 0, 0, fmt.Errorf("data de criação inválida no lote: %w", err)
 		}
-		if _, err := tx.Exec(`INSERT INTO transactions (`+loadColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		if _, err := tx.Exec(`INSERT INTO transactions (`+loadColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			it.before.ID, it.before.Description, it.before.AmountCents, it.before.Type, it.before.Category,
-			it.before.Date, it.before.Priority, it.before.ExternalID, created); err != nil {
+			it.before.Date, it.before.Priority, it.before.ExternalID, created, it.before.BookID); err != nil {
 			return 0, 0, err
 		}
 		restored++

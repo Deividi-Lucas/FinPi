@@ -107,3 +107,68 @@ func TestCategories_AreIsolatedByBook(t *testing.T) {
 		t.Errorf("renomear categoria de outro livro: %v", err)
 	}
 }
+
+func TestImport_GoesToTheBookAndKeepsGlobalDedup(t *testing.T) {
+	pessoal, pj := twoBooks(t)
+	row := models.Transaction{Description: "Pix", AmountCents: 5000, Type: "income", Category: "Outros", Date: "2026-10-05", ExternalID: "ofx:1"}
+	if n, _, err := pj.ImportTransactions([]models.Transaction{row}); err != nil || n != 1 {
+		t.Fatalf("import no PJ: %d, %v", n, err)
+	}
+	if list, _ := pessoal.GetTransactions("2026-10"); len(list) != 0 {
+		t.Errorf("importação vazou para o Pessoal: %+v", list)
+	}
+	if n, skipped, _ := pessoal.ImportTransactions([]models.Transaction{row}); n != 0 || skipped != 1 {
+		t.Errorf("o mesmo extrato em outro livro deveria ser ignorado: n=%d skipped=%d", n, skipped)
+	}
+	if ids, _ := pessoal.ImportedExternalIDs(); !ids["ofx:1"] {
+		t.Error("ImportedExternalIDs deveria ser global")
+	}
+	mustCreate(t, pj, models.Transaction{Description: "Manual", AmountCents: 700, Type: "expense", Category: "Outros", Date: "2026-10-06"})
+	if keys, _ := pessoal.ManualTransactionKeys("2026-10-01", "2026-10-31"); len(keys) != 0 {
+		t.Errorf("chaves manuais vazaram: %+v", keys)
+	}
+	if m, _ := pessoal.LatestCategoryByDescription(); len(m) != 0 {
+		t.Errorf("histórico de categorias vazou: %+v", m)
+	}
+}
+
+func TestBulk_IsScopedByBook(t *testing.T) {
+	pessoal, pj := twoBooks(t)
+	a := mustCreate(t, pessoal, models.Transaction{Description: "A", AmountCents: 1, Type: "expense", Category: "Outros", Date: "2026-10-05"})
+	b := mustCreate(t, pj, models.Transaction{Description: "B", AmountCents: 1, Type: "expense", Category: "Outros", Date: "2026-10-05"})
+
+	got, _ := pessoal.GetTransactionsByIDs([]int64{a.ID, b.ID})
+	if len(got) != 1 || got[0].ID != a.ID {
+		t.Errorf("GetTransactionsByIDs alcançou outro livro: %+v", got)
+	}
+	applied, skipped, err := pessoal.ApplyEdits("Edição", []int64{a.ID, b.ID}, func(t models.Transaction) (models.Transaction, error) {
+		t.Category = "Lazer"
+		return t, nil
+	})
+	if err != nil || applied != 1 || skipped != 1 {
+		t.Fatalf("ApplyEdits = %d, %d, %v (quer 1 aplicado e 1 ignorado)", applied, skipped, err)
+	}
+	if cur := current(t, pj, b.ID); cur.Category != "Outros" {
+		t.Errorf("lançamento do PJ foi editado: %+v", cur)
+	}
+
+	if bt, _ := pj.LatestUndoableBatch(); bt != nil {
+		t.Errorf("o PJ enxergou o lote do Pessoal: %+v", bt)
+	}
+	if _, _, err := pj.UndoLatestBatch(); !errors.Is(err, ErrNoBatch) {
+		t.Errorf("desfazer no PJ: %v, quer ErrNoBatch", err)
+	}
+	if bt, _ := pessoal.LatestUndoableBatch(); bt == nil {
+		t.Fatal("o Pessoal deveria ter um lote para desfazer")
+	}
+	if restored, _, err := pessoal.UndoLatestBatch(); err != nil || restored != 1 {
+		t.Errorf("desfazer no Pessoal = %d, %v", restored, err)
+	}
+
+	if n, _, err := pessoal.ApplyDeletes("Exclusão", []int64{a.ID, b.ID}); err != nil || n != 1 {
+		t.Errorf("ApplyDeletes alcançou outro livro: %d, %v", n, err)
+	}
+	if got, _ := pj.GetTransactionsByIDs([]int64{b.ID}); len(got) != 1 {
+		t.Error("lançamento do PJ foi excluído")
+	}
+}
