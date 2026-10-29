@@ -313,3 +313,22 @@ func TestImportPreview_FragmentHasControls(t *testing.T) {
 		t.Error("o trecho da revisão não deve conter scripts")
 	}
 }
+
+// importPreviewBody envia o extrato sintético para a prévia, escolhendo o livro de destino.
+func importPreviewBody(t *testing.T, h *Handler, bookID string) string {
+	t.Helper()
+	rec := postFile(h.ImportPreview, "/import/preview", "extrato.csv", []byte(importCSV), url.Values{"livro": {bookID}})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d: %s", rec.Code, rec.Body.String())
+	}
+	return rec.Body.String()
+}
+
+func TestImportPreview_ShowsTheDestinationBook(t *testing.T) {
+	h, db := newTestHandler(t)
+	_, pjID := newPJ(t, db)
+	body := importPreviewBody(t, h, pjID)
+	if !strings.Contains(body, "Importando para") || !strings.Contains(body, "PJ") {
+		t.Errorf("a prévia deveria dizer o livro de destino: %.300s", body)
+	}
+}

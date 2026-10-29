@@ -729,7 +729,10 @@
     <div id="import-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 backdrop-blur-sm p-4" onclick="closeImportModal()">
         <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl p-6 relative" onclick="event.stopPropagation()">
             <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-5">
-                <h3 class="text-lg font-semibold text-white">Importar extrato</h3>
+                <div>
+                    <h3 class="text-lg font-semibold text-white">Importar extrato</h3>
+                    <p class="text-xs text-slate-400">Os lançamentos entram no livro <strong style="color: {{.Book.Hex}}">{{.Book.Name}}</strong>.</p>
+                </div>
                 <button type="button" onclick="closeImportModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer" title="Fechar (a revisão é mantida)">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
