@@ -128,6 +128,23 @@ aviso na seção leva direto ao menu de categorias. Em empate de valor, o maior/
 
 ---
 
+## 🔎 Filtros
+
+A página principal e o **Relatório** têm uma barra de **Filtros**: busca por **texto** (na descrição, ignorando acentos e
+maiúsculas; várias palavras valem juntas), **categorias** (várias, com caixas de seleção), **tipo** (todos, receitas ou
+despesas) e **faixa de valor** (de/até, inclusive). Tudo se combina e vai na URL, então o link pode ser guardado ou
+compartilhado.
+
+- **Página principal:** o filtro age na **lista do histórico** (o mês selecionado; ligue **Todos os meses** para procurar
+  em qualquer data, do mais recente ao mais antigo, até 500 lançamentos). Os cartões e o dashboard do mês continuam
+  mostrando o mês inteiro. A lista tem um resumo próprio (quantos lançamentos, receitas e despesas). Criar, editar ou
+  excluir mantém o filtro.
+- **Relatório:** **todos os números** (cartões, fluxo de caixa, recorrentes e receitas) passam a considerar só o que o
+  filtro deixa passar, inclusive as parcelas previstas (pela categoria da série e pelo nome). As setas de ano, os botões
+  de agrupamento e o interruptor de previstas preservam o filtro.
+
+---
+
 ## 📈 Relatório
 
 O botão **Relatório** abre `/relatorio`: escolha um **ano** (setas ‹ ›) ou um **período** (de/até, até 5 anos). A página
