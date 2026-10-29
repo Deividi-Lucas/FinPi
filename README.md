@@ -37,9 +37,9 @@ finpi/
 │   └── build.yml               # Pipeline de compilação automática no GitHub Actions
 ├── internal/
 │   ├── database/
-│   │   ├── sqlite.go           # Otimizações de WAL, pragmas, migração e queries SQLite
+│   │   ├── sqlite.go           # Otimizações de WAL, pragmas, migração (inclui o livro Pessoal), escopo por livro (`ForBook`) e queries SQLite
 │   │   ├── categories.go       # Categorias (por livro): criar, renomear, ocultar e excluir
-│   │   ├── books.go            # Livros: cadastro, arquivar, escopo por livro e migração para o livro Pessoal
+│   │   ├── books.go            # API de livros: criar, copiar categorias, editar e arquivar
 │   │   ├── move.go             # Mover lançamentos entre livros (prévia, categoria no destino, desfazer)
 │   │   └── sqlite_test.go      # Testes do banco (centavos, migração, exclusão)
 │   ├── handlers/
@@ -190,10 +190,11 @@ entram (as parcelas previstas ficam de fora).
 **por livro**: dashboard, relatório, filtros, parcelas, edição múltipla e desfazer só enxergam o livro aberto.
 
 - **Seletor:** no cabeçalho, cada livro tem uma **cor**; o livro aberto vai na URL (`?livro=`) e, sem ela, abre o
-  **Pessoal**.
+  primeiro livro ativo (o de menor id, normalmente o **Pessoal**).
 - **Gerenciar** (`/livros`, `/livros/editar`, `/livros/arquivar`): criar um livro **vazio** ou **copiando as categorias**
   de outro, **renomear**, trocar a **cor** e **arquivar/reativar**. Livros nunca são excluídos e sempre há pelo menos um
-  livro ativo. Arquivar o livro aberto leva de volta ao Pessoal.
+  livro ativo. Arquivar o livro aberto leva ao primeiro livro ativo
+  (o de menor id, normalmente o Pessoal).
 - **Categorias por livro:** cada livro tem as suas (nomes únicos dentro do livro); criar "Impostos" no PJ não cria no
   Pessoal.
 - **Mover lançamentos:** na edição múltipla, **Mover…** escolhe o livro de destino (`/bulk/...` com `acao=mover`). A
