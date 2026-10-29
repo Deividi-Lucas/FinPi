@@ -98,6 +98,7 @@ func TransactionKey(date string, cents int64, typ string) string {
 // ProjectedInstallment é uma parcela prevista: calculada a partir do histórico, nunca gravada.
 type ProjectedInstallment struct {
 	Name        string
+	Category    string // categoria da parcela mais recente da série (usada pelos filtros)
 	Type        string // "income" ou "expense"
 	Number      int
 	Total       int

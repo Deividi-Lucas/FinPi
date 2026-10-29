@@ -429,3 +429,153 @@ func TestReport_IncomeTablesKeepLiveUpdatesBeforeRendering(t *testing.T) {
 		t.Errorf("startLiveUpdates (%d) deve vir antes da renderização das receitas (%d)", live, render)
 	}
 }
+
+func TestReport_FilterByCategoryRecalculatesEverything(t *testing.T) {
+	h, db := newTestHandler(t)
+	seedYear(t, db)
+
+	_, body := getReport(h, "/relatorio?ano=2026&cat="+url.QueryEscape("Alimentação"))
+
+	cards := slice(body, `<section class="mt-6 grid`, `<!-- Fluxo de caixa`)
+	if !strings.Contains(cards, "R$ 240,00") || strings.Contains(cards, "R$ 1.185,00") {
+		t.Errorf("os cartões deveriam considerar só a categoria Alimentação: %s", cards)
+	}
+	rec := panel(body, "panel-categoria")
+	if !strings.Contains(rec, "Alimentação") || strings.Contains(rec, "Moradia") || strings.Contains(rec, "Lazer") {
+		t.Error("os recorrentes deveriam ter só a categoria filtrada")
+	}
+	if !strings.Contains(slice(body, `id="incomes"`, `id="panel-`), "Nenhuma receita neste período.") {
+		t.Error("filtrando uma categoria de despesa, não há receitas")
+	}
+}
+
+func TestReport_FilterByTextTypeAndValue(t *testing.T) {
+	h, db := newTestHandler(t)
+	seedYear(t, db)
+	cases := map[string]struct {
+		query string
+		want  []string
+		not   []string
+	}{
+		"texto (só receitas)": {"q=salario", []string{"R$ 10.000,00"}, []string{"R$ 1.185,00"}},
+		"tipo despesa":        {"tipo=despesa", []string{"R$ 1.185,00"}, []string{"R$ 10.000,00"}},
+		"valor mínimo":        {"min=500", []string{"R$ 10.000,00", "R$ 900,00"}, []string{"R$ 1.185,00"}},
+		"valor máximo":        {"max=100", []string{"R$ 45,00"}, []string{"R$ 10.000,00", "R$ 900,00"}},
+	}
+	for name, c := range cases {
+		_, body := getReport(h, "/relatorio?ano=2026&"+c.query)
+		cards := slice(body, `<section class="mt-6 grid`, `<!-- Fluxo de caixa`)
+		for _, w := range c.want {
+			if !strings.Contains(cards, w) {
+				t.Errorf("%s: cartões sem %q", name, w)
+			}
+		}
+		for _, n := range c.not {
+			if strings.Contains(cards, n) {
+				t.Errorf("%s: cartões não deveriam ter %q", name, n)
+			}
+		}
+	}
+}
+
+func TestReport_FilterKeepsLinksAndForms(t *testing.T) {
+	h, db := newTestHandler(t)
+	seedYear(t, db)
+	_, body := getReport(h, "/relatorio?ano=2026&q=cinema&cat=Lazer&tipo=despesa&min=1,50&todos=1")
+
+	for _, want := range []string{
+		`href="/relatorio?ano=2025&amp;cat=Lazer&amp;min=1%2C50&amp;q=cinema&amp;tipo=despesa"`, // seta do ano
+		`agrupar=mes&amp;ano=2026&amp;cat=Lazer`, // botão de agrupamento
+		`data-url="/relatorio?ano=2026&amp;cat=Lazer&amp;min=1%2C50&amp;previstas=1&amp;q=cinema&amp;tipo=despesa"`, // previstas
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("link sem os filtros: falta %s", want)
+		}
+	}
+	period := slice(body, `id="period-form"`, `</form>`)
+	for _, want := range []string{`name="q" value="cinema"`, `name="cat" value="Lazer"`, `name="tipo" value="despesa"`, `name="min" value="1,50"`} {
+		if !strings.Contains(period, want) {
+			t.Errorf("o formulário de período deveria levar o filtro: falta %s", want)
+		}
+	}
+	if strings.Contains(body, "todos=1") || strings.Contains(body, `name="todos"`) {
+		t.Error("'todos os meses' não existe no relatório")
+	}
+}
+
+func TestReport_FilterBarReflectsState(t *testing.T) {
+	h, db := newTestHandler(t)
+	seedYear(t, db)
+	_, body := getReport(h, "/relatorio?de=2026-02-01&ate=2026-02-28&agrupar=semana&previstas=1&q=pix&cat=Lazer&tipo=receita&min=1&max=9")
+	bar := slice(body, `id="filters-form"`, `</form>`)
+	for _, want := range []string{
+		`name="q" value="pix"`, `name="cat" value="Lazer" checked`, `value="receita" checked`, `name="min" value="1,00"`, `name="max" value="9,00"`,
+		`name="de" value="2026-02-01"`, `name="ate" value="2026-02-28"`, `name="agrupar" value="semana"`, `name="previstas" value="1"`,
+		"4 filtros ativos", "Limpar",
+	} {
+		if !strings.Contains(bar, want) {
+			t.Errorf("barra de filtros do relatório sem %q", want)
+		}
+	}
+	if strings.Contains(bar, `name="ano"`) {
+		t.Error("em período personalizado a barra leva de/até, não o ano")
+	}
+}
+
+func TestReport_FilterProjectedInstallmentsByCategory(t *testing.T) {
+	h, db := newTestHandler(t)
+	tx := models.Transaction{Description: "Geladeira 3/10", Category: "Moradia", Type: "expense", AmountCents: 25000, Date: "2026-10-15"}
+	if err := db.CreateTransaction(&tx); err != nil {
+		t.Fatal(err)
+	}
+	mustTx(t, db, "Cinema", "Lazer", "expense", 4500, "2026-03-03")
+
+	_, on := getReport(h, "/relatorio?ano=2026&previstas=1&cat=Moradia")
+	if n := strings.Count(on, "data-projected"); n != 2 {
+		t.Errorf("fatias previstas com a categoria da parcela = %d, quer 2", n)
+	}
+	_, off := getReport(h, "/relatorio?ano=2026&previstas=1&cat=Lazer")
+	if strings.Contains(off, "data-projected") {
+		t.Error("as previstas também respeitam o filtro de categoria")
+	}
+	_, byText := getReport(h, "/relatorio?ano=2026&previstas=1&q=geladeira")
+	if n := strings.Count(byText, "data-projected"); n != 2 {
+		t.Errorf("busca por texto nas previstas = %d fatias, quer 2", n)
+	}
+}
+
+func TestReport_FilterWithNoMatchesSaysSo(t *testing.T) {
+	h, db := newTestHandler(t)
+	seedYear(t, db)
+	_, body := getReport(h, "/relatorio?ano=2026&q=inexistente")
+	if !strings.Contains(body, "Nenhum lançamento corresponde aos filtros neste período.") {
+		t.Error("deveria dizer que nada corresponde aos filtros")
+	}
+	if strings.Contains(body, "<svg") || strings.Contains(body, "Sem lançamentos neste período.") {
+		t.Error("sem gráfico e sem a mensagem de período vazio")
+	}
+	if !strings.Contains(body, `id="filters-form"`) {
+		t.Error("a barra de filtros continua disponível para mudar o filtro")
+	}
+}
+
+func TestReport_InvalidFilterValuesWarnAndAreIgnored(t *testing.T) {
+	h, db := newTestHandler(t)
+	seedYear(t, db)
+	code, body := getReport(h, "/relatorio?ano=2026&min=abc&max=1,234")
+	if code != http.StatusOK || !strings.Contains(body, "Valor mínimo inválido") || !strings.Contains(body, "Valor máximo inválido") {
+		t.Errorf("status=%d, avisos ausentes", code)
+	}
+	if !strings.Contains(slice(body, `<section class="mt-6 grid`, `<!-- Fluxo de caixa`), "R$ 10.000,00") {
+		t.Error("valores inválidos são ignorados: o relatório continua completo")
+	}
+}
+
+func TestReport_FilterFormGuardsLiveUpdates(t *testing.T) {
+	h, _ := newTestHandler(t)
+	_, body := getReport(h, "/relatorio")
+	script := body[strings.Index(body, "startLiveUpdates(function"):]
+	if !strings.Contains(script[:800], "filters-form") {
+		t.Error("o tempo real deve proteger também o formulário de filtros")
+	}
+}

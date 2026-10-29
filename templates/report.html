@@ -49,6 +49,7 @@
                 </label>
                 {{if .GroupExplicit}}<input type="hidden" name="agrupar" value="{{.Group}}">{{end}}
                 {{if .IncludeProjected}}<input type="hidden" name="previstas" value="1">{{end}}
+                {{template "filterHidden" .}}
                 <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm px-4 py-1.5 rounded-lg transition cursor-pointer">Aplicar</button>
             </form>
 
@@ -58,8 +59,25 @@
             </label>
         </section>
 
+        <!-- Filtros: todos os números do relatório (cartões, fluxo de caixa, recorrentes e receitas) respeitam o filtro -->
+        <section id="filters" class="mt-4 p-4 rounded-2xl bg-slate-800/40 border border-slate-800">
+            <form id="filters-form" method="GET" action="/relatorio" class="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
+                {{if .Custom}}<input type="hidden" name="de" value="{{.From}}"><input type="hidden" name="ate" value="{{.To}}">{{else}}<input type="hidden" name="ano" value="{{.Year}}">{{end}}
+                {{if .GroupExplicit}}<input type="hidden" name="agrupar" value="{{.Group}}">{{end}}
+                {{if .IncludeProjected}}<input type="hidden" name="previstas" value="1">{{end}}
+
+                {{template "filterFields" .}}
+
+                <div class="flex items-center gap-2 pb-0.5">
+                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm px-4 py-2 rounded-lg transition cursor-pointer">Aplicar</button>
+                    <a href="{{.ClearURL}}" class="px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition">Limpar</a>
+                    {{if .Filter.Active}}<span class="px-2 py-1 rounded-md text-xs bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">{{.Filter.Active}} {{plural .Filter.Active "filtro ativo" "filtros ativos"}}</span>{{end}}
+                </div>
+            </form>
+        </section>
+
         {{if .Empty}}
-        <p class="mt-8 p-6 rounded-2xl bg-slate-800/40 border border-slate-800 text-sm text-slate-500 text-center">Sem lançamentos neste período.</p>
+        <p class="mt-8 p-6 rounded-2xl bg-slate-800/40 border border-slate-800 text-sm text-slate-500 text-center">{{if .Filter.Active}}Nenhum lançamento corresponde aos filtros neste período.{{else}}Sem lançamentos neste período.{{end}}</p>
         {{else}}
 
         <!-- Cartões -->
@@ -218,11 +236,18 @@
     </div>
 
     <script>
-        // Tempo real: não recarrega se você estiver mexendo nas datas do período (foco ou valor alterado).
+        // Tempo real: não recarrega se você estiver mexendo no período ou nos filtros.
         startLiveUpdates(function () {
-            const form = document.getElementById('period-form');
-            if (form.contains(document.activeElement)) return true;
-            return Array.from(form.querySelectorAll('input[type="date"]')).some(function (el) { return el.value !== el.defaultValue; });
+            // Formulários em edição (período e filtros): foco ou valor alterado.
+            return ['period-form', 'filters-form'].some(function (id) {
+                const form = document.getElementById(id);
+                if (!form) return false;
+                if (form.contains(document.activeElement)) return true;
+                return Array.from(form.elements).some(function (el) {
+                    if (el.type === 'checkbox' || el.type === 'radio') return el.checked !== el.defaultChecked;
+                    return el.value !== el.defaultValue;
+                });
+            });
         });
 
         // Tabelas ranqueadas (gastos recorrentes e fontes de receita): abas, ordenação e "Ver todas". O estado de cada

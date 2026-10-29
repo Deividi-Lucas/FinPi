@@ -40,6 +40,7 @@ func Project(candidates []models.Transaction, month string) []models.ProjectedIn
 			}
 			out = append(out, models.ProjectedInstallment{
 				Name:        l.info.Name,
+				Category:    l.tx.Category,
 				Type:        l.tx.Type,
 				Number:      k,
 				Total:       l.info.Total,
