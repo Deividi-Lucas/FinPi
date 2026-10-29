@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    {{template "headCommon"}}
+    <title>FinPi - Relatório</title>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans antialiased selection:bg-emerald-500 selection:text-white">
+    {{template "liveUpdates"}}
+    <div class="max-w-6xl mx-auto px-4 py-8">
+
+        <header class="flex flex-col sm:flex-row items-center justify-between pb-6 border-b border-slate-800 gap-4">
+            <div class="flex items-center gap-3">
+                <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-xl">🪙</div>
+                <div>
+                    <h1 class="text-2xl font-bold tracking-tight text-white">Relatório</h1>
+                    <p class="text-xs text-slate-400">Fluxo de caixa e gastos recorrentes por período</p>
+                </div>
+            </div>
+            <a href="/" class="inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-sm font-medium px-3 py-2 rounded-xl border border-slate-700 transition">Voltar ao mês</a>
+        </header>
+
+        {{if .Warning}}
+        <div class="mt-4 p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm">{{.Warning}}</div>
+        {{end}}
+
+        {{template "liveBanner"}}
+
+        <!-- Período -->
+        <section class="mt-6 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div class="flex items-center gap-2">
+                {{if .Custom}}
+                <span class="px-3 py-2 rounded-xl bg-slate-800/80 border border-slate-700 text-sm text-slate-200">{{formatDate .From}} a {{formatDate .To}}</span>
+                <a href="{{.YearURL}}" class="text-xs text-emerald-400 hover:text-emerald-300">Ver o ano completo</a>
+                {{else}}
+                <a href="{{.PrevURL}}" class="px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm" title="Ano anterior" aria-label="Ano anterior">&lsaquo;</a>
+                <span class="px-4 py-2 rounded-xl bg-slate-800/80 border border-slate-700 text-sm font-semibold text-white">{{.Year}}</span>
+                <a href="{{.NextURL}}" class="px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm" title="Próximo ano" aria-label="Próximo ano">&rsaquo;</a>
+                {{end}}
+            </div>
+
+            <form id="period-form" method="GET" action="/relatorio" class="flex flex-wrap items-center gap-2">
+                <label class="text-xs text-slate-300">De
+                    <input type="date" name="de" value="{{.From}}" required class="ml-1 bg-slate-900 text-slate-200 text-sm rounded-lg px-2 py-1.5 border border-slate-700 focus:outline-none focus:border-emerald-500">
+                </label>
+                <label class="text-xs text-slate-300">até
+                    <input type="date" name="ate" value="{{.To}}" required class="ml-1 bg-slate-900 text-slate-200 text-sm rounded-lg px-2 py-1.5 border border-slate-700 focus:outline-none focus:border-emerald-500">
+                </label>
+                {{if .GroupExplicit}}<input type="hidden" name="agrupar" value="{{.Group}}">{{end}}
+                {{if .IncludeProjected}}<input type="hidden" name="previstas" value="1">{{end}}
+                <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm px-4 py-1.5 rounded-lg transition cursor-pointer">Aplicar</button>
+            </form>
+
+            <label class="flex items-center gap-1.5 text-xs font-medium text-slate-300 cursor-pointer">
+                <input type="checkbox" {{if .IncludeProjected}}checked{{end}} data-url="{{.ToggleProjected}}" onchange="location.href = this.dataset.url" class="accent-emerald-500 cursor-pointer">
+                Incluir previstas
+            </label>
+        </section>
+
+        {{if .Empty}}
+        <p class="mt-8 p-6 rounded-2xl bg-slate-800/40 border border-slate-800 text-sm text-slate-500 text-center">Sem lançamentos neste período.</p>
+        {{else}}
+
+        <!-- Cartões -->
+        <section class="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="p-5 rounded-2xl bg-slate-800/40 border border-slate-800">
+                <p class="text-xs uppercase tracking-wider text-slate-400">Entradas</p>
+                <p class="mt-2 text-2xl font-extrabold text-emerald-400">{{formatCurrency .Cards.Income}}</p>
+                {{if .Cards.WithProjected}}<p class="mt-1 text-xs text-slate-500">(com previstas)</p>{{end}}
+            </div>
+            <div class="p-5 rounded-2xl bg-slate-800/40 border border-slate-800">
+                <p class="text-xs uppercase tracking-wider text-slate-400">Saídas</p>
+                <p class="mt-2 text-2xl font-extrabold text-rose-400">{{formatCurrency .Cards.Expense}}</p>
+                {{if .Cards.WithProjected}}<p class="mt-1 text-xs text-slate-500">(com previstas)</p>{{end}}
+            </div>
+            <div class="p-5 rounded-2xl bg-slate-800/40 border border-slate-800">
+                <p class="text-xs uppercase tracking-wider text-slate-400">Resultado</p>
+                <p class="mt-2 text-2xl font-extrabold {{if ge .Cards.Net 0}}text-emerald-400{{else}}text-rose-400{{end}}">{{formatCurrency .Cards.Net}}</p>
+                {{if .Cards.HasNetPercent}}<p class="mt-1 text-xs text-slate-500">{{formatPercent .Cards.NetPercent}} das entradas</p>{{end}}
+            </div>
+            {{if .Cards.HasAvg}}
+            <div class="p-5 rounded-2xl bg-slate-800/40 border border-slate-800">
+                <p class="text-xs uppercase tracking-wider text-slate-400">Média de saídas por mês</p>
+                <p class="mt-2 text-2xl font-extrabold text-white">{{formatCurrency .Cards.AvgExpense}}</p>
+            </div>
+            {{end}}
+        </section>
+
+        <!-- Fluxo de caixa -->
+        <section class="mt-8 p-5 rounded-2xl bg-slate-800/40 border border-slate-800">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <h2 class="text-base font-semibold text-white">Fluxo de caixa</h2>
+                <div class="flex items-center gap-2 text-xs">
+                    <span class="text-slate-400">Agrupar por:</span>
+                    {{range .Options}}
+                    {{if .Disabled}}<span class="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-600 border border-slate-800 cursor-not-allowed" title="Indisponível para o tamanho deste período">{{.Label}}</span>
+                    {{else}}<a href="{{.URL}}" class="px-3 py-1.5 rounded-lg border {{if .Active}}bg-emerald-600 text-white border-emerald-500{{else}}bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700{{end}}">{{.Label}}</a>{{end}}
+                    {{end}}
+                    {{if .GroupExplicit}}<a href="{{.AutoURL}}" class="text-emerald-400 hover:text-emerald-300">automático</a>{{end}}
+                </div>
+            </div>
+            <p class="mt-1 text-xs text-slate-500">Linha azul: saldo acumulado no período (começa em zero).</p>
+
+            <div class="mt-4 flex flex-wrap items-center gap-4 text-xs text-slate-400">
+                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-emerald-500"></span> Entradas</span>
+                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-rose-500"></span> Saídas</span>
+                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm border border-dashed border-slate-300 bg-slate-500/30"></span> Prevista</span>
+                <span class="flex items-center gap-1.5"><span class="w-4 border-t-2 border-sky-400"></span> Saldo acumulado</span>
+            </div>
+
+            <svg viewBox="0 0 {{.Chart.Width}} {{.Chart.Height}}" role="img" aria-label="{{.ChartLabel}}" class="mt-3 w-full h-auto">
+                {{range .Chart.YTicks}}
+                <line x1="{{$.Chart.Left}}" x2="{{$.Chart.Right}}" y1="{{.Y}}" y2="{{.Y}}" stroke="#334155" stroke-width="1" stroke-dasharray="2 4" />
+                <text x="{{$.Chart.Left}}" y="{{.Y}}" dx="-8" dy="4" text-anchor="end" font-size="11" fill="#94a3b8">{{.Label}}</text>
+                {{end}}
+                <line x1="{{.Chart.Left}}" x2="{{.Chart.Right}}" y1="{{.Chart.ZeroY}}" y2="{{.Chart.ZeroY}}" stroke="#64748b" stroke-width="1.5" />
+                {{range .Chart.Bars}}
+                <rect x="{{.X}}" y="{{.Y}}" width="{{.W}}" height="{{.H}}" rx="1"
+                    {{if eq .Kind "income"}}fill="#10b981"{{else}}fill="#f43f5e"{{end}}
+                    {{if .Projected}}fill-opacity="0.35" stroke-width="1" stroke-dasharray="3 2" {{if eq .Kind "income"}}stroke="#10b981"{{else}}stroke="#f43f5e"{{end}}{{end}}><title>{{.Title}}</title></rect>
+                {{end}}
+                <polyline points="{{.Chart.Line}}" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linejoin="round" />
+                {{range .Chart.Dots}}<circle cx="{{.X}}" cy="{{.Y}}" r="3" fill="#38bdf8"><title>{{.Title}}</title></circle>{{end}}
+                {{range .Chart.XLabels}}<text x="{{.X}}" y="{{$.Chart.Bottom}}" dy="18" text-anchor="middle" font-size="11" fill="#94a3b8">{{.Text}}</text>{{end}}
+            </svg>
+
+            <div class="mt-4 overflow-x-auto rounded-xl border border-slate-800">
+                <table class="w-full text-left text-xs text-slate-300">
+                    <thead class="bg-slate-900/60 uppercase tracking-wider text-slate-400 border-b border-slate-800">
+                        <tr>
+                            <th class="px-3 py-2">Período</th>
+                            <th class="px-3 py-2 text-right">Entradas</th>
+                            <th class="px-3 py-2 text-right">Saídas</th>
+                            <th class="px-3 py-2 text-right">Resultado</th>
+                            <th class="px-3 py-2 text-right">Saldo acumulado</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800/60">
+                        {{range .Buckets}}
+                        <tr data-bucket {{if .HasProjection}}data-projected{{end}}>
+                            <td class="px-3 py-2 whitespace-nowrap text-slate-100">{{.Label}}{{if .HasProjection}} <span class="ml-1 px-1.5 py-0.5 rounded-md bg-sky-500/10 text-sky-300 border border-sky-500/20">prevista</span>{{end}}</td>
+                            <td class="px-3 py-2 text-right text-emerald-400">{{formatCurrency .TotalIncome}}</td>
+                            <td class="px-3 py-2 text-right text-rose-400">{{formatCurrency .TotalExpense}}</td>
+                            <td class="px-3 py-2 text-right {{if ge .Net 0}}text-emerald-400{{else}}text-rose-400{{end}}">{{formatCurrency .Net}}</td>
+                            <td class="px-3 py-2 text-right font-medium {{if ge .Balance 0}}text-slate-100{{else}}text-rose-400{{end}}">{{formatCurrency .Balance}}</td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Gastos recorrentes -->
+        <section class="mt-8 p-5 rounded-2xl bg-slate-800/40 border border-slate-800" id="recurring">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <h2 class="text-base font-semibold text-white">Gastos recorrentes</h2>
+                <div class="flex items-center gap-2 text-xs">
+                    <button type="button" data-tab="categoria" class="px-3 py-1.5 rounded-lg border bg-emerald-600 text-white border-emerald-500 cursor-pointer">Categoria</button>
+                    <button type="button" data-tab="descricao" class="px-3 py-1.5 rounded-lg border bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700 cursor-pointer">Descrição</button>
+                </div>
+            </div>
+
+            {{template "recurringPanel" (dict "ID" "panel-categoria" "Tab" "categoria" "Rows" .Recurrence.ByCategory "Empty" "Sem despesas neste período.")}}
+            {{template "recurringPanel" (dict "ID" "panel-descricao" "Tab" "descricao" "Rows" .Recurrence.ByDescription "Empty" "Nenhum gasto se repetiu neste período.")}}
+        </section>
+        {{end}}
+
+        <footer class="mt-12 text-center text-xs text-slate-500">
+            <p>🪙 FinPi &bull; Binário único em Go &bull; Armazenamento SQLite WAL &bull; Otimizado para Raspberry Pi 3</p>
+            <p class="mt-1 text-slate-600">Versão {{.Version}}</p>
+        </footer>
+    </div>
+
+    <script>
+        // Abas, ordenação e "Ver todas" dos gastos recorrentes. O estado fica no sessionStorage para sobreviver
+        // ao recarregamento automático do tempo real.
+        const REPORT_STATE_KEY = 'finpi:relatorio';
+        const VISIBLE_ROWS = 10;
+        const state = { tab: 'categoria', sort: 'count', all: { categoria: false, descricao: false } };
+
+        function reportStore() {
+            try { return window.sessionStorage; } catch (e) { return null; }
+        }
+
+        function loadState() {
+            const store = reportStore();
+            if (!store) return;
+            try {
+                const saved = JSON.parse(store.getItem(REPORT_STATE_KEY));
+                if (saved && (saved.tab === 'categoria' || saved.tab === 'descricao')) state.tab = saved.tab;
+                if (saved && (saved.sort === 'count' || saved.sort === 'total')) state.sort = saved.sort;
+                if (saved && saved.all) { state.all.categoria = !!saved.all.categoria; state.all.descricao = !!saved.all.descricao; }
+            } catch (e) { /* sem estado salvo: usa o padrão */ }
+        }
+
+        function saveState() {
+            const store = reportStore();
+            try { if (store) store.setItem(REPORT_STATE_KEY, JSON.stringify(state)); } catch (e) { /* ignora */ }
+        }
+
+        function renderRecurring() {
+            document.querySelectorAll('[data-tab]').forEach(function (btn) {
+                const active = btn.dataset.tab === state.tab;
+                btn.className = 'px-3 py-1.5 rounded-lg border cursor-pointer ' +
+                    (active ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700');
+            });
+            document.querySelectorAll('[data-panel]').forEach(function (panel) {
+                const tab = panel.dataset.panel;
+                panel.classList.toggle('hidden', tab !== state.tab);
+                const body = panel.querySelector('tbody');
+                const rows = Array.from(body.querySelectorAll('[data-row]'));
+                rows.sort(function (a, b) {
+                    const byCount = Number(b.dataset.count) - Number(a.dataset.count);
+                    const byTotal = Number(b.dataset.total) - Number(a.dataset.total);
+                    const first = state.sort === 'total' ? byTotal : byCount;
+                    const second = state.sort === 'total' ? byCount : byTotal;
+                    return first || second || Number(a.dataset.i) - Number(b.dataset.i);
+                });
+                rows.forEach(function (row, i) {
+                    body.appendChild(row);
+                    row.classList.toggle('hidden', !state.all[tab] && i >= VISIBLE_ROWS);
+                });
+                const more = panel.querySelector('[data-more]');
+                if (more) more.classList.toggle('hidden', state.all[tab] || rows.length <= VISIBLE_ROWS);
+                panel.querySelectorAll('[data-sort]').forEach(function (th) {
+                    th.classList.toggle('text-emerald-400', th.dataset.sort === state.sort);
+                });
+            });
+        }
+
+        document.querySelectorAll('[data-tab]').forEach(function (btn) {
+            btn.addEventListener('click', function () { state.tab = btn.dataset.tab; saveState(); renderRecurring(); });
+        });
+        document.querySelectorAll('[data-sort]').forEach(function (th) {
+            th.addEventListener('click', function () { state.sort = th.dataset.sort; saveState(); renderRecurring(); });
+        });
+        document.querySelectorAll('[data-more]').forEach(function (btn) {
+            btn.addEventListener('click', function () { state.all[btn.dataset.more] = true; saveState(); renderRecurring(); });
+        });
+        loadState();
+        renderRecurring();
+
+        // Tempo real: não recarrega se você estiver mexendo nas datas do período (foco ou valor alterado).
+        startLiveUpdates(function () {
+            const form = document.getElementById('period-form');
+            if (form.contains(document.activeElement)) return true;
+            return Array.from(form.querySelectorAll('input[type="date"]')).some(function (el) { return el.value !== el.defaultValue; });
+        });
+    </script>
+</body>
+</html>
+
+{{define "recurringPanel"}}
+<div id="{{.ID}}" data-panel="{{.Tab}}" class="mt-4 {{if ne .Tab "categoria"}}hidden{{end}}">
+    {{if .Rows}}
+    <div class="overflow-x-auto rounded-xl border border-slate-800">
+        <table class="w-full text-left text-xs text-slate-300">
+            <thead class="bg-slate-900/60 uppercase tracking-wider text-slate-400 border-b border-slate-800">
+                <tr>
+                    <th class="px-3 py-2">Nome</th>
+                    <th class="px-3 py-2 text-right cursor-pointer select-none" data-sort="count" title="Ordenar por vezes">Vezes</th>
+                    <th class="px-3 py-2 text-right cursor-pointer select-none" data-sort="total" title="Ordenar pelo maior total">Total</th>
+                    <th class="px-3 py-2 text-right">Média</th>
+                    <th class="px-3 py-2 text-right">% das saídas</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/60">
+                {{range $i, $r := .Rows}}
+                <tr data-row data-i="{{$i}}" data-count="{{$r.Count}}" data-total="{{$r.TotalCents}}">
+                    <td class="px-3 py-2 text-slate-100">{{$r.Name}}</td>
+                    <td class="px-3 py-2 text-right">{{$r.Count}}</td>
+                    <td class="px-3 py-2 text-right text-rose-400">{{formatCurrency $r.TotalCents}}</td>
+                    <td class="px-3 py-2 text-right">{{formatCurrency $r.AvgCents}}</td>
+                    <td class="px-3 py-2 text-right">{{formatPercent $r.Percent}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+    <button type="button" data-more="{{.Tab}}" class="mt-3 text-xs text-emerald-400 hover:text-emerald-300 cursor-pointer">Ver todas ({{len .Rows}})</button>
+    {{else}}
+    <p class="p-4 text-sm text-slate-500">{{.Empty}}</p>
+    {{end}}
+</div>
+{{end}}

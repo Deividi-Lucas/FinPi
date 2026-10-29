@@ -68,6 +68,7 @@ func main() {
 	mux.HandleFunc("/categories/delete", h.DeleteCategory)
 	mux.HandleFunc("/import/preview", h.ImportPreview)
 	mux.HandleFunc("/import/confirm", h.ImportConfirm)
+	mux.HandleFunc("/relatorio", h.Report)
 	mux.HandleFunc("/events", h.Events) // atualização em tempo real (SSE)
 
 	addr := fmt.Sprintf("%s:%s", *host, *port)

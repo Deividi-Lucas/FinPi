@@ -47,6 +47,15 @@ func NewHandler(db *database.DB, templateFS fs.FS, version string) (*Handler, er
 		"formatPercent": func(p float64) string {
 			return strings.Replace(strconv.FormatFloat(p, 'f', 1, 64), ".", ",", 1) + "%"
 		},
+		"dict": func(pairs ...any) map[string]any {
+			m := map[string]any{}
+			for i := 0; i+1 < len(pairs); i += 2 {
+				if k, ok := pairs[i].(string); ok {
+					m[k] = pairs[i+1]
+				}
+			}
+			return m
+		},
 	}
 
 	tmpl, err := template.New("").Funcs(funcMap).ParseFS(templateFS, "templates/*.html")
