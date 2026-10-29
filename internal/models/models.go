@@ -71,6 +71,12 @@ type PageData struct {
 	HistoryExpense   int64 // soma das despesas da lista filtrada, em centavos
 	HistoryTruncated bool  // a lista mostra só os mais recentes
 	Filter           FilterView
+
+	Book     Book   // livro selecionado
+	BookID   int64  // id do livro selecionado
+	Books    []Book // livros ativos
+	AllBooks []Book // todos, para o cadastro
+	BookPath string // página atual, para o seletor de livro
 }
 
 // FilterView são os filtros da lista, prontos para o formulário e para os campos ocultos.

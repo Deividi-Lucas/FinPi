@@ -52,7 +52,7 @@ func pluralWord(n int, one, many string) string {
 }
 
 // parseBulkRequest lê e valida o pedido (ação, ids e a edição). Nunca confia no que veio do navegador.
-func (h *Handler) parseBulkRequest(form url.Values) (bulkRequest, error) {
+func parseBulkRequest(db *database.DB, form url.Values) (bulkRequest, error) {
 	var req bulkRequest
 
 	switch a := strings.TrimSpace(form.Get("acao")); a {
@@ -86,7 +86,7 @@ func (h *Handler) parseBulkRequest(form url.Values) (bulkRequest, error) {
 	spec := bulk.Spec{Find: form.Get("localizar"), Replace: form.Get("substituir")}
 
 	if c := strings.TrimSpace(form.Get("categoria")); c != "" {
-		categories, err := h.db.ListCategories()
+		categories, err := db.ListCategories()
 		if err != nil {
 			return req, &serverFault{err}
 		}
@@ -155,6 +155,7 @@ type bulkView struct {
 	SelectedMonth    string
 	IncludeProjected bool
 	Filter           models.FilterView
+	BookID           int64 // livro da operação, repetido no "aplicar"
 }
 
 var bulkParamNames = []string{"acao", "categoria", "prioridade", "data_modo", "data", "desloca", "desloca_unidade", "localizar", "substituir"}
@@ -166,37 +167,41 @@ func bulkMonth(r *http.Request) string {
 	return time.Now().Format("2006-01")
 }
 
-// bulkForm confere o método, lê o formulário e valida o pedido; devolve false se já respondeu.
-func (h *Handler) bulkForm(w http.ResponseWriter, r *http.Request) (bulkRequest, bool) {
+// bulkForm confere o método, lê o formulário, resolve o livro e valida o pedido; devolve false se já respondeu.
+func (h *Handler) bulkForm(w http.ResponseWriter, r *http.Request) (bulkRequest, *database.DB, models.Book, bool) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Método não permitido", http.StatusMethodNotAllowed)
-		return bulkRequest{}, false
+		return bulkRequest{}, nil, models.Book{}, false
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, maxBulkBody)
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Dados do formulário inválidos ou grandes demais", http.StatusBadRequest)
-		return bulkRequest{}, false
+		return bulkRequest{}, nil, models.Book{}, false
 	}
-	req, err := h.parseBulkRequest(r.PostForm)
+	db, book, ok := h.postScope(w, r)
+	if !ok {
+		return bulkRequest{}, nil, models.Book{}, false
+	}
+	req, err := parseBulkRequest(db, r.PostForm)
 	if err != nil {
 		var sf *serverFault
 		if errors.As(err, &sf) {
 			serverError(w, "Erro ao carregar categorias", sf.err)
-			return bulkRequest{}, false
+			return bulkRequest{}, nil, models.Book{}, false
 		}
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		return bulkRequest{}, false
+		return bulkRequest{}, nil, models.Book{}, false
 	}
-	return req, true
+	return req, db, book, true
 }
 
 // BulkPreview devolve a prévia (antes → depois) da edição ou da exclusão em lote. Não grava nada.
 func (h *Handler) BulkPreview(w http.ResponseWriter, r *http.Request) {
-	req, ok := h.bulkForm(w, r)
+	req, db, book, ok := h.bulkForm(w, r)
 	if !ok {
 		return
 	}
-	list, err := h.db.GetTransactionsByIDs(req.IDs)
+	list, err := db.GetTransactionsByIDs(req.IDs)
 	if err != nil {
 		serverError(w, "Erro ao carregar lançamentos", err)
 		return
@@ -208,7 +213,7 @@ func (h *Handler) BulkPreview(w http.ResponseWriter, r *http.Request) {
 
 	view := bulkView{
 		Action: req.Action, Missing: len(req.IDs) - len(list), SelectedMonth: bulkMonth(r),
-		IncludeProjected: wantsProjected(r), Filter: filterView(formFilters(r), nil, nil),
+		IncludeProjected: wantsProjected(r), Filter: filterView(formFilters(r), nil, nil), BookID: book.ID,
 	}
 	for _, name := range bulkParamNames {
 		if v := r.PostForm.Get(name); v != "" {
@@ -249,7 +254,7 @@ func bulkRedirect(w http.ResponseWriter, r *http.Request, params string) {
 
 // BulkApply revalida a operação e a grava numa única transação (com o lote que permite desfazer).
 func (h *Handler) BulkApply(w http.ResponseWriter, r *http.Request) {
-	req, ok := h.bulkForm(w, r)
+	req, db, _, ok := h.bulkForm(w, r)
 	if !ok {
 		return
 	}
@@ -261,10 +266,10 @@ func (h *Handler) BulkApply(w http.ResponseWriter, r *http.Request) {
 	)
 	if req.Action == "excluir" {
 		summary := fmt.Sprintf("Exclusão de %d %s", len(req.IDs), pluralWord(len(req.IDs), "lançamento", "lançamentos"))
-		applied, skipped, err = h.db.ApplyDeletes(summary, req.IDs)
+		applied, skipped, err = db.ApplyDeletes(summary, req.IDs)
 		param = "excluidos"
 	} else {
-		applied, skipped, err = h.db.ApplyEdits(bulk.Summary(req.Spec), req.IDs, func(t models.Transaction) (models.Transaction, error) {
+		applied, skipped, err = db.ApplyEdits(bulk.Summary(req.Spec), req.IDs, func(t models.Transaction) (models.Transaction, error) {
 			after, err := bulk.Apply(t, req.Spec)
 			if err != nil {
 				return t, &bulkValidationError{fmt.Sprintf("Lançamento %q: %s.", t.Description, err)}
@@ -302,7 +307,11 @@ func (h *Handler) BulkUndo(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Dados do formulário inválidos", http.StatusBadRequest)
 		return
 	}
-	restored, skipped, err := h.db.UndoLatestBatch()
+	db, _, ok := h.postScope(w, r)
+	if !ok {
+		return
+	}
+	restored, skipped, err := db.UndoLatestBatch()
 	if errors.Is(err, database.ErrNoBatch) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return

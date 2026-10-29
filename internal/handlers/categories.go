@@ -73,7 +73,11 @@ func (h *Handler) CreateCategory(w http.ResponseWriter, r *http.Request) {
 	if !categoryForm(w, r) {
 		return
 	}
-	_, err := h.db.CreateCategory(r.PostForm.Get("name"))
+	db, _, ok := h.postScope(w, r)
+	if !ok {
+		return
+	}
+	_, err := db.CreateCategory(r.PostForm.Get("name"))
 	h.finishCategoryAction(w, r, err)
 }
 
@@ -82,12 +86,16 @@ func (h *Handler) RenameCategory(w http.ResponseWriter, r *http.Request) {
 	if !categoryForm(w, r) {
 		return
 	}
+	db, _, ok := h.postScope(w, r)
+	if !ok {
+		return
+	}
 	id, ok := categoryID(r)
 	if !ok {
 		http.Error(w, "ID inválido", http.StatusBadRequest)
 		return
 	}
-	h.finishCategoryAction(w, r, h.db.RenameCategory(id, r.PostForm.Get("name")))
+	h.finishCategoryAction(w, r, db.RenameCategory(id, r.PostForm.Get("name")))
 }
 
 // SetCategoryVisibility oculta (hidden=1) ou reexibe (hidden=0) uma categoria nas listas de escolha.
@@ -95,12 +103,16 @@ func (h *Handler) SetCategoryVisibility(w http.ResponseWriter, r *http.Request) 
 	if !categoryForm(w, r) {
 		return
 	}
+	db, _, ok := h.postScope(w, r)
+	if !ok {
+		return
+	}
 	id, ok := categoryID(r)
 	if !ok {
 		http.Error(w, "ID inválido", http.StatusBadRequest)
 		return
 	}
-	h.finishCategoryAction(w, r, h.db.SetCategoryHidden(id, r.PostForm.Get("hidden") == "1"))
+	h.finishCategoryAction(w, r, db.SetCategoryHidden(id, r.PostForm.Get("hidden") == "1"))
 }
 
 // SetCategoryPriority classifica a categoria como essencial, supérfluo ou sem classificação (vazio).
@@ -108,12 +120,16 @@ func (h *Handler) SetCategoryPriority(w http.ResponseWriter, r *http.Request) {
 	if !categoryForm(w, r) {
 		return
 	}
+	db, _, ok := h.postScope(w, r)
+	if !ok {
+		return
+	}
 	id, ok := categoryID(r)
 	if !ok {
 		http.Error(w, "ID inválido", http.StatusBadRequest)
 		return
 	}
-	h.finishCategoryAction(w, r, h.db.SetCategoryPriority(id, strings.TrimSpace(r.PostForm.Get("priority"))))
+	h.finishCategoryAction(w, r, db.SetCategoryPriority(id, strings.TrimSpace(r.PostForm.Get("priority"))))
 }
 
 // DeleteCategory exclui uma categoria sem lançamentos.
@@ -121,10 +137,14 @@ func (h *Handler) DeleteCategory(w http.ResponseWriter, r *http.Request) {
 	if !categoryForm(w, r) {
 		return
 	}
+	db, _, ok := h.postScope(w, r)
+	if !ok {
+		return
+	}
 	id, ok := categoryID(r)
 	if !ok {
 		http.Error(w, "ID inválido", http.StatusBadRequest)
 		return
 	}
-	h.finishCategoryAction(w, r, h.db.DeleteCategory(id))
+	h.finishCategoryAction(w, r, db.DeleteCategory(id))
 }
