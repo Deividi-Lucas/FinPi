@@ -8,7 +8,7 @@
     <div class="max-w-6xl mx-auto px-4 py-8">
         
         <!-- Header -->
-        <header class="flex flex-col sm:flex-row items-center justify-between pb-8 border-b border-slate-800 gap-4">
+        <header class="flex flex-col sm:flex-row items-center justify-between pb-8 border-b border-slate-800 gap-4" style="border-bottom-color: {{.Book.Hex}}">
             <div class="flex items-center gap-3">
                 <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-xl">
                     🪙
@@ -22,7 +22,15 @@
             </div>
 
             <div class="flex flex-wrap items-center justify-center gap-2">
-            <a href="/relatorio" class="inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-sm font-medium px-3 py-2 rounded-xl border border-slate-700 transition">
+            {{template "bookBar" .}}
+            <button
+                type="button"
+                onclick="openBooksModal()"
+                class="inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-sm font-medium px-3 py-2 rounded-xl border border-slate-700 transition cursor-pointer"
+            >
+                Livros
+            </button>
+            <a href="/relatorio?livro={{.BookID}}" class="inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-sm font-medium px-3 py-2 rounded-xl border border-slate-700 transition">
                 Relatório
             </a>
             <button
@@ -35,6 +43,7 @@
 
             <!-- Filtro de Mês -->
             <form method="GET" action="/" class="flex items-center gap-2 bg-slate-800/80 p-1.5 rounded-xl border border-slate-700">
+                <input type="hidden" name="livro" value="{{.BookID}}">
                 <label for="month" class="text-xs font-medium text-slate-300 pl-2">Mês:</label>
                 <input 
                     type="month" 
@@ -68,7 +77,7 @@
 
         {{with .BulkResult}}
         <div id="bulk-result" class="mt-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm">
-            {{if eq .Kind "edit"}}{{.Count}} {{plural .Count "lançamento alterado" "lançamentos alterados"}}{{else if eq .Kind "delete"}}{{.Count}} {{plural .Count "lançamento excluído" "lançamentos excluídos"}}{{else}}{{.Count}} {{plural .Count "lançamento restaurado" "lançamentos restaurados"}}{{end}}{{if gt .Skipped 0}} &middot; {{.Skipped}} {{if eq .Kind "undo"}}{{plural .Skipped "foi alterado depois e ficou como está" "foram alterados depois e ficaram como estão"}}{{else}}{{plural .Skipped "sem mudança ou inexistente" "sem mudança ou inexistentes"}}{{end}}{{end}}.
+            {{if eq .Kind "edit"}}{{.Count}} {{plural .Count "lançamento alterado" "lançamentos alterados"}}{{else if eq .Kind "delete"}}{{.Count}} {{plural .Count "lançamento excluído" "lançamentos excluídos"}}{{else if eq .Kind "move"}}{{.Count}} {{plural .Count "lançamento movido" "lançamentos movidos"}} para outro livro{{else}}{{.Count}} {{plural .Count "lançamento restaurado" "lançamentos restaurados"}}{{end}}{{if gt .Skipped 0}} &middot; {{.Skipped}} {{if eq .Kind "undo"}}{{plural .Skipped "foi alterado depois e ficou como está" "foram alterados depois e ficaram como estão"}}{{else}}{{plural .Skipped "sem mudança ou inexistente" "sem mudança ou inexistentes"}}{{end}}{{end}}.
             {{if and $.Undo (ne .Kind "undo")}}
             <form method="POST" action="/bulk/undo" onsubmit="return confirm('Desfazer a última edição em lote?');" class="inline ml-2">
                 {{template "stateFields" $}}
@@ -238,6 +247,7 @@
             <div class="mb-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm">{{.Filter.Warning}}</div>
             {{end}}
             <form id="filters-form" method="GET" action="/" class="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
+                <input type="hidden" name="livro" value="{{.BookID}}">
                 <input type="hidden" name="month" value="{{.SelectedMonth}}">
                 {{if .IncludeProjected}}<input type="hidden" name="previstas" value="1">{{end}}
 
@@ -247,7 +257,7 @@
 
                 <div class="flex items-center gap-2 pb-0.5">
                     <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm px-4 py-2 rounded-lg transition cursor-pointer">Aplicar</button>
-                    <a href="/?month={{.SelectedMonth}}{{if .IncludeProjected}}&previstas=1{{end}}" class="px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition">Limpar</a>
+                    <a href="/?month={{.SelectedMonth}}&livro={{.BookID}}{{if .IncludeProjected}}&previstas=1{{end}}" class="px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition">Limpar</a>
                     {{if .Filter.Active}}<span class="px-2 py-1 rounded-md text-xs bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">{{.Filter.Active}} {{plural .Filter.Active "filtro ativo" "filtros ativos"}}</span>{{end}}
                 </div>
             </form>
@@ -279,6 +289,7 @@
                 <span><strong id="bulk-count">0</strong> selecionados</span>
                 <button type="button" onclick="openBulkEdit()" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium cursor-pointer">Editar…</button>
                 <button type="button" onclick="openBulkDelete()" class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-medium cursor-pointer">Excluir</button>
+                {{if gt (len .Books) 1}}<button type="button" onclick="openBulkMove()" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium cursor-pointer">Mover…</button>{{end}}
                 <button type="button" onclick="clearBulkSelection()" class="px-3 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-slate-800 cursor-pointer">Limpar seleção</button>
             </div>
 
@@ -353,6 +364,7 @@
                                     </button>
                                     <form method="POST" action="/transactions/delete" onsubmit="return confirm('Deseja realmente excluir este lançamento?');" class="inline">
                                         <input type="hidden" name="id" value="{{.ID}}">
+                                        <input type="hidden" name="livro" value="{{$.BookID}}">
                                         <input type="hidden" name="month" value="{{$.SelectedMonth}}">
                                         <input type="hidden" name="previstas" value="{{if $.IncludeProjected}}1{{end}}">
                                         <input type="hidden" name="filtros" value="{{$.Filter.Query}}">
@@ -451,6 +463,7 @@
 
             <form id="edit-form" method="POST" action="/transactions/update" data-draft-prefix="finpi:draft:editar-lancamento:" class="space-y-4">
                 <input type="hidden" id="edit-id" name="id">
+                <input type="hidden" name="livro" value="{{.BookID}}">
                 <input type="hidden" name="month" value="{{.SelectedMonth}}">
                 <input type="hidden" name="previstas" value="{{if .IncludeProjected}}1{{end}}">
                 <input type="hidden" name="filtros" value="{{.Filter.Query}}">
@@ -598,6 +611,7 @@
             <div id="new-form-error" role="alert" class="hidden mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm"></div>
 
             <form id="new-form" method="POST" action="/transactions" data-draft-key="finpi:draft:novo-lancamento" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <input type="hidden" name="livro" value="{{.BookID}}">
                 <input type="hidden" name="month" value="{{.SelectedMonth}}">
                 <input type="hidden" name="previstas" value="{{if .IncludeProjected}}1{{end}}">
                 <input type="hidden" name="filtros" value="{{.Filter.Query}}">
@@ -715,7 +729,10 @@
     <div id="import-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 backdrop-blur-sm p-4" onclick="closeImportModal()">
         <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl p-6 relative" onclick="event.stopPropagation()">
             <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-5">
-                <h3 class="text-lg font-semibold text-white">Importar extrato</h3>
+                <div>
+                    <h3 class="text-lg font-semibold text-white">Importar extrato</h3>
+                    <p class="text-xs text-slate-400">Os lançamentos entram no livro <strong style="color: {{.Book.Hex}}">{{.Book.Name}}</strong>.</p>
+                </div>
                 <button type="button" onclick="closeImportModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer" title="Fechar (a revisão é mantida)">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -800,6 +817,20 @@
                 <div class="flex items-center justify-end gap-3 pt-2 border-t border-slate-800">
                     <button type="button" onclick="closeBulkModal()" class="px-4 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition cursor-pointer">Cancelar</button>
                     <button id="bulk-form-submit" type="submit" class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-medium text-sm px-5 py-2 rounded-xl transition cursor-pointer">Ver prévia</button>
+                </div>
+            </form>
+
+            <form id="bulk-move-form" class="hidden space-y-4">
+                {{template "stateFields" .}}
+                <input type="hidden" name="acao" value="mover">
+                <label class="block text-xs font-medium text-slate-300">Mover para o livro
+                    <select name="livro_destino" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100">
+                        {{range .Books}}{{if ne .ID $.BookID}}<option value="{{.ID}}">{{.Name}}</option>{{end}}{{end}}
+                    </select>
+                </label>
+                <div class="flex items-center justify-end gap-3 pt-2 border-t border-slate-800">
+                    <button type="button" onclick="closeBulkModal()" class="px-4 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition cursor-pointer">Cancelar</button>
+                    <button type="submit" class="bg-sky-600 hover:bg-sky-500 text-white font-medium text-sm px-5 py-2 rounded-xl transition cursor-pointer">Ver prévia</button>
                 </div>
             </form>
 
@@ -893,6 +924,77 @@
                 </li>
                 {{end}}
             </ul>
+        </div>
+    </div>
+
+    <!-- Pop-up de Livros -->
+    <div id="books-modal" data-open="{{.ShowBooks}}" class="fixed inset-0 z-50 {{if .ShowBooks}}flex{{else}}hidden{{end}} items-center justify-center bg-black/60 backdrop-blur-sm p-4" onclick="closeBooksModal()">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl p-6 relative" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-5">
+                <h3 class="text-lg font-semibold text-white">Livros</h3>
+                <button type="button" onclick="closeBooksModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer" title="Fechar">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            {{if .BookError}}
+            <div class="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm">{{.BookError}}</div>
+            {{end}}
+
+            <p class="mb-4 text-xs text-slate-400">Cada livro tem seus próprios lançamentos e categorias (ex.: Pessoal e PJ).</p>
+
+            <ul class="divide-y divide-slate-800/60 mb-5">
+                {{range $b := .AllBooks}}
+                <li class="py-3 {{if .Archived}}opacity-60{{end}}">
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="min-w-0 flex items-center gap-2">
+                            <span class="inline-block h-2.5 w-2.5 rounded-full" style="background: {{.Hex}}"></span>
+                            <span class="font-medium text-slate-100">{{.Name}}</span>
+                            {{if eq .ID $.BookID}}<span class="px-2 py-0.5 rounded-md text-xs bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">aberto</span>{{end}}
+                            {{if .Archived}}<span class="px-2 py-0.5 rounded-md text-xs bg-slate-800 text-slate-400 border border-slate-700">arquivado</span>{{end}}
+                        </div>
+                        <form method="POST" action="/livros/arquivar" class="inline"{{if not .Archived}} onsubmit="return confirm('Arquivar este livro? Os lançamentos ficam guardados e ele pode ser reativado depois.');"{{end}}>
+                            <input type="hidden" name="livro" value="{{$.BookID}}">
+                            <input type="hidden" name="month" value="{{$.SelectedMonth}}">
+                            <input type="hidden" name="id" value="{{.ID}}">
+                            <input type="hidden" name="arquivar" value="{{if .Archived}}0{{else}}1{{end}}">
+                            <button type="submit" class="px-2 py-1 rounded-lg text-xs text-slate-300 hover:bg-slate-800 transition cursor-pointer">{{if .Archived}}Reativar{{else}}Arquivar{{end}}</button>
+                        </form>
+                    </div>
+                    <form method="POST" action="/livros/editar" class="mt-2 flex flex-wrap items-center gap-2">
+                        <input type="hidden" name="livro" value="{{$.BookID}}">
+                        <input type="hidden" name="month" value="{{$.SelectedMonth}}">
+                        <input type="hidden" name="id" value="{{.ID}}">
+                        <input type="text" name="name" required maxlength="40" value="{{.Name}}" aria-label="Nome do livro" class="flex-1 min-w-[8rem] bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 transition">
+                        <select name="color" aria-label="Cor do livro" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-200 cursor-pointer">
+                            {{range $.BookColors}}<option value="{{.Key}}" {{if eq .Key $b.Color}}selected{{end}}>{{.Label}}</option>{{end}}
+                        </select>
+                        <button type="submit" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition cursor-pointer">Salvar</button>
+                    </form>
+                </li>
+                {{end}}
+            </ul>
+
+            <form method="POST" action="/livros" class="space-y-2 pt-4 border-t border-slate-800">
+                <input type="hidden" name="livro" value="{{.BookID}}">
+                <input type="hidden" name="month" value="{{.SelectedMonth}}">
+                <h4 class="text-sm font-semibold text-slate-200">Novo livro</h4>
+                <div class="flex flex-wrap items-center gap-2">
+                    <input type="text" name="name" required maxlength="40" placeholder="Nome (ex.: PJ)" class="flex-1 min-w-[8rem] bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition">
+                    <select name="color" aria-label="Cor do livro" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-2 text-xs text-slate-200 cursor-pointer">
+                        {{range .BookColors}}<option value="{{.Key}}">{{.Label}}</option>{{end}}
+                    </select>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <select name="copiar_de" aria-label="Categorias do livro novo" class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-2 py-2 text-xs text-slate-200 cursor-pointer">
+                        <option value="">Começar vazio</option>
+                        {{range .Books}}<option value="{{.ID}}">Copiar categorias de {{.Name}}</option>{{end}}
+                    </select>
+                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm px-4 py-2 rounded-xl transition cursor-pointer">Criar livro</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -1012,6 +1114,24 @@
             history.replaceState(null, '', url);
         }
 
+        function openBooksModal() {
+            const modal = document.getElementById('books-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            modal.dataset.open = 'true';
+        }
+
+        function closeBooksModal() {
+            const modal = document.getElementById('books-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            modal.dataset.open = 'false';
+            // Tira ?livros=1 da URL para que um recarregamento não reabra o pop-up.
+            const url = new URL(location.href);
+            url.searchParams.delete('livros');
+            history.replaceState(null, '', url);
+        }
+
         function toggleRename(id) {
             document.getElementById('rename-' + id).classList.toggle('hidden');
         }
@@ -1020,6 +1140,7 @@
             if (e.key === 'Escape') {
                 closeEditModal();
                 closeCategoriesModal();
+                closeBooksModal();
                 closeNewModal();
                 closeImportModal();
                 closeBulkModal();
@@ -1505,6 +1626,7 @@
         }
 
         function closeBulkModal() {
+            if (bulkMoveForm) bulkMoveForm.classList.add('hidden');
             bulkModal.classList.add('hidden');
             bulkModal.classList.remove('flex');
         }
@@ -1514,6 +1636,7 @@
             if (!n) return;
             bulkPreview.innerHTML = '';
             bulkForm.classList.remove('hidden');
+            if (bulkMoveForm) bulkMoveForm.classList.add('hidden');
             showBulkError('');
             showBulkModal('Editar ' + n + ' ' + (n === 1 ? 'lançamento' : 'lançamentos'));
         }
@@ -1535,13 +1658,33 @@
                 });
                 const text = await resp.text();
                 if (!resp.ok) { showBulkError(text.trim() || 'Não foi possível montar a prévia.'); return; }
-                bulkPreview.dataset.mode = params.get('acao') === 'excluir' ? 'delete' : 'edit';
+                bulkPreview.dataset.mode = params.get('acao') === 'excluir' ? 'delete' : (params.get('acao') === 'mover' ? 'move' : 'edit');
                 bulkPreview.innerHTML = text;
                 bulkForm.classList.add('hidden');
+                if (bulkMoveForm) bulkMoveForm.classList.add('hidden');
                 if (title) showBulkModal(title);
             } catch (err) {
                 showBulkError('Sem conexão com o servidor.');
             }
+        }
+
+        const bulkMoveForm = document.getElementById('bulk-move-form');
+
+        function openBulkMove() {
+            const n = bulkSelected().length;
+            if (!n || !bulkMoveForm) return;
+            bulkPreview.innerHTML = '';
+            bulkForm.classList.add('hidden');
+            bulkMoveForm.classList.remove('hidden');
+            showBulkError('');
+            showBulkModal('Mover ' + n + ' ' + (n === 1 ? 'lançamento' : 'lançamentos'));
+        }
+
+        if (bulkMoveForm) {
+            bulkMoveForm.addEventListener('submit', async function (e) {
+                e.preventDefault();
+                await requestBulkPreview(bulkParamsFrom(bulkMoveForm));
+            });
         }
 
         function openBulkDelete() {
@@ -1565,7 +1708,7 @@
         bulkPreview.addEventListener('click', async function (e) {
             if (e.target.closest('[data-bulk-cancel]')) {
                 bulkPreview.innerHTML = '';
-                if (bulkPreview.dataset.mode === 'delete') { closeBulkModal(); } else { bulkForm.classList.remove('hidden'); }
+                if (bulkPreview.dataset.mode === 'delete') { closeBulkModal(); } else if (bulkPreview.dataset.mode === 'move' && bulkMoveForm) { bulkMoveForm.classList.remove('hidden'); } else { bulkForm.classList.remove('hidden'); }
                 return;
             }
             const apply = e.target.closest('[data-bulk-apply]');
@@ -1618,6 +1761,8 @@
             if (modal && !modal.classList.contains('hidden')) return true;
             const categories = document.getElementById('categories-modal');
             if (categories && !categories.classList.contains('hidden')) return true;
+            const books = document.getElementById('books-modal');
+            if (books && !books.classList.contains('hidden')) return true;
             // Pop-up de novo lançamento aberto: mostra o aviso em vez de recarregar. Fechado, o que foi
             // digitado já está no rascunho guardado, então recarregar é seguro.
             const newModal = document.getElementById('new-modal');
@@ -1627,7 +1772,7 @@
 </body>
 </html>
 
-{{define "stateFields"}}<input type="hidden" name="month" value="{{.SelectedMonth}}"><input type="hidden" name="previstas" value="{{if .IncludeProjected}}1{{end}}"><input type="hidden" name="filtros" value="{{.Filter.Query}}">{{end}}
+{{define "stateFields"}}<input type="hidden" name="livro" value="{{.BookID}}"><input type="hidden" name="month" value="{{.SelectedMonth}}"><input type="hidden" name="previstas" value="{{if .IncludeProjected}}1{{end}}"><input type="hidden" name="filtros" value="{{.Filter.Query}}">{{end}}
 
 {{/* filterHidden repete os filtros da lista em um formulário GET (ex.: o seletor de mês). */}}
 {{define "filterHidden"}}{{with .Filter}}{{if .Text}}<input type="hidden" name="q" value="{{.Text}}">{{end}}{{range .Categories}}<input type="hidden" name="cat" value="{{.}}">{{end}}{{if .Type}}<input type="hidden" name="tipo" value="{{.Type}}">{{end}}{{if .Min}}<input type="hidden" name="min" value="{{.Min}}">{{end}}{{if .Max}}<input type="hidden" name="max" value="{{.Max}}">{{end}}{{if .AllMonths}}<input type="hidden" name="todos" value="1">{{end}}{{end}}{{end}}

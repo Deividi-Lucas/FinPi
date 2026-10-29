@@ -17,6 +17,7 @@ var ErrNotFound = errors.New("lançamento não encontrado")
 type DB struct {
 	conn *sql.DB
 	now  func() time.Time // relógio (trocável nos testes); usado para datar os lotes de edição
+	book int64            // livro em que as consultas atuam (ver ForBook)
 }
 
 // InitDB inicializa o banco SQLite com pragmas otimizados para baixo consumo de RAM e durabilidade do cartão SD do Raspberry Pi.
@@ -53,7 +54,7 @@ func InitDB(dbPath string) (*DB, error) {
 		return nil, fmt.Errorf("erro ao aplicar schema inicial: %w", err)
 	}
 
-	return &DB{conn: conn, now: time.Now}, nil
+	return &DB{conn: conn, now: time.Now, book: DefaultBookID}, nil
 }
 
 const createTransactionsSQL = `
@@ -116,7 +117,7 @@ func migrate(conn *sql.DB) error {
 	if _, err := conn.Exec(createIndexSQL); err != nil {
 		return err
 	}
-	if _, err := conn.Exec(createCategoriesSQL); err != nil {
+	if _, err := conn.Exec(fmt.Sprintf(categoriesTableSQL, "IF NOT EXISTS categories")); err != nil {
 		return err
 	}
 	for _, table := range []string{"transactions", "categories"} {
@@ -135,8 +136,80 @@ func migrate(conn *sql.DB) error {
 			return fmt.Errorf("erro ao criar as tabelas de edição em lote: %w", err)
 		}
 	}
+	if _, err := conn.Exec(createBooksSQL); err != nil {
+		return fmt.Errorf("erro ao criar a tabela de livros: %w", err)
+	}
+	if _, err := conn.Exec(`INSERT OR IGNORE INTO books (id, name, name_key, color) VALUES (1, 'Pessoal', 'pessoal', 'emerald')`); err != nil {
+		return fmt.Errorf("erro ao criar o livro Pessoal: %w", err)
+	}
+	for _, table := range []string{"transactions", "batches"} {
+		if err := ensureColumn(conn, table, "book_id", bookColumnSQL); err != nil {
+			return fmt.Errorf("erro ao adicionar book_id em %s: %w", table, err)
+		}
+	}
+	if err := migrateCategoriesPerBook(conn); err != nil {
+		return fmt.Errorf("erro ao separar as categorias por livro: %w", err)
+	}
+	if _, err := conn.Exec(`CREATE INDEX IF NOT EXISTS idx_transactions_book_date ON transactions(book_id, date)`); err != nil {
+		return err
+	}
 	return seedCategories(conn)
 }
+
+// DefaultBookID é o livro "Pessoal", criado na migração; recebe tudo o que existia antes dos livros.
+const DefaultBookID = 1
+
+const createBooksSQL = `
+	CREATE TABLE IF NOT EXISTS books (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT NOT NULL,
+		name_key TEXT NOT NULL UNIQUE,
+		color TEXT NOT NULL DEFAULT 'emerald',
+		archived INTEGER NOT NULL DEFAULT 0,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	)`
+
+const bookColumnSQL = `book_id INTEGER NOT NULL DEFAULT 1`
+
+// migrateCategoriesPerBook reconstrói a tabela categories (formato antigo: name_key UNIQUE no banco todo)
+// com book_id e UNIQUE(book_id, name_key). Tudo numa transação; os dados ficam no livro 1.
+func migrateCategoriesPerBook(conn *sql.DB) error {
+	cols, err := tableColumns(conn, "categories")
+	if err != nil {
+		return err
+	}
+	if cols["book_id"] {
+		return nil
+	}
+	tx, err := conn.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	steps := []string{
+		fmt.Sprintf(categoriesTableSQL, "categories_new"),
+		`INSERT INTO categories_new (id, book_id, name, name_key, hidden, priority)
+		 SELECT id, 1, name, name_key, hidden, priority FROM categories`,
+		`DROP TABLE categories`,
+		`ALTER TABLE categories_new RENAME TO categories`,
+	}
+	for _, stmt := range steps {
+		if _, err := tx.Exec(stmt); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// ForBook devolve um acesso ao banco que atua só no livro informado (compartilha a conexão).
+func (d *DB) ForBook(id int64) *DB {
+	c := *d
+	c.book = id
+	return &c
+}
+
+// BookID é o livro em que este acesso atua.
+func (d *DB) BookID() int64 { return d.book }
 
 func tableColumns(conn *sql.DB, table string) (map[string]bool, error) {
 	rows, err := conn.Query(fmt.Sprintf("PRAGMA table_info(%s)", table))
@@ -214,11 +287,11 @@ func (d *DB) CreateTransaction(t *models.Transaction) error {
 		return ErrInvalidPriority
 	}
 	query := `
-		INSERT INTO transactions (description, amount_cents, type, category, date, priority, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO transactions (description, amount_cents, type, category, date, priority, created_at, book_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	now := time.Now()
-	res, err := d.conn.Exec(query, t.Description, t.AmountCents, t.Type, t.Category, t.Date, t.Priority, now)
+	res, err := d.conn.Exec(query, t.Description, t.AmountCents, t.Type, t.Category, t.Date, t.Priority, now, d.book)
 	if err != nil {
 		return err
 	}
@@ -239,17 +312,19 @@ func (d *DB) GetTransactions(yearMonth string) ([]models.Transaction, error) {
 		query = `
 			SELECT ` + transactionColumns + `
 			FROM transactions
-			WHERE strftime('%Y-%m', date) = ?
+			WHERE book_id = ? AND strftime('%Y-%m', date) = ?
 			ORDER BY date DESC, id DESC
 		`
-		args = append(args, yearMonth)
+		args = append(args, d.book, yearMonth)
 	} else {
 		query = `
 			SELECT ` + transactionColumns + `
 			FROM transactions
+			WHERE book_id = ?
 			ORDER BY date DESC, id DESC
 			LIMIT 100
 		`
+		args = append(args, d.book)
 	}
 
 	rows, err := d.conn.Query(query, args...)
@@ -267,9 +342,9 @@ func (d *DB) GetTransactionsBetween(from, to string) ([]models.Transaction, erro
 	rows, err := d.conn.Query(`
 		SELECT `+transactionColumns+`
 		FROM transactions
-		WHERE date >= ? AND date <= ?
+		WHERE book_id = ? AND date >= ? AND date <= ?
 		ORDER BY date ASC, id ASC
-	`, from, to)
+	`, d.book, from, to)
 	if err != nil {
 		return nil, err
 	}
@@ -285,9 +360,9 @@ func (d *DB) GetInstallmentCandidates() ([]models.Transaction, error) {
 	rows, err := d.conn.Query(`
 		SELECT ` + transactionColumns + `
 		FROM transactions
-		WHERE description LIKE '%/%' OR description LIKE '%parcela%'
+		WHERE book_id = ? AND (description LIKE '%/%' OR description LIKE '%parcela%')
 		ORDER BY date ASC, id ASC
-	`)
+	`, d.book)
 	if err != nil {
 		return nil, err
 	}
@@ -303,10 +378,10 @@ func (d *DB) GetSummaryByMonth(yearMonth string) (models.Summary, error) {
 			COALESCE(SUM(CASE WHEN type = 'income' THEN amount_cents ELSE 0 END), 0) AS total_income,
 			COALESCE(SUM(CASE WHEN type = 'expense' THEN amount_cents ELSE 0 END), 0) AS total_expense
 		FROM transactions
-		WHERE strftime('%Y-%m', date) = ?
+		WHERE book_id = ? AND strftime('%Y-%m', date) = ?
 	`
 	var s models.Summary
-	row := d.conn.QueryRow(query, yearMonth)
+	row := d.conn.QueryRow(query, d.book, yearMonth)
 	if err := row.Scan(&s.TotalIncome, &s.TotalExpense); err != nil {
 		return s, err
 	}
@@ -322,9 +397,9 @@ func (d *DB) UpdateTransaction(t *models.Transaction) error {
 	query := `
 		UPDATE transactions
 		SET description = ?, amount_cents = ?, type = ?, category = ?, date = ?, priority = ?
-		WHERE id = ?
+		WHERE id = ? AND book_id = ?
 	`
-	res, err := d.conn.Exec(query, t.Description, t.AmountCents, t.Type, t.Category, t.Date, t.Priority, t.ID)
+	res, err := d.conn.Exec(query, t.Description, t.AmountCents, t.Type, t.Category, t.Date, t.Priority, t.ID, d.book)
 	if err != nil {
 		return err
 	}
@@ -333,7 +408,7 @@ func (d *DB) UpdateTransaction(t *models.Transaction) error {
 
 // DeleteTransaction exclui um lançamento pelo ID.
 func (d *DB) DeleteTransaction(id int64) error {
-	res, err := d.conn.Exec(`DELETE FROM transactions WHERE id = ?`, id)
+	res, err := d.conn.Exec(`DELETE FROM transactions WHERE id = ? AND book_id = ?`, id, d.book)
 	if err != nil {
 		return err
 	}

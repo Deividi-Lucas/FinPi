@@ -30,6 +30,7 @@ type reportQuery struct {
 	Group     string // "dia", "semana", "mes" ou "" (automático)
 	Projected bool
 	Filter    filter.Filter // texto, categorias, tipo e valor (todos os números do relatório respeitam o filtro)
+	Book      int64         // livro (só quando veio explícito na URL)
 }
 
 // URL monta o link do relatório com este estado, depois de aplicar mod (se houver).
@@ -49,6 +50,9 @@ func (q reportQuery) URL(mod func(*reportQuery)) string {
 	}
 	if q.Projected {
 		v.Set("previstas", "1")
+	}
+	if q.Book > 0 {
+		v.Set("livro", strconv.FormatInt(q.Book, 10))
 	}
 	for k, vs := range q.Filter.Values() {
 		v[k] = vs
@@ -182,6 +186,11 @@ type reportPage struct {
 	Filter        models.FilterView // filtros ativos (a barra de filtros e os campos ocultos)
 	AllCategories []models.Category // lista de categorias da barra de filtros
 	ClearURL      string            // mesmo período, sem filtros
+
+	Book     models.Book // livro do relatório
+	BookID   int64
+	Books    []models.Book // livros ativos (seletor)
+	BookPath string        // página atual, para o seletor de livro
 }
 
 // Report renderiza a página do relatório por período (somente leitura).
@@ -192,15 +201,23 @@ func (h *Handler) Report(w http.ResponseWriter, r *http.Request) {
 	}
 
 	q, warning := parseReportQuery(r.URL.Query(), time.Now())
+	db, book, books, invalid, err := h.bookScope(r)
+	if err != nil {
+		serverError(w, "Erro ao carregar os livros", err)
+		return
+	}
+	if r.URL.Query().Get("livro") != "" && !invalid {
+		q.Book = book.ID // só entra nos endereços quando veio explícito e válido
+	}
 
-	txs, err := h.db.GetTransactionsBetween(q.From, q.To)
+	txs, err := db.GetTransactionsBetween(q.From, q.To)
 	if err != nil {
 		serverError(w, "Erro ao carregar lançamentos do período", err)
 		return
 	}
 	txs = filterTransactions(q.Filter, txs)
 
-	categories, err := h.db.ListCategories()
+	categories, err := db.ListCategories()
 	if err != nil {
 		serverError(w, "Erro ao carregar categorias", err)
 		return
@@ -209,7 +226,7 @@ func (h *Handler) Report(w http.ResponseWriter, r *http.Request) {
 	months := monthsBetween(q.From, q.To)
 	var projected []models.ProjectedInstallment
 	if q.Projected {
-		candidates, err := h.db.GetInstallmentCandidates()
+		candidates, err := db.GetInstallmentCandidates()
 		if err != nil {
 			serverError(w, "Erro ao carregar parcelas", err)
 			return
@@ -247,6 +264,8 @@ func (h *Handler) Report(w http.ResponseWriter, r *http.Request) {
 		Filter:        filterView(q.Filter, nil, categories),
 		AllCategories: categories,
 		ClearURL:      q.URL(func(x *reportQuery) { x.Filter = filter.Filter{} }),
+
+		Book: book, BookID: book.ID, Books: activeBooks(books), BookPath: "/relatorio",
 	}
 	for _, o := range []struct {
 		g     report.Granularity

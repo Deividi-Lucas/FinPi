@@ -72,6 +72,9 @@ func main() {
 	mux.HandleFunc("/import/preview", h.ImportPreview)
 	mux.HandleFunc("/import/confirm", h.ImportConfirm)
 	mux.HandleFunc("/relatorio", h.Report)
+	mux.HandleFunc("/livros", h.CreateBook)
+	mux.HandleFunc("/livros/editar", h.UpdateBook)
+	mux.HandleFunc("/livros/arquivar", h.ArchiveBook)
 	mux.HandleFunc("/events", h.Events) // atualização em tempo real (SSE)
 
 	addr := fmt.Sprintf("%s:%s", *host, *port)

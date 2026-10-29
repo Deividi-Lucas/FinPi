@@ -7,7 +7,34 @@
     <p class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs">{{.Missing}} {{plural .Missing "lançamento selecionado não existe mais e foi ignorado" "lançamentos selecionados não existem mais e foram ignorados"}}.</p>
     {{end}}
 
-    {{if eq .Action "excluir"}}
+    {{if eq .Action "mover"}}
+    <p class="text-sm text-sky-300">Estes lançamentos serão <strong>movidos para o livro {{.DestName}}</strong>. Você poderá desfazer logo depois.</p>
+    {{if .PartialSeries}}
+    <p class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs">Atenção: só parte das parcelas de {{range $i, $n := .PartialSeries}}{{if $i}}, {{end}}{{$n}}{{end}} está selecionada. A série ficará dividida entre os livros.</p>
+    {{end}}
+    <div class="overflow-x-auto rounded-xl border border-slate-800">
+        <table class="w-full text-left text-xs text-slate-300">
+            <thead class="bg-slate-900/60 uppercase tracking-wider text-slate-400 border-b border-slate-800">
+                <tr><th class="px-3 py-2"></th><th class="px-3 py-2">Descrição</th><th class="px-3 py-2">Data</th><th class="px-3 py-2">Categoria no destino</th></tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/60">
+                {{range .Move}}
+                <tr>
+                    <td class="px-3 py-2"><input type="checkbox" name="ids" value="{{.Tx.ID}}" checked class="cursor-pointer"></td>
+                    <td class="px-3 py-2 text-slate-100">{{.Tx.Description}}</td>
+                    <td class="px-3 py-2 whitespace-nowrap">{{formatDate .Tx.Date}}</td>
+                    <td class="px-3 py-2 whitespace-nowrap">{{.DestCat}}{{if .NewCat}} <span class="text-amber-300">(nova)</span>{{end}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+    <p class="text-xs text-slate-400">{{.Changed}} {{plural .Changed "será movido" "serão movidos"}}. Desmarque o que não quiser mover. Categorias marcadas como (nova) serão criadas no livro de destino.</p>
+    <div class="flex items-center justify-end gap-3 pt-2">
+        <button type="button" data-bulk-cancel class="px-4 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition cursor-pointer">Cancelar</button>
+        <button type="button" data-bulk-apply class="bg-sky-600 hover:bg-sky-500 text-white font-medium text-sm px-5 py-2 rounded-xl transition cursor-pointer">Mover {{.Changed}} {{plural .Changed "lançamento" "lançamentos"}}</button>
+    </div>
+    {{else if eq .Action "excluir"}}
     <p class="text-sm text-rose-300">Estes lançamentos serão <strong>excluídos</strong>. Você poderá desfazer logo depois.</p>
     <div class="overflow-x-auto rounded-xl border border-slate-800">
         <table class="w-full text-left text-xs text-slate-300">

@@ -29,8 +29,8 @@ func (d *DB) ImportedExternalIDs() (map[string]bool, error) {
 // ManualTransactionKeys devolve as chaves (data|centavos|tipo) dos lançamentos feitos à mão no intervalo.
 func (d *DB) ManualTransactionKeys(minDate, maxDate string) (map[string]bool, error) {
 	rows, err := d.conn.Query(
-		`SELECT date, amount_cents, type FROM transactions WHERE external_id = '' AND date BETWEEN ? AND ?`,
-		minDate, maxDate)
+		`SELECT date, amount_cents, type FROM transactions WHERE book_id = ? AND external_id = '' AND date BETWEEN ? AND ?`,
+		d.book, minDate, maxDate)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func (d *DB) ManualTransactionKeys(minDate, maxDate string) (map[string]bool, er
 // LatestCategoryByDescription mapeia a descrição normalizada (textutil.Fold) para a categoria do
 // lançamento mais recente (data, depois ID) com essa descrição.
 func (d *DB) LatestCategoryByDescription() (map[string]string, error) {
-	rows, err := d.conn.Query(`SELECT description, category FROM transactions ORDER BY date ASC, id ASC`)
+	rows, err := d.conn.Query(`SELECT description, category FROM transactions WHERE book_id = ? ORDER BY date ASC, id ASC`, d.book)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +70,7 @@ func (d *DB) LatestCategoryByDescription() (map[string]string, error) {
 	return out, rows.Err()
 }
 
-// ImportTransactions grava as linhas numa única transação. Linhas cujo external_id já existe são
+// ImportTransactions grava as linhas, no livro do DB, numa única transação. Linhas cujo external_id já existe são
 // ignoradas (skipped). Qualquer outro erro desfaz tudo.
 func (d *DB) ImportTransactions(rows []models.Transaction) (inserted, skipped int, err error) {
 	for _, t := range rows {
@@ -86,8 +86,8 @@ func (d *DB) ImportTransactions(rows []models.Transaction) (inserted, skipped in
 	defer tx.Rollback()
 
 	stmt, err := tx.Prepare(`
-		INSERT INTO transactions (description, amount_cents, type, category, date, priority, external_id)
-		VALUES (?, ?, ?, ?, ?, '', ?)
+		INSERT INTO transactions (description, amount_cents, type, category, date, priority, external_id, book_id)
+		VALUES (?, ?, ?, ?, ?, '', ?, ?)
 		ON CONFLICT(external_id) WHERE external_id <> '' DO NOTHING`)
 	if err != nil {
 		return 0, 0, err
@@ -95,7 +95,7 @@ func (d *DB) ImportTransactions(rows []models.Transaction) (inserted, skipped in
 	defer stmt.Close()
 
 	for _, t := range rows {
-		res, err := stmt.Exec(t.Description, t.AmountCents, t.Type, t.Category, t.Date, t.ExternalID)
+		res, err := stmt.Exec(t.Description, t.AmountCents, t.Type, t.Category, t.Date, t.ExternalID, d.book)
 		if err != nil {
 			return 0, 0, err
 		}

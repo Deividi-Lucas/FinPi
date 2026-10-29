@@ -273,7 +273,7 @@ func TestReport_EmptyPeriod(t *testing.T) {
 func TestReport_NavigationLinks(t *testing.T) {
 	h, _ := newTestHandler(t)
 	_, body := getReport(h, "/relatorio?ano=2026&previstas=1")
-	for _, want := range []string{`href="/relatorio?ano=2025&amp;previstas=1"`, `href="/relatorio?ano=2027&amp;previstas=1"`, `href="/"`} {
+	for _, want := range []string{`href="/relatorio?ano=2025&amp;previstas=1"`, `href="/relatorio?ano=2027&amp;previstas=1"`, `href="/?livro=1"`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("página sem o link %s", want)
 		}
@@ -301,7 +301,7 @@ func TestReport_RejectsNonGET(t *testing.T) {
 
 func TestDashboard_HasReportButton(t *testing.T) {
 	h, _ := newTestHandler(t)
-	if body := getDashboard(h, "/"); !strings.Contains(body, `href="/relatorio"`) {
+	if body := getDashboard(h, "/"); !strings.Contains(body, `href="/relatorio?livro=1"`) {
 		t.Error("página principal sem o botão Relatório")
 	}
 }

@@ -31,6 +31,8 @@ type importView struct {
 	SelectedMonth    string
 	IncludeProjected bool
 	Filter           models.FilterView // vazio: o trecho da revisão reaproveita o stateFields da página
+	Book             models.Book       // livro que recebe a importação
+	BookID           int64
 }
 
 func importError(w http.ResponseWriter, err error) {
@@ -59,6 +61,10 @@ func (h *Handler) ImportPreview(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Envie um arquivo de extrato (.xlsx ou .csv).", http.StatusBadRequest)
 		return
 	}
+	db, book, ok := h.postScope(w, r)
+	if !ok {
+		return
+	}
 	file, header, err := r.FormFile("file")
 	if err != nil {
 		http.Error(w, "Envie um arquivo de extrato (.xlsx ou .csv).", http.StatusBadRequest)
@@ -78,7 +84,7 @@ func (h *Handler) ImportPreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	categories, err := h.db.ListCategories()
+	categories, err := db.ListCategories()
 	if err != nil {
 		serverError(w, "Erro ao carregar categorias", err)
 		return
@@ -88,7 +94,7 @@ func (h *Handler) ImportPreview(w http.ResponseWriter, r *http.Request) {
 		options = append(options, c.Name)
 	}
 
-	existing, err := h.db.ImportedExternalIDs()
+	existing, err := db.ImportedExternalIDs()
 	if err != nil {
 		serverError(w, "Erro ao consultar importações anteriores", err)
 		return
@@ -102,12 +108,12 @@ func (h *Handler) ImportPreview(w http.ResponseWriter, r *http.Request) {
 			maxDate = row.Date
 		}
 	}
-	manual, err := h.db.ManualTransactionKeys(minDate, maxDate)
+	manual, err := db.ManualTransactionKeys(minDate, maxDate)
 	if err != nil {
 		serverError(w, "Erro ao consultar lançamentos existentes", err)
 		return
 	}
-	byDesc, err := h.db.LatestCategoryByDescription()
+	byDesc, err := db.LatestCategoryByDescription()
 	if err != nil {
 		serverError(w, "Erro ao consultar o histórico de categorias", err)
 		return
@@ -132,7 +138,7 @@ func (h *Handler) ImportPreview(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	view := importView{
 		FileName: header.Filename, Preview: preview, Options: options,
-		SelectedMonth: requestMonth(r), IncludeProjected: wantsProjected(r),
+		SelectedMonth: requestMonth(r), IncludeProjected: wantsProjected(r), Book: book, BookID: book.ID,
 	}
 	if err := h.tmpl.ExecuteTemplate(w, "importPreview", view); err != nil {
 		serverError(w, "Erro ao renderizar a revisão", err)
@@ -187,13 +193,18 @@ func (h *Handler) ImportConfirm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	db, _, ok := h.postScope(w, r)
+	if !ok {
+		return
+	}
+
 	n, err := strconv.Atoi(strings.TrimSpace(r.PostForm.Get("n")))
 	if err != nil || n < 0 || n > statement.MaxRows {
 		http.Error(w, "Dados da importação inválidos", http.StatusBadRequest)
 		return
 	}
 
-	categories, err := h.db.ListCategories()
+	categories, err := db.ListCategories()
 	if err != nil {
 		serverError(w, "Erro ao carregar categorias", err)
 		return
@@ -224,7 +235,7 @@ func (h *Handler) ImportConfirm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	inserted, skipped, err := h.db.ImportTransactions(rows)
+	inserted, skipped, err := db.ImportTransactions(rows)
 	if err != nil {
 		serverError(w, "Erro ao gravar a importação", err)
 		return
@@ -233,7 +244,7 @@ func (h *Handler) ImportConfirm(w http.ResponseWriter, r *http.Request) {
 		h.events.Publish()
 	}
 
-	target := fmt.Sprintf("/?month=%s&importados=%d&ignorados=%d", url.QueryEscape(latest[:7]), inserted, skipped)
+	target := fmt.Sprintf("/?month=%s&importados=%d&ignorados=%d", url.QueryEscape(latest[:7]), inserted, skipped) + bookQuery(r)
 	if r.PostForm.Get("previstas") == "1" {
 		target += "&previstas=1"
 	}

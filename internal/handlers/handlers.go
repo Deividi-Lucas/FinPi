@@ -104,9 +104,9 @@ var errUnknownCategory = errors.New("categoria inexistente")
 
 // resolveCategory confere a categoria do lançamento. Com "__new__", cria a categoria (ou reutiliza a
 // existente, ignorando caixa e acentos) e passa a usar o nome canônico. Ocultas continuam válidas.
-func (h *Handler) resolveCategory(form url.Values, t *models.Transaction) error {
+func (h *Handler) resolveCategory(db *database.DB, form url.Values, t *models.Transaction) error {
 	if t.Category == newCategoryOption {
-		c, err := h.db.GetOrCreateCategory(form.Get("new_category"))
+		c, err := db.GetOrCreateCategory(form.Get("new_category"))
 		if err != nil {
 			return err
 		}
@@ -114,7 +114,7 @@ func (h *Handler) resolveCategory(form url.Values, t *models.Transaction) error 
 		return nil
 	}
 
-	ok, err := h.db.CategoryExists(t.Category)
+	ok, err := db.CategoryExists(t.Category)
 	if err != nil {
 		return err
 	}
@@ -154,6 +154,7 @@ func formFilters(r *http.Request) filter.Filter {
 
 // withFilters acrescenta os filtros do formulário ao endereço de volta, para a lista continuar filtrada.
 func withFilters(target string, r *http.Request) string {
+	target += bookQuery(r)
 	if q := formFilters(r).Query(); q != "" {
 		return target + "&" + q
 	}
@@ -220,7 +221,8 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	h.renderDashboard(w, r, http.StatusOK, "", r.URL.Query().Get("categorias") == "1")
+	q := r.URL.Query()
+	h.renderPage(w, r, pageOpts{Status: http.StatusOK, ShowCategories: q.Get("categorias") == "1", ShowBooks: q.Get("livros") == "1"})
 }
 
 // requestMonth lê o mês (AAAA-MM) da URL ou, em envios de formulário, do corpo.
@@ -247,22 +249,42 @@ func visibleCategories(all []models.Category) []models.Category {
 	return out
 }
 
+// pageOpts reúne o que muda numa renderização da tela principal além do pedido.
+type pageOpts struct {
+	Status         int
+	CategoryError  string
+	ShowCategories bool
+	BookError      string
+	ShowBooks      bool
+}
+
 // renderDashboard monta e renderiza a página. Em erros do menu de categorias, devolve o status
 // correspondente com a mensagem dentro do pop-up (aberto).
 func (h *Handler) renderDashboard(w http.ResponseWriter, r *http.Request, status int, categoryError string, showCategories bool) {
+	h.renderPage(w, r, pageOpts{Status: status, CategoryError: categoryError, ShowCategories: showCategories})
+}
+
+// renderPage monta e renderiza a tela principal; erros dos pop-ups (categorias, livros) vêm em o, com o pop-up aberto.
+func (h *Handler) renderPage(w http.ResponseWriter, r *http.Request, o pageOpts) {
 	now := time.Now()
 	selectedMonth := requestMonth(r)
 	if selectedMonth == "" {
 		selectedMonth = now.Format("2006-01")
 	}
 
-	summary, err := h.db.GetSummaryByMonth(selectedMonth)
+	db, book, books, _, err := h.bookScope(r)
+	if err != nil {
+		serverError(w, "Erro ao carregar os livros", err)
+		return
+	}
+
+	summary, err := db.GetSummaryByMonth(selectedMonth)
 	if err != nil {
 		serverError(w, "Erro ao carregar resumo financeiro", err)
 		return
 	}
 
-	transactions, err := h.db.GetTransactions(selectedMonth)
+	transactions, err := db.GetTransactions(selectedMonth)
 	if err != nil {
 		serverError(w, "Erro ao carregar lançamentos", err)
 		return
@@ -270,7 +292,7 @@ func (h *Handler) renderDashboard(w http.ResponseWriter, r *http.Request, status
 
 	includeProjected := wantsProjected(r)
 
-	candidates, err := h.db.GetInstallmentCandidates()
+	candidates, err := db.GetInstallmentCandidates()
 	if err != nil {
 		serverError(w, "Erro ao carregar parcelas", err)
 		return
@@ -282,7 +304,7 @@ func (h *Handler) renderDashboard(w http.ResponseWriter, r *http.Request, status
 	}
 	installments.Annotate(transactions)
 
-	categories, err := h.db.ListCategories()
+	categories, err := db.ListCategories()
 	if err != nil {
 		serverError(w, "Erro ao carregar categorias", err)
 		return
@@ -294,7 +316,7 @@ func (h *Handler) renderDashboard(w http.ResponseWriter, r *http.Request, status
 	f, filterWarnings := requestFilter(r)
 	list := transactions
 	if f.AllMonths {
-		all, err := h.db.GetTransactionsBetween("0001-01-01", "9999-12-31")
+		all, err := db.GetTransactionsBetween("0001-01-01", "9999-12-31")
 		if err != nil {
 			serverError(w, "Erro ao carregar lançamentos", err)
 			return
@@ -320,7 +342,7 @@ func (h *Handler) renderDashboard(w http.ResponseWriter, r *http.Request, status
 	var bulkResult *models.BulkResult
 	query := r.URL.Query()
 	for _, k := range []struct{ param, skip, kind string }{
-		{"editados", "ignorados", "edit"}, {"excluidos", "ignorados", "delete"}, {"desfeitos", "pulados", "undo"},
+		{"editados", "ignorados", "edit"}, {"excluidos", "ignorados", "delete"}, {"desfeitos", "pulados", "undo"}, {"movidos", "ignorados", "move"},
 	} {
 		v := query.Get(k.param)
 		if v == "" {
@@ -335,7 +357,7 @@ func (h *Handler) renderDashboard(w http.ResponseWriter, r *http.Request, status
 	}
 
 	var undo *models.UndoView
-	if b, err := h.db.LatestUndoableBatch(); err != nil {
+	if b, err := db.LatestUndoableBatch(); err != nil {
 		serverError(w, "Erro ao consultar a última edição em lote", err)
 		return
 	} else if b != nil {
@@ -368,12 +390,21 @@ func (h *Handler) renderDashboard(w http.ResponseWriter, r *http.Request, status
 
 		Categories:     visibleCategories(categories),
 		AllCategories:  categories,
-		ShowCategories: showCategories,
-		CategoryError:  categoryError,
+		ShowCategories: o.ShowCategories,
+		CategoryError:  o.CategoryError,
+
+		Book:       book,
+		BookID:     book.ID,
+		Books:      activeBooks(books),
+		AllBooks:   books,
+		BookPath:   "/",
+		BookError:  o.BookError,
+		ShowBooks:  o.ShowBooks,
+		BookColors: models.BookColors,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(status)
+	w.WriteHeader(o.Status)
 	if err := h.tmpl.ExecuteTemplate(w, "index.html", data); err != nil {
 		serverError(w, "Erro ao renderizar página", err)
 	}
@@ -390,6 +421,10 @@ func (h *Handler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Dados do formulário inválidos", http.StatusBadRequest)
 		return
 	}
+	db, _, ok := h.postScope(w, r)
+	if !ok {
+		return
+	}
 
 	t, err := parseTransactionForm(r.PostForm)
 	if err != nil {
@@ -397,12 +432,12 @@ func (h *Handler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.resolveCategory(r.PostForm, &t); err != nil {
+	if err := h.resolveCategory(db, r.PostForm, &t); err != nil {
 		categoryFormError(w, err)
 		return
 	}
 
-	if err := h.db.CreateTransaction(&t); err != nil {
+	if err := db.CreateTransaction(&t); err != nil {
 		serverError(w, "Erro ao gravar transação", err)
 		return
 	}
@@ -423,6 +458,10 @@ func (h *Handler) UpdateTransaction(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Dados do formulário inválidos", http.StatusBadRequest)
 		return
 	}
+	db, _, ok := h.postScope(w, r)
+	if !ok {
+		return
+	}
 
 	id, err := strconv.ParseInt(strings.TrimSpace(r.PostForm.Get("id")), 10, 64)
 	if err != nil || id <= 0 {
@@ -437,12 +476,12 @@ func (h *Handler) UpdateTransaction(w http.ResponseWriter, r *http.Request) {
 	}
 	t.ID = id
 
-	if err := h.resolveCategory(r.PostForm, &t); err != nil {
+	if err := h.resolveCategory(db, r.PostForm, &t); err != nil {
 		categoryFormError(w, err)
 		return
 	}
 
-	if err := h.db.UpdateTransaction(&t); err != nil {
+	if err := db.UpdateTransaction(&t); err != nil {
 		dbError(w, "Erro ao atualizar transação", err)
 		return
 	}
@@ -462,6 +501,10 @@ func (h *Handler) DeleteTransaction(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Dados do formulário inválidos", http.StatusBadRequest)
 		return
 	}
+	db, _, ok := h.postScope(w, r)
+	if !ok {
+		return
+	}
 
 	id, err := strconv.ParseInt(strings.TrimSpace(r.PostForm.Get("id")), 10, 64)
 	if err != nil || id <= 0 {
@@ -469,7 +512,7 @@ func (h *Handler) DeleteTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.db.DeleteTransaction(id); err != nil {
+	if err := db.DeleteTransaction(id); err != nil {
 		dbError(w, "Erro ao excluir transação", err)
 		return
 	}
