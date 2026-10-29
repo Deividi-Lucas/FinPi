@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"finpi/internal/filter"
 	"finpi/internal/installments"
 	"finpi/internal/models"
 	"finpi/internal/report"
@@ -28,6 +29,7 @@ type reportQuery struct {
 	Custom    bool
 	Group     string // "dia", "semana", "mes" ou "" (automático)
 	Projected bool
+	Filter    filter.Filter // texto, categorias, tipo e valor (todos os números do relatório respeitam o filtro)
 }
 
 // URL monta o link do relatório com este estado, depois de aplicar mod (se houver).
@@ -48,6 +50,9 @@ func (q reportQuery) URL(mod func(*reportQuery)) string {
 	if q.Projected {
 		v.Set("previstas", "1")
 	}
+	for k, vs := range q.Filter.Values() {
+		v[k] = vs
+	}
 	return "/relatorio?" + v.Encode()
 }
 
@@ -55,8 +60,17 @@ func yearBounds(year int) (string, string) {
 	return fmt.Sprintf("%04d-01-01", year), fmt.Sprintf("%04d-12-31", year)
 }
 
-// parseReportQuery lê os parâmetros. Entrada inválida devolve o ano atual e uma mensagem de aviso.
+// parseReportQuery lê o período e os filtros da URL. Entrada inválida é ignorada e vira um aviso.
 func parseReportQuery(v url.Values, now time.Time) (reportQuery, string) {
+	q, warning := parsePeriod(v, now)
+	f, filterWarnings := filter.Parse(v)
+	f.AllMonths = false // "todos os meses" só existe no histórico da página principal
+	q.Filter = f
+	return q, strings.TrimSpace(warning + " " + strings.Join(filterWarnings, " "))
+}
+
+// parsePeriod lê o período (ano ou de/até), o agrupamento e as previstas. Entrada inválida devolve o ano atual e um aviso.
+func parsePeriod(v url.Values, now time.Time) (reportQuery, string) {
 	q := reportQuery{Year: now.Year(), Projected: v.Get("previstas") == "1"}
 	if g, ok := report.ParseGranularity(v.Get("agrupar")); ok {
 		q.Group = string(g)
@@ -164,6 +178,10 @@ type reportPage struct {
 	Recurrence report.Recurrence
 	Income     report.IncomeReport
 	ChartLabel string
+
+	Filter        models.FilterView // filtros ativos (a barra de filtros e os campos ocultos)
+	AllCategories []models.Category // lista de categorias da barra de filtros
+	ClearURL      string            // mesmo período, sem filtros
 }
 
 // Report renderiza a página do relatório por período (somente leitura).
@@ -180,6 +198,13 @@ func (h *Handler) Report(w http.ResponseWriter, r *http.Request) {
 		serverError(w, "Erro ao carregar lançamentos do período", err)
 		return
 	}
+	txs = filterTransactions(q.Filter, txs)
+
+	categories, err := h.db.ListCategories()
+	if err != nil {
+		serverError(w, "Erro ao carregar categorias", err)
+		return
+	}
 
 	months := monthsBetween(q.From, q.To)
 	var projected []models.ProjectedInstallment
@@ -191,7 +216,7 @@ func (h *Handler) Report(w http.ResponseWriter, r *http.Request) {
 		}
 		for _, m := range months {
 			for _, p := range installments.Project(candidates, m) {
-				if p.Date >= q.From && p.Date <= q.To {
+				if p.Date >= q.From && p.Date <= q.To && q.Filter.Match(p.Category, p.Name, p.Type, p.AmountCents) {
 					projected = append(projected, p)
 				}
 			}
@@ -218,6 +243,10 @@ func (h *Handler) Report(w http.ResponseWriter, r *http.Request) {
 		Recurrence: report.Recurring(txs),
 		Income:     report.Incomes(txs, len(months)),
 		ChartLabel: "Entradas, saídas e saldo acumulado por " + map[report.Granularity]string{report.Day: "dia", report.Week: "semana", report.Month: "mês"}[granularity],
+
+		Filter:        filterView(q.Filter, nil, categories),
+		AllCategories: categories,
+		ClearURL:      q.URL(func(x *reportQuery) { x.Filter = filter.Filter{} }),
 	}
 	for _, o := range []struct {
 		g     report.Granularity
@@ -245,4 +274,18 @@ func (h *Handler) Report(w http.ResponseWriter, r *http.Request) {
 	if err := h.tmpl.ExecuteTemplate(w, "report.html", page); err != nil {
 		serverError(w, "Erro ao renderizar relatório", err)
 	}
+}
+
+// filterTransactions deixa só os lançamentos que passam pelos filtros (a lista continua na mesma ordem).
+func filterTransactions(f filter.Filter, list []models.Transaction) []models.Transaction {
+	if f.Active() == 0 {
+		return list
+	}
+	var out []models.Transaction
+	for _, t := range list {
+		if f.Match(t.Category, t.Description, t.Type, t.AmountCents) {
+			out = append(out, t)
+		}
+	}
+	return out
 }

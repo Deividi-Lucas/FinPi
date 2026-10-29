@@ -126,3 +126,14 @@ func TestProject_SeparatesSeriesByTotalAndIgnoresPlainTransactions(t *testing.T)
 		t.Errorf("ordenação por data/nome inesperada: %+v", got)
 	}
 }
+
+func TestProject_CarriesTheCategoryOfTheLatestInstallment(t *testing.T) {
+	first := tx(1, "Geladeira 2/10", "expense", "2026-09-15", 25000)
+	first.Category = "Moradia"
+	latest := tx(2, "Geladeira 3/10", "expense", "2026-10-15", 25000)
+	latest.Category = "Casa"
+
+	if p := only(t, Project([]models.Transaction{first, latest}, "2026-11")); p.Category != "Casa" {
+		t.Errorf("categoria = %q, quer a da parcela mais recente (Casa)", p.Category)
+	}
+}

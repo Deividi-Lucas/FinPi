@@ -39,7 +39,7 @@ func redirectToCategories(w http.ResponseWriter, r *http.Request) {
 	if r.PostForm.Get("previstas") == "1" {
 		target += "&previstas=1"
 	}
-	http.Redirect(w, r, target, http.StatusSeeOther)
+	http.Redirect(w, r, withFilters(target, r), http.StatusSeeOther)
 }
 
 // finishCategoryAction conclui uma ação do menu: sucesso avisa as outras telas e redireciona;

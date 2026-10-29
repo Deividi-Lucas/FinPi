@@ -55,6 +55,7 @@
                     >
                     Incluir previstas nos totais
                 </label>
+                {{template "filterHidden" .}}
             </form>
             </div>
         </header>
@@ -219,17 +220,40 @@
             </button>
         </div>
 
+        <!-- Filtros do histórico (só a lista é filtrada; os cartões e o dashboard do mês não mudam) -->
+        <section id="filters" class="mb-4 p-4 rounded-2xl bg-slate-800/40 border border-slate-800">
+            {{if .Filter.Warning}}
+            <div class="mb-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm">{{.Filter.Warning}}</div>
+            {{end}}
+            <form id="filters-form" method="GET" action="/" class="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
+                <input type="hidden" name="month" value="{{.SelectedMonth}}">
+                {{if .IncludeProjected}}<input type="hidden" name="previstas" value="1">{{end}}
+
+                {{template "filterFields" .}}
+
+                <label class="flex items-center gap-1.5 text-xs font-medium text-slate-300 cursor-pointer pb-2.5"><input type="checkbox" name="todos" value="1" {{if .Filter.AllMonths}}checked{{end}} class="accent-emerald-500"> Todos os meses</label>
+
+                <div class="flex items-center gap-2 pb-0.5">
+                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm px-4 py-2 rounded-lg transition cursor-pointer">Aplicar</button>
+                    <a href="/?month={{.SelectedMonth}}{{if .IncludeProjected}}&previstas=1{{end}}" class="px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition">Limpar</a>
+                    {{if .Filter.Active}}<span class="px-2 py-1 rounded-md text-xs bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">{{.Filter.Active}} {{plural .Filter.Active "filtro ativo" "filtros ativos"}}</span>{{end}}
+                </div>
+            </form>
+        </section>
+
         <!-- Tabela de Histórico / Listagem -->
-        <section class="bg-slate-800/40 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+        <section id="history" class="bg-slate-800/40 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
             <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
                 <h2 class="text-base font-semibold text-white flex items-center gap-2">
                     <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                     </svg>
-                    Histórico de Transações ({{len .Transactions}})
+                    Histórico de Transações ({{.HistoryCount}})
                 </h2>
                 <span class="text-xs text-slate-400">Ordenado por data decrescente</span>
             </div>
+            <p id="history-summary" class="px-6 py-2 text-xs text-slate-400 border-b border-slate-800/60">{{.HistoryCount}} {{plural .HistoryCount "lançamento" "lançamentos"}} &middot; receitas {{formatCurrency .HistoryIncome}} &middot; despesas {{formatCurrency .HistoryExpense}}{{if .Filter.AllMonths}} &middot; todos os meses{{end}}</p>
+            {{if .HistoryTruncated}}<p class="px-6 py-2 text-xs text-amber-300 bg-amber-500/10 border-b border-amber-500/20">Mostrando os 500 mais recentes. Refine os filtros para ver os demais.</p>{{end}}
 
             <div class="overflow-x-auto">
                 <table class="w-full text-left text-sm text-slate-300">
@@ -244,7 +268,7 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-800/60">
-                        {{range .Transactions}}
+                        {{range .History}}
                         <tr class="hover:bg-slate-800/50 transition">
                             <td class="px-6 py-4 whitespace-nowrap text-xs text-slate-400">
                                 {{formatDate .Date}}
@@ -302,6 +326,7 @@
                                         <input type="hidden" name="id" value="{{.ID}}">
                                         <input type="hidden" name="month" value="{{$.SelectedMonth}}">
                                         <input type="hidden" name="previstas" value="{{if $.IncludeProjected}}1{{end}}">
+                                        <input type="hidden" name="filtros" value="{{$.Filter.Query}}">
                                         <button 
                                             type="submit" 
                                             title="Excluir lançamento"
@@ -321,13 +346,14 @@
                                 <svg class="w-10 h-10 mx-auto mb-3 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                 </svg>
-                                Nenhum lançamento registrado para o período selecionado.
+                                {{if .Filter.Active}}Nenhum lançamento corresponde aos filtros.{{else}}Nenhum lançamento registrado para o período selecionado.{{end}}
                             </td>
                         </tr>
                         {{end}}
                     </tbody>
                 </table>
             </div>
+            <div id="history-end" class="hidden"></div>
         </section>
 
         {{if .Projected}}
@@ -398,6 +424,7 @@
                 <input type="hidden" id="edit-id" name="id">
                 <input type="hidden" name="month" value="{{.SelectedMonth}}">
                 <input type="hidden" name="previstas" value="{{if .IncludeProjected}}1{{end}}">
+                <input type="hidden" name="filtros" value="{{.Filter.Query}}">
 
                 <!-- Descrição -->
                 <div>
@@ -544,6 +571,7 @@
             <form id="new-form" method="POST" action="/transactions" data-draft-key="finpi:draft:novo-lancamento" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <input type="hidden" name="month" value="{{.SelectedMonth}}">
                 <input type="hidden" name="previstas" value="{{if .IncludeProjected}}1{{end}}">
+                <input type="hidden" name="filtros" value="{{.Filter.Query}}">
 
                 <!-- Descrição -->
                 <div class="sm:col-span-2">
@@ -1333,6 +1361,13 @@
         // Tempo real (SSE): se você estiver no meio de uma edição, mostra um aviso em vez de recarregar.
         startLiveUpdates(function () {
             if (hasPendingImport()) return true; // revisão de extrato em andamento: não recarregar
+            // Formulário de filtros em edição (foco ou valor alterado): não recarregar e perder o que foi digitado.
+            const filters = document.getElementById('filters-form');
+            if (filters && filters.contains(document.activeElement)) return true;
+            if (filters && Array.from(filters.elements).some(function (el) {
+                if (el.type === 'checkbox' || el.type === 'radio') return el.checked !== el.defaultChecked;
+                return el.value !== el.defaultValue;
+            })) return true;
             const modal = document.getElementById('edit-modal');
             if (modal && !modal.classList.contains('hidden')) return true;
             const categories = document.getElementById('categories-modal');
@@ -1346,4 +1381,7 @@
 </body>
 </html>
 
-{{define "stateFields"}}<input type="hidden" name="month" value="{{.SelectedMonth}}"><input type="hidden" name="previstas" value="{{if .IncludeProjected}}1{{end}}">{{end}}
+{{define "stateFields"}}<input type="hidden" name="month" value="{{.SelectedMonth}}"><input type="hidden" name="previstas" value="{{if .IncludeProjected}}1{{end}}"><input type="hidden" name="filtros" value="{{.Filter.Query}}">{{end}}
+
+{{/* filterHidden repete os filtros da lista em um formulário GET (ex.: o seletor de mês). */}}
+{{define "filterHidden"}}{{with .Filter}}{{if .Text}}<input type="hidden" name="q" value="{{.Text}}">{{end}}{{range .Categories}}<input type="hidden" name="cat" value="{{.}}">{{end}}{{if .Type}}<input type="hidden" name="tipo" value="{{.Type}}">{{end}}{{if .Min}}<input type="hidden" name="min" value="{{.Min}}">{{end}}{{if .Max}}<input type="hidden" name="max" value="{{.Max}}">{{end}}{{if .AllMonths}}<input type="hidden" name="todos" value="1">{{end}}{{end}}{{end}}

@@ -63,3 +63,35 @@
         }
     </script>
 {{end}}
+
+{{/* filterFields: campos comuns da barra de filtros (busca, categorias, tipo e valor). O ponto precisa ter .Filter e .AllCategories. */}}
+{{define "filterFields"}}
+                <label class="flex-1 min-w-[12rem] text-xs text-slate-300">Buscar na descrição
+                    <input type="search" name="q" value="{{.Filter.Text}}" maxlength="100" placeholder="Ex.: pix fulano" class="mt-1 w-full bg-slate-900 text-slate-200 text-sm rounded-lg px-3 py-2 border border-slate-700 focus:outline-none focus:border-emerald-500">
+                </label>
+
+                <details class="relative text-xs text-slate-300">
+                    <summary class="list-none px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-sm text-slate-200 cursor-pointer select-none">Categorias{{if .Filter.Categories}} ({{len .Filter.Categories}}){{end}} &#9662;</summary>
+                    <div class="absolute z-20 mt-1 max-h-64 w-56 overflow-y-auto p-2 rounded-xl bg-slate-900 border border-slate-700 shadow-xl">
+                        {{range .AllCategories}}
+                        <label class="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-800 cursor-pointer"><input type="checkbox" name="cat" value="{{.Name}}" {{if index $.Filter.Selected .Name}}checked{{end}} class="accent-emerald-500"> {{.Name}}{{if .Hidden}} <span class="text-slate-500">(oculta)</span>{{end}}</label>
+                        {{end}}
+                    </div>
+                </details>
+
+                <div class="text-xs text-slate-300">Tipo
+                    <div class="mt-1 flex items-center gap-3 px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-sm text-slate-200">
+                        <label class="flex items-center gap-1 cursor-pointer"><input type="radio" name="tipo" value="" {{if eq .Filter.Type ""}}checked{{end}} class="accent-emerald-500"> Todos</label>
+                        <label class="flex items-center gap-1 cursor-pointer"><input type="radio" name="tipo" value="receita" {{if eq .Filter.Type "receita"}}checked{{end}} class="accent-emerald-500"> Receitas</label>
+                        <label class="flex items-center gap-1 cursor-pointer"><input type="radio" name="tipo" value="despesa" {{if eq .Filter.Type "despesa"}}checked{{end}} class="accent-emerald-500"> Despesas</label>
+                    </div>
+                </div>
+
+                <div class="text-xs text-slate-300">Valor (R$)
+                    <div class="mt-1 flex items-center gap-2">
+                        <input type="text" inputmode="decimal" name="min" value="{{.Filter.Min}}" placeholder="de" class="w-24 bg-slate-900 text-slate-200 text-sm rounded-lg px-3 py-2 border border-slate-700 focus:outline-none focus:border-emerald-500">
+                        <span class="text-slate-500">a</span>
+                        <input type="text" inputmode="decimal" name="max" value="{{.Filter.Max}}" placeholder="até" class="w-24 bg-slate-900 text-slate-200 text-sm rounded-lg px-3 py-2 border border-slate-700 focus:outline-none focus:border-emerald-500">
+                    </div>
+                </div>
+{{end}}
