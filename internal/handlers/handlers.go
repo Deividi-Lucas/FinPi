@@ -342,7 +342,7 @@ func (h *Handler) renderPage(w http.ResponseWriter, r *http.Request, o pageOpts)
 	var bulkResult *models.BulkResult
 	query := r.URL.Query()
 	for _, k := range []struct{ param, skip, kind string }{
-		{"editados", "ignorados", "edit"}, {"excluidos", "ignorados", "delete"}, {"desfeitos", "pulados", "undo"},
+		{"editados", "ignorados", "edit"}, {"excluidos", "ignorados", "delete"}, {"desfeitos", "pulados", "undo"}, {"movidos", "ignorados", "move"},
 	} {
 		v := query.Get(k.param)
 		if v == "" {

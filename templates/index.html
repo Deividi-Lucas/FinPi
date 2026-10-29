@@ -77,7 +77,7 @@
 
         {{with .BulkResult}}
         <div id="bulk-result" class="mt-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm">
-            {{if eq .Kind "edit"}}{{.Count}} {{plural .Count "lançamento alterado" "lançamentos alterados"}}{{else if eq .Kind "delete"}}{{.Count}} {{plural .Count "lançamento excluído" "lançamentos excluídos"}}{{else}}{{.Count}} {{plural .Count "lançamento restaurado" "lançamentos restaurados"}}{{end}}{{if gt .Skipped 0}} &middot; {{.Skipped}} {{if eq .Kind "undo"}}{{plural .Skipped "foi alterado depois e ficou como está" "foram alterados depois e ficaram como estão"}}{{else}}{{plural .Skipped "sem mudança ou inexistente" "sem mudança ou inexistentes"}}{{end}}{{end}}.
+            {{if eq .Kind "edit"}}{{.Count}} {{plural .Count "lançamento alterado" "lançamentos alterados"}}{{else if eq .Kind "delete"}}{{.Count}} {{plural .Count "lançamento excluído" "lançamentos excluídos"}}{{else if eq .Kind "move"}}{{.Count}} {{plural .Count "lançamento movido" "lançamentos movidos"}} para outro livro{{else}}{{.Count}} {{plural .Count "lançamento restaurado" "lançamentos restaurados"}}{{end}}{{if gt .Skipped 0}} &middot; {{.Skipped}} {{if eq .Kind "undo"}}{{plural .Skipped "foi alterado depois e ficou como está" "foram alterados depois e ficaram como estão"}}{{else}}{{plural .Skipped "sem mudança ou inexistente" "sem mudança ou inexistentes"}}{{end}}{{end}}.
             {{if and $.Undo (ne .Kind "undo")}}
             <form method="POST" action="/bulk/undo" onsubmit="return confirm('Desfazer a última edição em lote?');" class="inline ml-2">
                 {{template "stateFields" $}}
@@ -289,6 +289,7 @@
                 <span><strong id="bulk-count">0</strong> selecionados</span>
                 <button type="button" onclick="openBulkEdit()" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium cursor-pointer">Editar…</button>
                 <button type="button" onclick="openBulkDelete()" class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-medium cursor-pointer">Excluir</button>
+                {{if gt (len .Books) 1}}<button type="button" onclick="openBulkMove()" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium cursor-pointer">Mover…</button>{{end}}
                 <button type="button" onclick="clearBulkSelection()" class="px-3 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-slate-800 cursor-pointer">Limpar seleção</button>
             </div>
 
@@ -813,6 +814,20 @@
                 <div class="flex items-center justify-end gap-3 pt-2 border-t border-slate-800">
                     <button type="button" onclick="closeBulkModal()" class="px-4 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition cursor-pointer">Cancelar</button>
                     <button id="bulk-form-submit" type="submit" class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-medium text-sm px-5 py-2 rounded-xl transition cursor-pointer">Ver prévia</button>
+                </div>
+            </form>
+
+            <form id="bulk-move-form" class="hidden space-y-4">
+                {{template "stateFields" .}}
+                <input type="hidden" name="acao" value="mover">
+                <label class="block text-xs font-medium text-slate-300">Mover para o livro
+                    <select name="livro_destino" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100">
+                        {{range .Books}}{{if ne .ID $.BookID}}<option value="{{.ID}}">{{.Name}}</option>{{end}}{{end}}
+                    </select>
+                </label>
+                <div class="flex items-center justify-end gap-3 pt-2 border-t border-slate-800">
+                    <button type="button" onclick="closeBulkModal()" class="px-4 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition cursor-pointer">Cancelar</button>
+                    <button type="submit" class="bg-sky-600 hover:bg-sky-500 text-white font-medium text-sm px-5 py-2 rounded-xl transition cursor-pointer">Ver prévia</button>
                 </div>
             </form>
 
@@ -1608,6 +1623,7 @@
         }
 
         function closeBulkModal() {
+            if (bulkMoveForm) bulkMoveForm.classList.add('hidden');
             bulkModal.classList.add('hidden');
             bulkModal.classList.remove('flex');
         }
@@ -1617,6 +1633,7 @@
             if (!n) return;
             bulkPreview.innerHTML = '';
             bulkForm.classList.remove('hidden');
+            if (bulkMoveForm) bulkMoveForm.classList.add('hidden');
             showBulkError('');
             showBulkModal('Editar ' + n + ' ' + (n === 1 ? 'lançamento' : 'lançamentos'));
         }
@@ -1638,13 +1655,33 @@
                 });
                 const text = await resp.text();
                 if (!resp.ok) { showBulkError(text.trim() || 'Não foi possível montar a prévia.'); return; }
-                bulkPreview.dataset.mode = params.get('acao') === 'excluir' ? 'delete' : 'edit';
+                bulkPreview.dataset.mode = params.get('acao') === 'excluir' ? 'delete' : (params.get('acao') === 'mover' ? 'move' : 'edit');
                 bulkPreview.innerHTML = text;
                 bulkForm.classList.add('hidden');
+                if (bulkMoveForm) bulkMoveForm.classList.add('hidden');
                 if (title) showBulkModal(title);
             } catch (err) {
                 showBulkError('Sem conexão com o servidor.');
             }
+        }
+
+        const bulkMoveForm = document.getElementById('bulk-move-form');
+
+        function openBulkMove() {
+            const n = bulkSelected().length;
+            if (!n || !bulkMoveForm) return;
+            bulkPreview.innerHTML = '';
+            bulkForm.classList.add('hidden');
+            bulkMoveForm.classList.remove('hidden');
+            showBulkError('');
+            showBulkModal('Mover ' + n + ' ' + (n === 1 ? 'lançamento' : 'lançamentos'));
+        }
+
+        if (bulkMoveForm) {
+            bulkMoveForm.addEventListener('submit', async function (e) {
+                e.preventDefault();
+                await requestBulkPreview(bulkParamsFrom(bulkMoveForm));
+            });
         }
 
         function openBulkDelete() {
@@ -1668,7 +1705,7 @@
         bulkPreview.addEventListener('click', async function (e) {
             if (e.target.closest('[data-bulk-cancel]')) {
                 bulkPreview.innerHTML = '';
-                if (bulkPreview.dataset.mode === 'delete') { closeBulkModal(); } else { bulkForm.classList.remove('hidden'); }
+                if (bulkPreview.dataset.mode === 'delete') { closeBulkModal(); } else if (bulkPreview.dataset.mode === 'move' && bulkMoveForm) { bulkMoveForm.classList.remove('hidden'); } else { bulkForm.classList.remove('hidden'); }
                 return;
             }
             const apply = e.target.closest('[data-bulk-apply]');

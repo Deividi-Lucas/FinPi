@@ -104,7 +104,7 @@ type ImportResult struct {
 
 // BulkResult é o resultado de uma operação em lote, exibido num aviso após o redirecionamento.
 type BulkResult struct {
-	Kind    string // "edit", "delete" ou "undo"
+	Kind    string // "edit", "delete", "move" ou "undo"
 	Count   int
 	Skipped int
 }

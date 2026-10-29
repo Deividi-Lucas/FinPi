@@ -11,6 +11,7 @@ import (
 
 	"finpi/internal/bulk"
 	"finpi/internal/database"
+	"finpi/internal/installments"
 	"finpi/internal/models"
 	"finpi/internal/textutil"
 )
@@ -21,9 +22,10 @@ const (
 )
 
 type bulkRequest struct {
-	Action string // "editar" ou "excluir"
+	Action string // "editar", "excluir" ou "mover"
 	IDs    []int64
 	Spec   bulk.Spec
+	Dest   int64 // livro de destino (só em "mover")
 }
 
 type bulkValidationError struct{ msg string }
@@ -56,7 +58,7 @@ func parseBulkRequest(db *database.DB, form url.Values) (bulkRequest, error) {
 	var req bulkRequest
 
 	switch a := strings.TrimSpace(form.Get("acao")); a {
-	case "editar", "excluir":
+	case "editar", "excluir", "mover":
 		req.Action = a
 	default:
 		return req, errors.New("Ação inválida.")
@@ -78,6 +80,20 @@ func parseBulkRequest(db *database.DB, form url.Values) (bulkRequest, error) {
 	}
 	if len(req.IDs) == 0 {
 		return req, errors.New("Selecione ao menos um lançamento.")
+	}
+	if req.Action == "mover" {
+		dest, err := strconv.ParseInt(strings.TrimSpace(form.Get("livro_destino")), 10, 64)
+		if err != nil || dest <= 0 {
+			return req, errors.New("Escolha o livro de destino.")
+		}
+		if dest == db.BookID() {
+			return req, errors.New("O livro de destino é o mesmo de origem.")
+		}
+		if b, err := db.GetBook(dest); err != nil || b.Archived {
+			return req, errors.New("Livro de destino inválido ou arquivado.")
+		}
+		req.Dest = dest
+		return req, nil
 	}
 	if req.Action == "excluir" {
 		return req, nil
@@ -140,6 +156,13 @@ func parseBulkRequest(db *database.DB, form url.Values) (bulkRequest, error) {
 	return req, nil
 }
 
+// moveRow é uma linha da prévia de movimentação: o lançamento e a categoria que ele terá no destino.
+type moveRow struct {
+	Tx      models.Transaction
+	DestCat string
+	NewCat  bool // a categoria não existe no destino e será criada
+}
+
 // bulkParam é um campo da operação que a prévia repete em campos ocultos para o "aplicar".
 type bulkParam struct{ Name, Value string }
 
@@ -148,6 +171,9 @@ type bulkView struct {
 	Action           string
 	Rows             []bulk.Row           // edição
 	Delete           []models.Transaction // exclusão
+	Move             []moveRow            // movimentação
+	DestName         string               // nome do livro de destino
+	PartialSeries    []string             // séries de parcelas que ficariam divididas
 	Changed          int
 	Unchanged        int
 	Missing          int
@@ -158,7 +184,7 @@ type bulkView struct {
 	BookID           int64 // livro da operação, repetido no "aplicar"
 }
 
-var bulkParamNames = []string{"acao", "categoria", "prioridade", "data_modo", "data", "desloca", "desloca_unidade", "localizar", "substituir"}
+var bulkParamNames = []string{"acao", "categoria", "prioridade", "data_modo", "data", "desloca", "desloca_unidade", "localizar", "substituir", "livro_destino"}
 
 func bulkMonth(r *http.Request) string {
 	if m := r.PostForm.Get("month"); m != "" {
@@ -220,7 +246,31 @@ func (h *Handler) BulkPreview(w http.ResponseWriter, r *http.Request) {
 			view.Params = append(view.Params, bulkParam{name, v})
 		}
 	}
-	if req.Action == "excluir" {
+	if req.Action == "mover" {
+		dest := db.ForBook(req.Dest)
+		destBook, _ := db.GetBook(req.Dest)
+		cats, err := dest.ListCategories()
+		if err != nil {
+			serverError(w, "Erro ao carregar categorias do destino", err)
+			return
+		}
+		byKey := map[string]string{}
+		for _, c := range cats {
+			byKey[textutil.Fold(c.Name)] = c.Name
+		}
+		for _, t := range list {
+			name, ok := byKey[textutil.Fold(t.Category)]
+			if !ok {
+				name = t.Category
+			}
+			view.Move = append(view.Move, moveRow{Tx: t, DestCat: name, NewCat: !ok})
+		}
+		view.DestName = destBook.Name
+		if cands, err := db.GetInstallmentCandidates(); err == nil {
+			view.PartialSeries = installments.PartialSeries(list, cands)
+		}
+		view.Changed = len(list)
+	} else if req.Action == "excluir" {
 		view.Delete = list
 	} else {
 		view.Rows = bulk.Preview(list, req.Spec)
@@ -264,7 +314,10 @@ func (h *Handler) BulkApply(w http.ResponseWriter, r *http.Request) {
 		err              error
 		param            string
 	)
-	if req.Action == "excluir" {
+	if req.Action == "mover" {
+		applied, skipped, err = db.MoveToBook(req.IDs, req.Dest)
+		param = "movidos"
+	} else if req.Action == "excluir" {
 		summary := fmt.Sprintf("Exclusão de %d %s", len(req.IDs), pluralWord(len(req.IDs), "lançamento", "lançamentos"))
 		applied, skipped, err = db.ApplyDeletes(summary, req.IDs)
 		param = "excluidos"
@@ -282,6 +335,10 @@ func (h *Handler) BulkApply(w http.ResponseWriter, r *http.Request) {
 		var ve *bulkValidationError
 		if errors.As(err, &ve) {
 			http.Error(w, ve.msg, http.StatusBadRequest)
+			return
+		}
+		if errors.Is(err, database.ErrBookNotFound) || errors.Is(err, database.ErrSameBook) {
+			http.Error(w, "Livro de destino inválido.", http.StatusBadRequest)
 			return
 		}
 		if errors.Is(err, database.ErrInvalidPriority) {
