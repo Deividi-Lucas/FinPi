@@ -56,3 +56,54 @@ func TestTransactions_AreIsolatedByBook(t *testing.T) {
 		t.Errorf("excluir no próprio livro: %v", err)
 	}
 }
+
+func TestCategories_AreIsolatedByBook(t *testing.T) {
+	pessoal, pj := twoBooks(t)
+	// "Lazer" já vem nas categorias padrão do Pessoal
+	if _, err := pessoal.GetOrCreateCategory("Lazer"); err != nil {
+		t.Fatal(err)
+	}
+	if ok, _ := pj.CategoryExists("Lazer"); ok {
+		t.Error("categoria do Pessoal apareceu no PJ")
+	}
+	c, err := pj.CreateCategory("Lazer") // o mesmo nome vale em outro livro
+	if err != nil {
+		t.Fatalf("mesmo nome em outro livro: %v", err)
+	}
+	if _, err := pj.CreateCategory("lazer"); !errors.Is(err, ErrCategoryExists) {
+		t.Errorf("repetir no mesmo livro: %v", err)
+	}
+
+	mustCreate(t, pessoal, models.Transaction{Description: "Cinema", AmountCents: 1000, Type: "expense", Category: "Lazer", Date: "2026-10-05"})
+	cats, _ := pj.ListCategories()
+	if len(cats) != 1 || cats[0].Usage != 0 {
+		t.Errorf("uso da categoria do PJ contou lançamentos do Pessoal: %+v", cats)
+	}
+	// renomear no PJ não mexe nos lançamentos do Pessoal
+	if err := pj.RenameCategory(c.ID, "Diversão"); err != nil {
+		t.Fatal(err)
+	}
+	if list, _ := pessoal.GetTransactions("2026-10"); list[0].Category != "Lazer" {
+		t.Errorf("lançamento do Pessoal foi renomeado: %+v", list[0])
+	}
+	// categoria de outro livro: ocultar, classificar e excluir devem falhar
+	pessoalCats, _ := pessoal.ListCategories()
+	var lazerID int64
+	for _, pc := range pessoalCats {
+		if pc.Name == "Lazer" {
+			lazerID = pc.ID
+		}
+	}
+	if err := pj.SetCategoryHidden(lazerID, true); !errors.Is(err, ErrCategoryNotFound) {
+		t.Errorf("ocultar categoria de outro livro: %v", err)
+	}
+	if err := pj.SetCategoryPriority(lazerID, models.PriorityEssential); !errors.Is(err, ErrCategoryNotFound) {
+		t.Errorf("classificar categoria de outro livro: %v", err)
+	}
+	if err := pj.DeleteCategory(lazerID); !errors.Is(err, ErrCategoryNotFound) {
+		t.Errorf("excluir categoria de outro livro: %v", err)
+	}
+	if err := pj.RenameCategory(lazerID, "X"); !errors.Is(err, ErrCategoryNotFound) {
+		t.Errorf("renomear categoria de outro livro: %v", err)
+	}
+}

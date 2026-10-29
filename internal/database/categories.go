@@ -70,9 +70,9 @@ type usage struct {
 	count    int
 }
 
-// categoryUsage agrupa os lançamentos por categoria normalizada (textutil.Fold).
-func categoryUsage(q queryer) (map[string]*usage, error) {
-	rows, err := q.Query(`SELECT category, COUNT(*) FROM transactions GROUP BY category`)
+// categoryUsage agrupa os lançamentos do livro por categoria normalizada (textutil.Fold).
+func categoryUsage(q queryer, book int64) (map[string]*usage, error) {
+	rows, err := q.Query(`SELECT category, COUNT(*) FROM transactions WHERE book_id = ? GROUP BY category`, book)
 	if err != nil {
 		return nil, err
 	}
@@ -150,12 +150,12 @@ func seedCategories(conn *sql.DB) error {
 
 // ListCategories devolve todas as categorias (ocultas inclusive), em ordem alfabética sem acentos.
 func (d *DB) ListCategories() ([]models.Category, error) {
-	use, err := categoryUsage(d.conn)
+	use, err := categoryUsage(d.conn, d.book)
 	if err != nil {
 		return nil, err
 	}
 
-	rows, err := d.conn.Query(`SELECT id, name, name_key, hidden, priority FROM categories ORDER BY name_key`)
+	rows, err := d.conn.Query(`SELECT id, name, name_key, hidden, priority FROM categories WHERE book_id = ? ORDER BY name_key`, d.book)
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +183,7 @@ func (d *DB) ListCategories() ([]models.Category, error) {
 // CategoryExists diz se existe categoria com esse nome (ignora caixa e acentos; ocultas contam).
 func (d *DB) CategoryExists(name string) (bool, error) {
 	var n int
-	err := d.conn.QueryRow(`SELECT COUNT(*) FROM categories WHERE name_key = ?`, textutil.Fold(name)).Scan(&n)
+	err := d.conn.QueryRow(`SELECT COUNT(*) FROM categories WHERE book_id = ? AND name_key = ?`, d.book, textutil.Fold(name)).Scan(&n)
 	return n > 0, err
 }
 
@@ -201,7 +201,7 @@ func (d *DB) CreateCategory(name string) (models.Category, error) {
 		return models.Category{}, ErrCategoryExists
 	}
 
-	res, err := d.conn.Exec(`INSERT INTO categories (name, name_key) VALUES (?, ?)`, clean, textutil.Fold(clean))
+	res, err := d.conn.Exec(`INSERT INTO categories (book_id, name, name_key) VALUES (?, ?, ?)`, d.book, clean, textutil.Fold(clean))
 	if err != nil {
 		return models.Category{}, err
 	}
@@ -223,7 +223,7 @@ func (d *DB) GetOrCreateCategory(name string) (models.Category, error) {
 		c      models.Category
 		hidden int
 	)
-	err = d.conn.QueryRow(`SELECT id, name, hidden, priority FROM categories WHERE name_key = ?`, textutil.Fold(clean)).
+	err = d.conn.QueryRow(`SELECT id, name, hidden, priority FROM categories WHERE book_id = ? AND name_key = ?`, d.book, textutil.Fold(clean)).
 		Scan(&c.ID, &c.Name, &hidden, &c.Priority)
 	switch {
 	case err == nil:
@@ -250,7 +250,7 @@ func (d *DB) RenameCategory(id int64, name string) error {
 	defer tx.Rollback()
 
 	var oldKey string
-	err = tx.QueryRow(`SELECT name_key FROM categories WHERE id = ?`, id).Scan(&oldKey)
+	err = tx.QueryRow(`SELECT name_key FROM categories WHERE id = ? AND book_id = ?`, id, d.book).Scan(&oldKey)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ErrCategoryNotFound
 	}
@@ -260,25 +260,25 @@ func (d *DB) RenameCategory(id int64, name string) error {
 
 	newKey := textutil.Fold(clean)
 	var others int
-	if err := tx.QueryRow(`SELECT COUNT(*) FROM categories WHERE name_key = ? AND id <> ?`, newKey, id).Scan(&others); err != nil {
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM categories WHERE book_id = ? AND name_key = ? AND id <> ?`, d.book, newKey, id).Scan(&others); err != nil {
 		return err
 	}
 	if others > 0 {
 		return ErrCategoryExists
 	}
 
-	use, err := categoryUsage(tx)
+	use, err := categoryUsage(tx, d.book)
 	if err != nil {
 		return err
 	}
 	if u := use[oldKey]; u != nil {
 		for _, variant := range u.variants {
-			if _, err := tx.Exec(`UPDATE transactions SET category = ? WHERE category = ?`, clean, variant); err != nil {
+			if _, err := tx.Exec(`UPDATE transactions SET category = ? WHERE book_id = ? AND category = ?`, clean, d.book, variant); err != nil {
 				return err
 			}
 		}
 	}
-	if _, err := tx.Exec(`UPDATE categories SET name = ?, name_key = ? WHERE id = ?`, clean, newKey, id); err != nil {
+	if _, err := tx.Exec(`UPDATE categories SET name = ?, name_key = ? WHERE id = ? AND book_id = ?`, clean, newKey, id, d.book); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -290,7 +290,7 @@ func (d *DB) SetCategoryHidden(id int64, hidden bool) error {
 	if hidden {
 		flag = 1
 	}
-	res, err := d.conn.Exec(`UPDATE categories SET hidden = ? WHERE id = ?`, flag, id)
+	res, err := d.conn.Exec(`UPDATE categories SET hidden = ? WHERE id = ? AND book_id = ?`, flag, id, d.book)
 	if err != nil {
 		return err
 	}
@@ -309,7 +309,7 @@ func (d *DB) SetCategoryPriority(id int64, priority string) error {
 	if !models.ValidPriority(priority) {
 		return ErrInvalidPriority
 	}
-	res, err := d.conn.Exec(`UPDATE categories SET priority = ? WHERE id = ?`, priority, id)
+	res, err := d.conn.Exec(`UPDATE categories SET priority = ? WHERE id = ? AND book_id = ?`, priority, id, d.book)
 	if err != nil {
 		return err
 	}
@@ -332,7 +332,7 @@ func (d *DB) DeleteCategory(id int64) error {
 	defer tx.Rollback()
 
 	var name, key string
-	err = tx.QueryRow(`SELECT name, name_key FROM categories WHERE id = ?`, id).Scan(&name, &key)
+	err = tx.QueryRow(`SELECT name, name_key FROM categories WHERE id = ? AND book_id = ?`, id, d.book).Scan(&name, &key)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ErrCategoryNotFound
 	}
@@ -340,7 +340,7 @@ func (d *DB) DeleteCategory(id int64) error {
 		return err
 	}
 
-	use, err := categoryUsage(tx)
+	use, err := categoryUsage(tx, d.book)
 	if err != nil {
 		return err
 	}
@@ -348,7 +348,7 @@ func (d *DB) DeleteCategory(id int64) error {
 		return &CategoryInUseError{Name: name, Count: u.count}
 	}
 
-	if _, err := tx.Exec(`DELETE FROM categories WHERE id = ?`, id); err != nil {
+	if _, err := tx.Exec(`DELETE FROM categories WHERE id = ? AND book_id = ?`, id, d.book); err != nil {
 		return err
 	}
 	return tx.Commit()

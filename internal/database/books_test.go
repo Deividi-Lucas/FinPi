@@ -43,7 +43,6 @@ func TestCreateBook_Validation(t *testing.T) {
 }
 
 func TestCreateBook_CopiesCategoriesButNotTransactions(t *testing.T) {
-	t.Skip("depende do escopo de categorias (Task 4)")
 	db := openTestDB(t)
 	if _, err := db.CreateCategory("Mercado"); err != nil {
 		t.Fatal(err)
