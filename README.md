@@ -137,6 +137,12 @@ linha do saldo acumulado, que começa em zero no início do período) agrupado a
 vezes se repetiram e quanto somaram. **Incluir previstas** soma as parcelas futuras, marcadas como previstas. A página
 só lê dados e se atualiza em tempo real, como a principal; a URL guarda o período e pode ser compartilhada.
 
+A seção **Receitas** mostra de onde veio o dinheiro que entrou no período: quantas **fontes** (descrições) geraram receita,
+a **maior fonte** e quanto ela pesa nas entradas (dependência), em quantos **meses** houve receita (regularidade) e a
+receita média por mês. A tabela lista cada fonte por **Descrição** (todas, inclusive as de uma só entrada) ou por
+**Categoria**, com vezes, total, média, % das entradas, meses com entrada e a data da última. Só lançamentos reais
+entram (as parcelas previstas ficam de fora).
+
 ---
 
 ## 🏦 Importar extrato

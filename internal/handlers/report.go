@@ -162,6 +162,7 @@ type reportPage struct {
 	Buckets    []report.Bucket
 	Chart      report.Chart
 	Recurrence report.Recurrence
+	Income     report.IncomeReport
 	ChartLabel string
 }
 
@@ -215,6 +216,7 @@ func (h *Handler) Report(w http.ResponseWriter, r *http.Request) {
 		Buckets:    buckets,
 		Cards:      buildCards(buckets, len(months), q.Projected && len(projected) > 0),
 		Recurrence: report.Recurring(txs),
+		Income:     report.Incomes(txs, len(months)),
 		ChartLabel: "Entradas, saídas e saldo acumulado por " + map[report.Granularity]string{report.Day: "dia", report.Week: "semana", report.Month: "mês"}[granularity],
 	}
 	for _, o := range []struct {

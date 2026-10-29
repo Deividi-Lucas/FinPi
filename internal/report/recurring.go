@@ -29,12 +29,15 @@ type group struct {
 	count    int
 	total    int64
 	spelling map[string]int
-	order    []string // grafias na ordem em que apareceram (por data, depois ID)
+	order    []string        // grafias na ordem em que apareceram (por data, depois ID)
+	months   map[string]bool // meses (AAAA-MM) com ao menos um lançamento
+	last     string          // data (AAAA-MM-DD) do último lançamento
 }
 
-func (g *group) add(spelling string, cents int64) {
+func (g *group) add(spelling string, cents int64, date string) {
 	if g.spelling == nil {
 		g.spelling = map[string]int{}
+		g.months = map[string]bool{}
 	}
 	if g.spelling[spelling] == 0 {
 		g.order = append(g.order, spelling)
@@ -42,6 +45,12 @@ func (g *group) add(spelling string, cents int64) {
 	g.spelling[spelling]++
 	g.count++
 	g.total += cents
+	if len(date) >= 7 {
+		g.months[date[:7]] = true
+	}
+	if date > g.last {
+		g.last = date
+	}
 }
 
 // name devolve a grafia mais frequente; em empate, a que apareceu primeiro.
@@ -78,13 +87,13 @@ func Recurring(txs []models.Transaction) Recurrence {
 	descs := map[string]*group{}
 	for _, t := range expenses {
 		cat := collapse(t.Category)
-		addTo(cats, textutil.Fold(cat), cat, t.AmountCents)
+		addTo(cats, textutil.Fold(cat), cat, t.AmountCents, t.Date)
 
 		name := collapse(t.Description)
 		if info, ok := installments.Parse(t.Description); ok {
 			name = collapse(info.Name)
 		}
-		addTo(descs, textutil.Fold(name), name, t.AmountCents)
+		addTo(descs, textutil.Fold(name), name, t.AmountCents, t.Date)
 	}
 
 	r := Recurrence{ExpenseTotal: total}
@@ -93,13 +102,13 @@ func Recurring(txs []models.Transaction) Recurrence {
 	return r
 }
 
-func addTo(m map[string]*group, key, spelling string, cents int64) {
+func addTo(m map[string]*group, key, spelling string, cents int64, date string) {
 	g := m[key]
 	if g == nil {
 		g = &group{}
 		m[key] = g
 	}
-	g.add(spelling, cents)
+	g.add(spelling, cents, date)
 }
 
 func rows(m map[string]*group, total int64, minCount int) []RecurringRow {
@@ -110,11 +119,9 @@ func rows(m map[string]*group, total int64, minCount int) []RecurringRow {
 		}
 		row := RecurringRow{
 			Name: g.name(), Count: g.count, TotalCents: g.total,
-			AvgCents: (g.total*2 + int64(g.count)) / (2 * int64(g.count)),
+			AvgCents: avgCents(g.total, g.count),
 		}
-		if total > 0 {
-			row.Percent = math.Round(float64(g.total)*1000/float64(total)) / 10
-		}
+		row.Percent = percentOf(g.total, total)
 		out = append(out, row)
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -127,4 +134,17 @@ func rows(m map[string]*group, total int64, minCount int) []RecurringRow {
 		return out[i].Name < out[j].Name
 	})
 	return out
+}
+
+// avgCents devolve total ÷ count arredondado (meio para cima), em centavos.
+func avgCents(total int64, count int) int64 {
+	return (total*2 + int64(count)) / (2 * int64(count))
+}
+
+// percentOf devolve a fatia de part em total, em %, com uma casa decimal (0 quando total é 0).
+func percentOf(part, total int64) float64 {
+	if total <= 0 {
+		return 0
+	}
+	return math.Round(float64(part)*1000/float64(total)) / 10
 }
