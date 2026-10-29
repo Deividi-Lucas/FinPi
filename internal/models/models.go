@@ -17,6 +17,7 @@ type Transaction struct {
 
 	Priority   string `json:"priority"` // "", "essential" ou "superfluous"; vazio segue a categoria
 	ExternalID string `json:"-"`        // identificador de origem (importação); usado só na gravação em lote
+	BookID     int64  `json:"-"`        // livro do lançamento; preenchido onde o livro importa (lotes e movimentação)
 
 	Installment       *InstallmentInfo `json:"-"` // dados de exibição da parcela; não é gravado
 	EffectivePriority string           `json:"-"` // classificação efetiva (própria ou da categoria); não é gravada
@@ -174,4 +175,45 @@ func (s MonthStats) group(i int) PriorityGroup {
 		return s.Groups[i]
 	}
 	return PriorityGroup{}
+}
+
+// Book é um livro: um conjunto separado de lançamentos e categorias (ex.: Pessoal, PJ).
+type Book struct {
+	ID       int64
+	Name     string
+	Color    string // chave de BookColors
+	Archived bool
+}
+
+// BookColor é uma cor disponível para um livro.
+type BookColor struct{ Key, Label, Hex string }
+
+// BookColors é a paleta fixa de cores dos livros; a primeira é a padrão.
+var BookColors = []BookColor{
+	{"emerald", "Verde", "#10b981"},
+	{"sky", "Azul", "#0ea5e9"},
+	{"violet", "Violeta", "#8b5cf6"},
+	{"amber", "Âmbar", "#f59e0b"},
+	{"rose", "Rosa", "#f43f5e"},
+	{"slate", "Cinza", "#94a3b8"},
+}
+
+// ValidBookColor diz se key é uma cor da paleta.
+func ValidBookColor(key string) bool {
+	for _, c := range BookColors {
+		if c.Key == key {
+			return true
+		}
+	}
+	return false
+}
+
+// Hex devolve a cor do livro em #rrggbb (a padrão se a chave for desconhecida).
+func (b Book) Hex() string {
+	for _, c := range BookColors {
+		if c.Key == b.Color {
+			return c.Hex
+		}
+	}
+	return BookColors[0].Hex
 }

@@ -38,13 +38,16 @@ var defaultCategories = []string{
 	"Saúde", "Investimentos", "Educação", "Outros",
 }
 
-const createCategoriesSQL = `
-	CREATE TABLE IF NOT EXISTS categories (
+// categoriesTableSQL é o molde da tabela (%s = nome). O nome é único por livro, não no banco todo.
+const categoriesTableSQL = `
+	CREATE TABLE %s (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		book_id INTEGER NOT NULL DEFAULT 1,
 		name TEXT NOT NULL,
-		name_key TEXT NOT NULL UNIQUE,
+		name_key TEXT NOT NULL,
 		hidden INTEGER NOT NULL DEFAULT 0,
-		priority TEXT NOT NULL DEFAULT '' CHECK(priority IN ('', 'essential', 'superfluous'))
+		priority TEXT NOT NULL DEFAULT '' CHECK(priority IN ('', 'essential', 'superfluous')),
+		UNIQUE(book_id, name_key)
 	)`
 
 // cleanCategoryName remove espaços das pontas, colapsa os internos e valida o tamanho (1 a 40 caracteres).
