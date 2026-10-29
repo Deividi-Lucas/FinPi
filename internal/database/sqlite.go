@@ -255,6 +255,23 @@ func (d *DB) GetTransactions(yearMonth string) ([]models.Transaction, error) {
 	return scanTransactions(rows)
 }
 
+// GetTransactionsBetween recupera os lançamentos com data de from a to (inclusive, AAAA-MM-DD),
+// do mais antigo para o mais recente.
+func (d *DB) GetTransactionsBetween(from, to string) ([]models.Transaction, error) {
+	rows, err := d.conn.Query(`
+		SELECT `+transactionColumns+`
+		FROM transactions
+		WHERE date >= ? AND date <= ?
+		ORDER BY date ASC, id ASC
+	`, from, to)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return scanTransactions(rows)
+}
+
 // GetInstallmentCandidates devolve os lançamentos cuja descrição pode conter uma parcela
 // ("3/10" ou "parcela 3 de 10"), do mais antigo para o mais recente. É um pré-filtro barato:
 // a validação do formato é feita em installments.Parse.

@@ -59,6 +59,10 @@ finpi/
 │   │   ├── parse.go            # Lê a parcela da descrição (3/10, parcela 3 de 10)
 │   │   ├── project.go          # Projeta as parcelas previstas dos meses seguintes
 │   │   └── annotate.go         # Selo e restante dos lançamentos parcelados
+│   ├── report/
+│   │   ├── flow.go             # Fatias do fluxo de caixa (dia, semana, mês) e saldo acumulado
+│   │   ├── recurring.go        # Gastos recorrentes por categoria e por descrição
+│   │   └── chart.go            # Geometria do gráfico (SVG gerado no servidor)
 │   ├── textutil/
 │   │   └── fold.go             # Normalização de texto (sem acentos nem maiúsculas)
 │   └── models/
@@ -121,6 +125,17 @@ A classificação vem da **categoria**: no menu **Categorias**, escolha Essencia
 gasto que foge da regra, use o campo **Prioridade** ao lançar ou editar (a opção padrão é "Seguir a categoria").
 Receitas não são classificadas. Nada é classificado automaticamente: enquanto houver gastos sem classificação, um
 aviso na seção leva direto ao menu de categorias. Em empate de valor, o maior/menor gasto é o mais recente.
+
+---
+
+## 📈 Relatório
+
+O botão **Relatório** abre `/relatorio`: escolha um **ano** (setas ‹ ›) ou um **período** (de/até, até 5 anos). A página
+mostra entradas, saídas, resultado e a média de saídas por mês; o **fluxo de caixa** (barras de entradas e saídas e a
+linha do saldo acumulado, que começa em zero no início do período) agrupado automaticamente por dia, semana ou mês
+(botões para trocar); e os **gastos recorrentes** por categoria e por descrição (parcelas agrupadas), com quantas
+vezes se repetiram e quanto somaram. **Incluir previstas** soma as parcelas futuras, marcadas como previstas. A página
+só lê dados e se atualiza em tempo real, como a principal; a URL guarda o período e pode ser compartilhada.
 
 ---
 
