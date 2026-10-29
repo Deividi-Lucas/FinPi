@@ -16,6 +16,7 @@ var ErrNotFound = errors.New("lançamento não encontrado")
 
 type DB struct {
 	conn *sql.DB
+	now  func() time.Time // relógio (trocável nos testes); usado para datar os lotes de edição
 }
 
 // InitDB inicializa o banco SQLite com pragmas otimizados para baixo consumo de RAM e durabilidade do cartão SD do Raspberry Pi.
@@ -52,7 +53,7 @@ func InitDB(dbPath string) (*DB, error) {
 		return nil, fmt.Errorf("erro ao aplicar schema inicial: %w", err)
 	}
 
-	return &DB{conn: conn}, nil
+	return &DB{conn: conn, now: time.Now}, nil
 }
 
 const createTransactionsSQL = `
@@ -128,6 +129,11 @@ func migrate(conn *sql.DB) error {
 	}
 	if _, err := conn.Exec(createExternalIDIndexSQL); err != nil {
 		return fmt.Errorf("erro ao criar o índice de external_id: %w", err)
+	}
+	for _, stmt := range []string{createBatchesSQL, createBatchItemsSQL} {
+		if _, err := conn.Exec(stmt); err != nil {
+			return fmt.Errorf("erro ao criar as tabelas de edição em lote: %w", err)
+		}
 	}
 	return seedCategories(conn)
 }

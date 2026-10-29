@@ -59,6 +59,8 @@ finpi/
 │   │   ├── parse.go            # Lê a parcela da descrição (3/10, parcela 3 de 10)
 │   │   ├── project.go          # Projeta as parcelas previstas dos meses seguintes
 │   │   └── annotate.go         # Selo e restante dos lançamentos parcelados
+│   ├── bulk/
+│   │   └── bulk.go             # Cálculo das edições em lote (categoria, prioridade, data e descrição)
 │   ├── report/
 │   │   ├── flow.go             # Fatias do fluxo de caixa (dia, semana, mês) e saldo acumulado
 │   │   ├── recurring.go        # Gastos recorrentes por categoria e por descrição
@@ -142,6 +144,21 @@ compartilhado.
 - **Relatório:** **todos os números** (cartões, fluxo de caixa, recorrentes e receitas) passam a considerar só o que o
   filtro deixa passar, inclusive as parcelas previstas (pela categoria da série e pelo nome). As setas de ano, os botões
   de agrupamento e o interruptor de previstas preservam o filtro.
+
+---
+
+## ✏️ Edição múltipla
+
+No histórico da página principal, marque vários lançamentos (a caixa do cabeçalho seleciona toda a lista, que já
+respeita os filtros) e use **Editar…** ou **Excluir**. Dá para mudar **categoria**, **prioridade**, **data** (definir uma
+data ou deslocar por dias/meses; o dia que não existir vai para o fim do mês) e **descrição** (localizar e substituir um
+trecho, sem diferenciar maiúsculas; o resultado precisa ter de 1 a 200 caracteres, senão nada é alterado). Antes de gravar,
+uma **prévia** mostra cada lançamento em "antes → depois" e deixa desmarcar linhas; só **Aplicar** grava, numa única
+transação. Valor e tipo não mudam. Até 500 lançamentos por vez.
+
+**Desfazer:** cada edição ou exclusão em lote guarda o estado anterior (as 10 últimas, por 30 dias). O botão **Desfazer**
+restaura a mais recente; o que você alterou depois dela fica como está e é avisado. Desfazer uma exclusão recria o
+lançamento com o mesmo ID.
 
 ---
 

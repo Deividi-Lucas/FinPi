@@ -60,6 +60,8 @@ type PageData struct {
 	Stats MonthStats // números do dashboard do mês
 
 	ImportResult *ImportResult // aviso após importar um extrato (nil = sem aviso)
+	BulkResult   *BulkResult   // aviso após uma edição em lote (nil = sem aviso)
+	Undo         *UndoView     // edição em lote que ainda pode ser desfeita (nil = nenhuma)
 
 	// Histórico filtrado (a lista de lançamentos); os cartões e o dashboard do mês continuam usando Transactions.
 	History          []Transaction
@@ -87,6 +89,21 @@ type FilterView struct {
 type ImportResult struct {
 	Imported int
 	Skipped  int
+}
+
+// BulkResult é o resultado de uma operação em lote, exibido num aviso após o redirecionamento.
+type BulkResult struct {
+	Kind    string // "edit", "delete" ou "undo"
+	Count   int
+	Skipped int
+}
+
+// UndoView descreve a edição em lote que pode ser desfeita.
+type UndoView struct {
+	Action  string // "edit" ou "delete"
+	Summary string
+	Count   int
+	At      string // data e hora local, já formatada
 }
 
 // TransactionKey identifica um lançamento por data, valor (módulo, em centavos) e tipo.

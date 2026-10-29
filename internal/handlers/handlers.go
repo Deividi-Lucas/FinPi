@@ -48,6 +48,15 @@ func NewHandler(db *database.DB, templateFS fs.FS, version string) (*Handler, er
 		"formatPercent": func(p float64) string {
 			return strings.Replace(strconv.FormatFloat(p, 'f', 1, 64), ".", ",", 1) + "%"
 		},
+		"priorityLabel": func(p string) string {
+			switch p {
+			case "essential":
+				return "Essencial"
+			case "superfluous":
+				return "Supérfluo"
+			}
+			return "—"
+		},
 		"dict": func(pairs ...any) map[string]any {
 			m := map[string]any{}
 			for i := 0; i+1 < len(pairs); i += 2 {
@@ -308,6 +317,31 @@ func (h *Handler) renderDashboard(w http.ResponseWriter, r *http.Request, status
 		}
 	}
 
+	var bulkResult *models.BulkResult
+	query := r.URL.Query()
+	for _, k := range []struct{ param, skip, kind string }{
+		{"editados", "ignorados", "edit"}, {"excluidos", "ignorados", "delete"}, {"desfeitos", "pulados", "undo"},
+	} {
+		v := query.Get(k.param)
+		if v == "" {
+			continue
+		}
+		n, err1 := strconv.Atoi(v)
+		sk, _ := strconv.Atoi(query.Get(k.skip))
+		if err1 == nil && n >= 0 && n <= maxBulkIDs && sk >= 0 && sk <= maxBulkIDs {
+			bulkResult = &models.BulkResult{Kind: k.kind, Count: n, Skipped: sk}
+		}
+		break
+	}
+
+	var undo *models.UndoView
+	if b, err := h.db.LatestUndoableBatch(); err != nil {
+		serverError(w, "Erro ao consultar a última edição em lote", err)
+		return
+	} else if b != nil {
+		undo = &models.UndoView{Action: b.Action, Summary: b.Summary, Count: b.Count, At: b.CreatedAt.Local().Format("02/01/2006 15:04")}
+	}
+
 	data := models.PageData{
 		SelectedMonth: selectedMonth,
 		DisplayMonth:  formatDisplayMonth(selectedMonth),
@@ -317,6 +351,8 @@ func (h *Handler) renderDashboard(w http.ResponseWriter, r *http.Request, status
 		Version:       h.version,
 		Stats:         stats,
 		ImportResult:  importResult,
+		BulkResult:    bulkResult,
+		Undo:          undo,
 
 		History:          shown,
 		HistoryCount:     count,

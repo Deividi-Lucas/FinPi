@@ -1,0 +1,66 @@
+{{define "bulkPreview"}}
+<div id="bulk-preview-body" data-action="{{.Action}}" class="space-y-4">
+    {{template "stateFields" .}}
+    {{range .Params}}<input type="hidden" name="{{.Name}}" value="{{.Value}}">{{end}}
+
+    {{if .Missing}}
+    <p class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs">{{.Missing}} {{plural .Missing "lançamento selecionado não existe mais e foi ignorado" "lançamentos selecionados não existem mais e foram ignorados"}}.</p>
+    {{end}}
+
+    {{if eq .Action "excluir"}}
+    <p class="text-sm text-rose-300">Estes lançamentos serão <strong>excluídos</strong>. Você poderá desfazer logo depois.</p>
+    <div class="overflow-x-auto rounded-xl border border-slate-800">
+        <table class="w-full text-left text-xs text-slate-300">
+            <thead class="bg-slate-900/60 uppercase tracking-wider text-slate-400 border-b border-slate-800">
+                <tr><th class="px-3 py-2">Data</th><th class="px-3 py-2">Descrição</th><th class="px-3 py-2">Categoria</th><th class="px-3 py-2 text-right">Valor</th></tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/60">
+                {{range .Delete}}
+                <tr>
+                    <td class="px-3 py-2 whitespace-nowrap text-slate-400"><input type="hidden" name="ids" value="{{.ID}}">{{formatDate .Date}}</td>
+                    <td class="px-3 py-2 text-slate-100">{{.Description}}</td>
+                    <td class="px-3 py-2">{{.Category}}</td>
+                    <td class="px-3 py-2 text-right whitespace-nowrap {{if eq .Type "income"}}text-emerald-400{{else}}text-rose-400{{end}}">{{if eq .Type "income"}}+{{else}}-{{end}} {{formatCurrency .AmountCents}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+    <div class="flex items-center justify-end gap-3 pt-2">
+        <button type="button" data-bulk-cancel class="px-4 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition cursor-pointer">Cancelar</button>
+        <button type="button" data-bulk-apply class="bg-rose-600 hover:bg-rose-500 text-white font-medium text-sm px-5 py-2 rounded-xl transition cursor-pointer">Excluir {{len .Delete}} {{plural (len .Delete) "lançamento" "lançamentos"}}</button>
+    </div>
+
+    {{else}}
+    <div class="overflow-x-auto rounded-xl border border-slate-800">
+        <table class="w-full text-left text-xs text-slate-300">
+            <thead class="bg-slate-900/60 uppercase tracking-wider text-slate-400 border-b border-slate-800">
+                <tr>
+                    <th class="px-3 py-2"></th>
+                    <th class="px-3 py-2">Descrição</th>
+                    <th class="px-3 py-2">Data</th>
+                    <th class="px-3 py-2">Categoria</th>
+                    <th class="px-3 py-2">Prioridade</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/60">
+                {{range .Rows}}
+                <tr class="{{if not .Changed}}opacity-50{{end}}">
+                    <td class="px-3 py-2"><input type="checkbox" name="ids" value="{{.Before.ID}}" {{if .Changed}}checked{{else}}disabled{{end}} class="cursor-pointer"></td>
+                    <td class="px-3 py-2 text-slate-100">{{if ne .Before.Description .After.Description}}<span class="line-through text-slate-500">{{.Before.Description}}</span> &rarr; <span class="text-emerald-300">{{.After.Description}}</span>{{else}}{{.Before.Description}}{{end}}</td>
+                    <td class="px-3 py-2 whitespace-nowrap">{{if ne .Before.Date .After.Date}}<span class="line-through text-slate-500">{{formatDate .Before.Date}}</span> &rarr; <span class="text-emerald-300">{{formatDate .After.Date}}</span>{{else}}{{formatDate .Before.Date}}{{end}}</td>
+                    <td class="px-3 py-2 whitespace-nowrap">{{if ne .Before.Category .After.Category}}<span class="line-through text-slate-500">{{.Before.Category}}</span> &rarr; <span class="text-emerald-300">{{.After.Category}}</span>{{else}}{{.Before.Category}}{{end}}</td>
+                    <td class="px-3 py-2 whitespace-nowrap">{{if ne .Before.Priority .After.Priority}}<span class="line-through text-slate-500">{{priorityLabel .Before.Priority}}</span> &rarr; <span class="text-emerald-300">{{priorityLabel .After.Priority}}</span>{{else}}{{priorityLabel .Before.Priority}}{{end}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+    <p class="text-xs text-slate-400">{{.Changed}} {{plural .Changed "será alterado" "serão alterados"}} &middot; {{.Unchanged}} sem mudança. Desmarque o que não quiser alterar.</p>
+    <div class="flex items-center justify-end gap-3 pt-2">
+        <button type="button" data-bulk-cancel class="px-4 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition cursor-pointer">Cancelar</button>
+        {{if gt .Changed 0}}<button type="button" data-bulk-apply class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm px-5 py-2 rounded-xl transition cursor-pointer">Aplicar a {{.Changed}} {{plural .Changed "lançamento" "lançamentos"}}</button>{{end}}
+    </div>
+    {{end}}
+</div>
+{{end}}
