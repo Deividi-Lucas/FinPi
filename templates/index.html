@@ -1152,7 +1152,7 @@
                 });
                 if (resp.ok) {
                     clearDraftStorage();
-                    window.location.href = resp.url;
+                    finpiGo(resp.url);
                     return;
                 }
                 const text = (await resp.text()).trim();
@@ -1299,7 +1299,7 @@
                 });
                 if (resp.ok) {
                     removeEditDraft(id);
-                    window.location.href = resp.url;
+                    finpiGo(resp.url);
                     return;
                 }
                 const text = (await resp.text()).trim();
@@ -1437,7 +1437,7 @@
                     credentials: 'same-origin'
                 });
                 if (resp.ok) {
-                    window.location.href = resp.url;
+                    finpiGo(resp.url);
                     return;
                 }
                 showImportError((await resp.text()).trim() || 'Não foi possível importar. A revisão foi mantida.');
@@ -1585,7 +1585,7 @@
                     body: params,
                     credentials: 'same-origin'
                 });
-                if (resp.ok) { window.location.href = resp.url; return; }
+                if (resp.ok) { finpiGo(resp.url); return; }
                 showBulkError((await resp.text()).trim() || 'Não foi possível aplicar. Nada foi alterado.');
             } catch (err) {
                 showBulkError('Sem conexão com o servidor. Nada foi alterado.');
