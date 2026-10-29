@@ -138,22 +138,29 @@ func (d *DB) UpdateBook(id int64, name, color string) error {
 
 // SetBookArchived arquiva ou reativa o livro. Nunca deixa o banco sem livro ativo.
 func (d *DB) SetBookArchived(id int64, archived bool) error {
-	if _, err := d.GetBook(id); err != nil {
+	b, err := d.GetBook(id)
+	if err != nil {
 		return err
 	}
-	if archived {
-		var others int
-		if err := d.conn.QueryRow(`SELECT COUNT(*) FROM books WHERE archived = 0 AND id <> ?`, id).Scan(&others); err != nil {
-			return err
-		}
-		if others == 0 {
-			return ErrLastBook
-		}
+	if !archived {
+		_, err := d.conn.Exec(`UPDATE books SET archived = 0 WHERE id = ?`, id)
+		return err
 	}
-	flag := 0
-	if archived {
-		flag = 1
+	if b.Archived {
+		return nil
 	}
-	_, err := d.conn.Exec(`UPDATE books SET archived = ? WHERE id = ?`, flag, id)
-	return err
+	// Numa única instrução, para que duas chamadas simultâneas não arquivem os dois últimos livros ativos.
+	res, err := d.conn.Exec(`UPDATE books SET archived = 1 WHERE id = ?
+		AND (SELECT COUNT(*) FROM books WHERE archived = 0 AND id <> ?) > 0`, id, id)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrLastBook
+	}
+	return nil
 }
