@@ -192,3 +192,16 @@ func TestDashboard_ListensToEvents(t *testing.T) {
 		t.Error("a página deve se inscrever em /events")
 	}
 }
+
+func TestDashboard_UsesSharedLiveUpdateScript(t *testing.T) {
+	h, _ := newTestHandler(t)
+	body := getDashboard(h, "/")
+	for _, want := range []string{"function startLiveUpdates(", "startLiveUpdates(function", `id="live-update-banner"`, "cdn.tailwindcss.com"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("página principal sem %q", want)
+		}
+	}
+	if strings.Count(body, "new EventSource('/events')") != 1 {
+		t.Error("deveria haver exatamente uma conexão SSE na página")
+	}
+}

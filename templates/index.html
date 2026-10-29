@@ -1,29 +1,8 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {{template "headCommon"}}
     <title>FinPi - Gestão Financeira Ultraleve</title>
-    <!-- Tailwind CSS via CDN (zero build step, ideal para Raspberry Pi) -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        brand: {
-                            50: '#f0fdf4',
-                            100: '#dcfce7',
-                            500: '#22c55e',
-                            600: '#16a34a',
-                            700: '#15803d',
-                            900: '#14532d',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen font-sans antialiased selection:bg-emerald-500 selection:text-white">
     <div class="max-w-6xl mx-auto px-4 py-8">
@@ -93,14 +72,7 @@
         </div>
         {{end}}
 
-        <!-- Aviso de atualização em tempo real (exibido só se você estiver editando algo) -->
-        <div id="live-update-banner" class="hidden mt-4 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm items-center justify-between gap-3">
-            <span>Há novas atualizações nesta tela.</span>
-            <button type="button" onclick="location.reload()" class="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium cursor-pointer">
-                Atualizar agora
-            </button>
-        </div>
-
+        {{template "liveBanner"}}
         <!-- Cards do Dashboard -->
         <section class="grid grid-cols-1 md:grid-cols-3 gap-4 my-8">
             <!-- Total de Receitas -->
@@ -795,6 +767,7 @@
         </div>
     </div>
 
+    {{template "liveUpdates"}}
     <!-- Scripts de Interatividade -->
     <script>
         // "+ Nova categoria…": mostra o campo do nome e o torna obrigatório; qualquer outra opção o esconde.
@@ -1354,44 +1327,18 @@
             }
         })();
 
-        // Tempo real (SSE): quando outra tela cria, edita ou exclui um lançamento, esta tela atualiza.
-        // Se você estiver no meio de uma edição, mostra um aviso em vez de recarregar e perder o que digitou.
-        (function () {
-            function isEditing() {
-                if (hasPendingImport()) return true; // revisão de extrato em andamento: não recarregar
-                const modal = document.getElementById('edit-modal');
-                if (modal && !modal.classList.contains('hidden')) return true;
-                const categories = document.getElementById('categories-modal');
-                if (categories && !categories.classList.contains('hidden')) return true;
-                // Pop-up de novo lançamento aberto: mostra o aviso em vez de recarregar. Fechado, o que foi
-                // digitado já está no rascunho guardado, então recarregar é seguro.
-                const newModal = document.getElementById('new-modal');
-                return !!(newModal && !newModal.classList.contains('hidden'));
-            }
-
-            function refresh() {
-                if (!isEditing()) {
-                    location.reload();
-                    return;
-                }
-                const banner = document.getElementById('live-update-banner');
-                banner.classList.remove('hidden');
-                banner.classList.add('flex');
-            }
-
-            const source = new EventSource('/events');
-            let wasDisconnected = false;
-
-            source.addEventListener('change', refresh);
-            // Conexão caiu (ex.: o servidor reiniciou por uma atualização): ao voltar, recarrega a tela.
-            source.onerror = function () { wasDisconnected = true; };
-            source.onopen = function () {
-                if (wasDisconnected) {
-                    wasDisconnected = false;
-                    refresh();
-                }
-            };
-        })();
+        // Tempo real (SSE): se você estiver no meio de uma edição, mostra um aviso em vez de recarregar.
+        startLiveUpdates(function () {
+            if (hasPendingImport()) return true; // revisão de extrato em andamento: não recarregar
+            const modal = document.getElementById('edit-modal');
+            if (modal && !modal.classList.contains('hidden')) return true;
+            const categories = document.getElementById('categories-modal');
+            if (categories && !categories.classList.contains('hidden')) return true;
+            // Pop-up de novo lançamento aberto: mostra o aviso em vez de recarregar. Fechado, o que foi
+            // digitado já está no rascunho guardado, então recarregar é seguro.
+            const newModal = document.getElementById('new-modal');
+            return !!(newModal && !newModal.classList.contains('hidden'));
+        });
     </script>
 </body>
 </html>
