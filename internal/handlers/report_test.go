@@ -305,3 +305,127 @@ func TestDashboard_HasReportButton(t *testing.T) {
 		t.Error("página principal sem o botão Relatório")
 	}
 }
+
+// slice devolve o trecho do HTML que começa em start e termina no primeiro dos marcadores seguintes.
+func slice(body, start string, ends ...string) string {
+	i := strings.Index(body, start)
+	if i < 0 {
+		return ""
+	}
+	rest := body[i+len(start):]
+	end := len(rest)
+	for _, e := range ends {
+		if j := strings.Index(rest, e); j >= 0 && j < end {
+			end = j
+		}
+	}
+	return body[i : i+len(start)+end]
+}
+
+func incomePanel(body, id string) string {
+	return slice(body, `id="`+id+`"`, `id="income-panel-`, `id="panel-`, `</section>`)
+}
+
+// seedIncomes: Salário (jan e fev, R$ 5.000,00), Bônus (fev, R$ 2.000,00) e um Pix (mar, R$ 100,00): R$ 12.100,00.
+func seedIncomes(t *testing.T, db *database.DB) {
+	t.Helper()
+	mustTx(t, db, "Salário", "Salário", "income", 500000, "2026-01-05")
+	mustTx(t, db, "Salário", "Salário", "income", 500000, "2026-02-05")
+	mustTx(t, db, "Bônus", "Outros", "income", 200000, "2026-02-20")
+	mustTx(t, db, "Pix recebido Fulano", "Outros", "income", 10000, "2026-03-01")
+	mustTx(t, db, "Mercado", "Alimentação", "expense", 12000, "2026-01-10")
+}
+
+func TestReport_IncomeSectionShowsIndicatorsAndSources(t *testing.T) {
+	h, db := newTestHandler(t)
+	seedIncomes(t, db)
+
+	code, body := getReport(h, "/relatorio?ano=2026")
+
+	if code != http.StatusOK {
+		t.Fatalf("status = %d", code)
+	}
+	section := slice(body, `id="incomes"`, `id="panel-`)
+	for _, want := range []string{
+		"Receitas", "Fontes", "Maior fonte", "Salário", "82,6%", // 10.000 de 12.100
+		"Meses com receita", "3 de 12", "Receita média por mês", "R$ 1.008,33",
+	} {
+		if !strings.Contains(section, want) {
+			t.Errorf("seção Receitas sem %q", want)
+		}
+	}
+
+	desc := incomePanel(body, "income-panel-descricao")
+	for _, want := range []string{"Salário", "Bônus", "Pix recebido Fulano", "R$ 10.000,00", "2 de 12", "05/02/2026"} {
+		if !strings.Contains(desc, want) {
+			t.Errorf("aba Descrição sem %q", want)
+		}
+	}
+	// Ordem inicial: maior total primeiro.
+	if strings.Index(desc, "Salário") > strings.Index(desc, "Bônus") || strings.Index(desc, "Bônus") > strings.Index(desc, "Pix recebido") {
+		t.Error("as fontes deveriam vir ordenadas por total")
+	}
+	cat := incomePanel(body, "income-panel-categoria")
+	if !strings.Contains(cat, "Salário") || !strings.Contains(cat, "Outros") || strings.Contains(cat, "Alimentação") {
+		t.Error("aba Categoria deveria listar só categorias de receita")
+	}
+	if !strings.Contains(body, `data-itab="descricao"`) || !strings.Contains(body, `data-itab="categoria"`) {
+		t.Error("abas da seção Receitas ausentes")
+	}
+}
+
+func TestReport_IncomeSectionIgnoresProjectedInstallments(t *testing.T) {
+	h, db := newTestHandler(t)
+	mustTx(t, db, "Venda 1/3", "Outros", "income", 10000, "2026-10-05")
+
+	_, body := getReport(h, "/relatorio?ano=2026&previstas=1")
+
+	desc := incomePanel(body, "income-panel-descricao")
+	if !strings.Contains(desc, "R$ 100,00") || strings.Contains(desc, "R$ 200,00") || strings.Contains(desc, "R$ 300,00") {
+		t.Errorf("as parcelas previstas não entram nas receitas: %s", desc)
+	}
+}
+
+func TestReport_IncomeSectionEmptyWhenOnlyExpenses(t *testing.T) {
+	h, db := newTestHandler(t)
+	mustTx(t, db, "Mercado", "Alimentação", "expense", 12000, "2026-01-10")
+
+	code, body := getReport(h, "/relatorio?ano=2026")
+
+	if code != http.StatusOK || !strings.Contains(slice(body, `id="incomes"`, `id="panel-`), "Nenhuma receita neste período.") {
+		t.Error("seção Receitas deveria avisar que não há receitas")
+	}
+	if strings.Contains(body, "data-irow") {
+		t.Error("sem receitas não deve haver tabela de fontes")
+	}
+}
+
+func TestReport_IncomeSectionSingleMonthHidesMonthlyIndicators(t *testing.T) {
+	h, db := newTestHandler(t)
+	seedIncomes(t, db)
+
+	_, body := getReport(h, "/relatorio?de=2026-02-01&ate=2026-02-28")
+
+	section := slice(body, `id="incomes"`, `id="panel-`)
+	if strings.Contains(section, "Meses com receita") || strings.Contains(section, "Receita média por mês") {
+		t.Error("período de um mês não mostra os indicadores mensais")
+	}
+	if strings.Contains(section, `data-isort="months"`) {
+		t.Error("período de um mês não mostra a coluna Meses")
+	}
+	if !strings.Contains(section, "Maior fonte") || !strings.Contains(section, "Fontes") {
+		t.Error("os demais indicadores continuam")
+	}
+}
+
+func TestReport_IncomeTablesKeepLiveUpdatesBeforeRendering(t *testing.T) {
+	h, db := newTestHandler(t)
+	mustTx(t, db, "Mercado", "Alimentação", "expense", 12000, "2026-01-10") // seção de receitas vazia
+	_, body := getReport(h, "/relatorio?ano=2026")
+
+	live := strings.Index(body, "startLiveUpdates(function")
+	render := strings.LastIndex(body, "renderIncome()")
+	if live < 0 || render < 0 || live > render {
+		t.Errorf("startLiveUpdates (%d) deve vir antes da renderização das receitas (%d)", live, render)
+	}
+}

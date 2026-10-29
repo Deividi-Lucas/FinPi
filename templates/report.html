@@ -153,6 +153,49 @@
             </div>
         </section>
 
+        <!-- Receitas: de onde vem o dinheiro -->
+        <section id="incomes" class="mt-8 p-5 rounded-2xl bg-slate-800/40 border border-slate-800">
+            <h2 class="text-base font-semibold text-white">Receitas</h2>
+            <p class="mt-1 text-xs text-slate-500">De onde vem o dinheiro que entrou no período (só lançamentos reais; as previstas ficam de fora).</p>
+
+            {{if not .Income.BySource}}
+            <p class="mt-4 p-4 text-sm text-slate-500">Nenhuma receita neste período.</p>
+            {{else}}
+            <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="p-4 rounded-xl bg-slate-900/40 border border-slate-800">
+                    <p class="text-xs uppercase tracking-wider text-slate-400">Fontes</p>
+                    <p class="mt-2 text-xl font-extrabold text-white">{{.Income.Sources}}</p>
+                    <p class="mt-1 text-xs text-slate-500">{{plural .Income.Sources "descrição diferente" "descrições diferentes"}}</p>
+                </div>
+                {{with .Income.Largest}}
+                <div class="p-4 rounded-xl bg-slate-900/40 border border-slate-800">
+                    <p class="text-xs uppercase tracking-wider text-slate-400">Maior fonte</p>
+                    <p class="mt-2 text-xl font-extrabold text-emerald-400 truncate">{{.Name}}</p>
+                    <p class="mt-1 text-xs text-slate-500">{{formatPercent .Percent}} das entradas</p>
+                </div>
+                {{end}}
+                {{if .Income.HasMonthly}}
+                <div class="p-4 rounded-xl bg-slate-900/40 border border-slate-800">
+                    <p class="text-xs uppercase tracking-wider text-slate-400">Meses com receita</p>
+                    <p class="mt-2 text-xl font-extrabold text-white">{{.Income.MonthsWithIncome}} de {{.Income.MonthsTouched}}</p>
+                </div>
+                <div class="p-4 rounded-xl bg-slate-900/40 border border-slate-800">
+                    <p class="text-xs uppercase tracking-wider text-slate-400">Receita média por mês</p>
+                    <p class="mt-2 text-xl font-extrabold text-white">{{formatCurrency .Income.AvgMonthly}}</p>
+                </div>
+                {{end}}
+            </div>
+
+            <div class="mt-5 flex items-center gap-2 text-xs">
+                <button type="button" data-itab="descricao" class="px-3 py-1.5 rounded-lg border bg-emerald-600 text-white border-emerald-500 cursor-pointer">Descrição</button>
+                <button type="button" data-itab="categoria" class="px-3 py-1.5 rounded-lg border bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700 cursor-pointer">Categoria</button>
+            </div>
+
+            {{template "incomePanel" (dict "ID" "income-panel-descricao" "Tab" "descricao" "Rows" .Income.BySource "ShowMonths" .Income.HasMonthly "MonthsTouched" .Income.MonthsTouched)}}
+            {{template "incomePanel" (dict "ID" "income-panel-categoria" "Tab" "categoria" "Rows" .Income.ByCategory "ShowMonths" .Income.HasMonthly "MonthsTouched" .Income.MonthsTouched)}}
+            {{end}}
+        </section>
+
         <!-- Gastos recorrentes -->
         <section class="mt-8 p-5 rounded-2xl bg-slate-800/40 border border-slate-800" id="recurring">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -182,74 +225,96 @@
             return Array.from(form.querySelectorAll('input[type="date"]')).some(function (el) { return el.value !== el.defaultValue; });
         });
 
-        // Abas, ordenação e "Ver todas" dos gastos recorrentes. O estado fica no sessionStorage para sobreviver
-        // ao recarregamento automático do tempo real.
-        const REPORT_STATE_KEY = 'finpi:relatorio';
+        // Tabelas ranqueadas (gastos recorrentes e fontes de receita): abas, ordenação e "Ver todas". O estado de cada
+        // uma fica no sessionStorage para sobreviver ao recarregamento automático do tempo real.
         const VISIBLE_ROWS = 10;
-        const state = { tab: 'categoria', sort: 'count', all: { categoria: false, descricao: false } };
 
         function reportStore() {
             try { return window.sessionStorage; } catch (e) { return null; }
         }
 
-        function loadState() {
-            const store = reportStore();
-            if (!store) return;
-            try {
-                const saved = JSON.parse(store.getItem(REPORT_STATE_KEY));
-                if (saved && (saved.tab === 'categoria' || saved.tab === 'descricao')) state.tab = saved.tab;
-                if (saved && (saved.sort === 'count' || saved.sort === 'total')) state.sort = saved.sort;
-                if (saved && saved.all) { state.all.categoria = !!saved.all.categoria; state.all.descricao = !!saved.all.descricao; }
-            } catch (e) { /* sem estado salvo: usa o padrão */ }
-        }
+        // cfg: key (sessionStorage), attrs (nomes dos atributos data-*: tab, panel, sort, more, row), tabs, defaultTab,
+        // sorts (chaves de ordenação, em ordem de desempate) e defaultSort. Devolve a função que desenha a tabela.
+        function setupRanked(cfg) {
+            const A = cfg.attrs;
+            const state = { tab: cfg.defaultTab, sort: cfg.defaultSort, all: {} };
+            cfg.tabs.forEach(function (t) { state.all[t] = false; });
 
-        function saveState() {
-            const store = reportStore();
-            try { if (store) store.setItem(REPORT_STATE_KEY, JSON.stringify(state)); } catch (e) { /* ignora */ }
-        }
+            function load() {
+                const store = reportStore();
+                if (!store) return;
+                try {
+                    const saved = JSON.parse(store.getItem(cfg.key));
+                    if (saved && cfg.tabs.indexOf(saved.tab) >= 0) state.tab = saved.tab;
+                    if (saved && cfg.sorts.indexOf(saved.sort) >= 0) state.sort = saved.sort;
+                    if (saved && saved.all) cfg.tabs.forEach(function (t) { state.all[t] = !!saved.all[t]; });
+                } catch (e) { /* sem estado salvo: usa o padrão */ }
+            }
 
-        function renderRecurring() {
-            document.querySelectorAll('[data-tab]').forEach(function (btn) {
-                const active = btn.dataset.tab === state.tab;
-                btn.className = 'px-3 py-1.5 rounded-lg border cursor-pointer ' +
-                    (active ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700');
+            function save() {
+                const store = reportStore();
+                try { if (store) store.setItem(cfg.key, JSON.stringify(state)); } catch (e) { /* ignora */ }
+            }
+
+            function render() {
+                document.querySelectorAll('[data-' + A.tab + ']').forEach(function (btn) {
+                    const active = btn.dataset[A.tab] === state.tab;
+                    btn.className = 'px-3 py-1.5 rounded-lg border cursor-pointer ' +
+                        (active ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700');
+                });
+                document.querySelectorAll('[data-' + A.panel + ']').forEach(function (panel) {
+                    const tab = panel.dataset[A.panel];
+                    panel.classList.toggle('hidden', tab !== state.tab);
+                    const body = panel.querySelector('tbody');
+                    if (!body) return; // painel vazio: só a mensagem, sem tabela
+                    const rows = Array.from(body.querySelectorAll('[data-' + A.row + ']'));
+                    const order = [state.sort].concat(cfg.sorts.filter(function (k) { return k !== state.sort; }));
+                    rows.sort(function (a, b) {
+                        for (let i = 0; i < order.length; i++) {
+                            const diff = Number(b.dataset[order[i]]) - Number(a.dataset[order[i]]);
+                            if (diff) return diff;
+                        }
+                        return Number(a.dataset.i) - Number(b.dataset.i);
+                    });
+                    rows.forEach(function (row, i) {
+                        body.appendChild(row);
+                        row.classList.toggle('hidden', !state.all[tab] && i >= VISIBLE_ROWS);
+                    });
+                    const more = panel.querySelector('[data-' + A.more + ']');
+                    if (more) more.classList.toggle('hidden', state.all[tab] || rows.length <= VISIBLE_ROWS);
+                    panel.querySelectorAll('[data-' + A.sort + ']').forEach(function (th) {
+                        th.classList.toggle('text-emerald-400', th.dataset[A.sort] === state.sort);
+                    });
+                });
+            }
+
+            document.querySelectorAll('[data-' + A.tab + ']').forEach(function (btn) {
+                btn.addEventListener('click', function () { state.tab = btn.dataset[A.tab]; save(); render(); });
             });
-            document.querySelectorAll('[data-panel]').forEach(function (panel) {
-                const tab = panel.dataset.panel;
-                panel.classList.toggle('hidden', tab !== state.tab);
-                const body = panel.querySelector('tbody');
-                if (!body) return; // painel vazio: só a mensagem, sem tabela
-                const rows = Array.from(body.querySelectorAll('[data-row]'));
-                rows.sort(function (a, b) {
-                    const byCount = Number(b.dataset.count) - Number(a.dataset.count);
-                    const byTotal = Number(b.dataset.total) - Number(a.dataset.total);
-                    const first = state.sort === 'total' ? byTotal : byCount;
-                    const second = state.sort === 'total' ? byCount : byTotal;
-                    return first || second || Number(a.dataset.i) - Number(b.dataset.i);
-                });
-                rows.forEach(function (row, i) {
-                    body.appendChild(row);
-                    row.classList.toggle('hidden', !state.all[tab] && i >= VISIBLE_ROWS);
-                });
-                const more = panel.querySelector('[data-more]');
-                if (more) more.classList.toggle('hidden', state.all[tab] || rows.length <= VISIBLE_ROWS);
-                panel.querySelectorAll('[data-sort]').forEach(function (th) {
-                    th.classList.toggle('text-emerald-400', th.dataset.sort === state.sort);
-                });
+            document.querySelectorAll('[data-' + A.sort + ']').forEach(function (th) {
+                th.addEventListener('click', function () { state.sort = th.dataset[A.sort]; save(); render(); });
             });
+            document.querySelectorAll('[data-' + A.more + ']').forEach(function (btn) {
+                btn.addEventListener('click', function () { state.all[btn.dataset[A.more]] = true; save(); render(); });
+            });
+            load();
+            return render;
         }
 
-        document.querySelectorAll('[data-tab]').forEach(function (btn) {
-            btn.addEventListener('click', function () { state.tab = btn.dataset.tab; saveState(); renderRecurring(); });
+        const renderRecurring = setupRanked({
+            key: 'finpi:relatorio',
+            attrs: { tab: 'tab', panel: 'panel', sort: 'sort', more: 'more', row: 'row' },
+            tabs: ['categoria', 'descricao'], defaultTab: 'categoria',
+            sorts: ['count', 'total'], defaultSort: 'count'
         });
-        document.querySelectorAll('[data-sort]').forEach(function (th) {
-            th.addEventListener('click', function () { state.sort = th.dataset.sort; saveState(); renderRecurring(); });
+        const renderIncome = setupRanked({
+            key: 'finpi:relatorio:receitas',
+            attrs: { tab: 'itab', panel: 'ipanel', sort: 'isort', more: 'imore', row: 'irow' },
+            tabs: ['descricao', 'categoria'], defaultTab: 'descricao',
+            sorts: ['total', 'count', 'months'], defaultSort: 'total'
         });
-        document.querySelectorAll('[data-more]').forEach(function (btn) {
-            btn.addEventListener('click', function () { state.all[btn.dataset.more] = true; saveState(); renderRecurring(); });
-        });
-        loadState();
         renderRecurring();
+        renderIncome();
     </script>
 </body>
 </html>
@@ -285,5 +350,42 @@
     {{else}}
     <p class="p-4 text-sm text-slate-500">{{.Empty}}</p>
     {{end}}
+</div>
+{{end}}
+
+{{define "incomePanel"}}
+<div id="{{.ID}}" data-ipanel="{{.Tab}}" class="mt-4 {{if ne .Tab "descricao"}}hidden{{end}}">
+    <div class="overflow-x-auto rounded-xl border border-slate-800">
+        <table class="w-full text-left text-xs text-slate-300">
+            <thead class="bg-slate-900/60 uppercase tracking-wider text-slate-400 border-b border-slate-800">
+                <tr>
+                    <th class="px-3 py-2">Nome</th>
+                    <th class="px-3 py-2 text-right cursor-pointer select-none" data-isort="count" title="Ordenar por vezes">Vezes</th>
+                    <th class="px-3 py-2 text-right cursor-pointer select-none" data-isort="total" title="Ordenar pelo maior total">Total</th>
+                    <th class="px-3 py-2 text-right">Média</th>
+                    <th class="px-3 py-2 text-right">% das entradas</th>
+                    {{if .ShowMonths}}<th class="px-3 py-2 text-right cursor-pointer select-none" data-isort="months" title="Ordenar por meses com entrada">Meses</th>{{end}}
+                    <th class="px-3 py-2 text-right">Última</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/60">
+                {{range $i, $r := .Rows}}
+                <tr data-irow data-i="{{$i}}" data-count="{{$r.Count}}" data-total="{{$r.TotalCents}}" data-months="{{$r.Months}}">
+                    <td class="px-3 py-2 text-slate-100">{{$r.Name}}</td>
+                    <td class="px-3 py-2 text-right">{{$r.Count}}</td>
+                    <td class="px-3 py-2 text-right text-emerald-400">{{formatCurrency $r.TotalCents}}</td>
+                    <td class="px-3 py-2 text-right">{{formatCurrency $r.AvgCents}}</td>
+                    <td class="px-3 py-2 text-right whitespace-nowrap">
+                        {{formatPercent $r.Percent}}
+                        <div class="mt-1 h-1 w-20 ml-auto rounded bg-slate-800"><div class="h-1 rounded bg-emerald-500" style="width: {{printf "%.1f" $r.Percent}}%"></div></div>
+                    </td>
+                    {{if $.ShowMonths}}<td class="px-3 py-2 text-right whitespace-nowrap">{{$r.Months}} de {{$.MonthsTouched}}</td>{{end}}
+                    <td class="px-3 py-2 text-right whitespace-nowrap text-slate-400">{{formatDate $r.LastDate}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+    <button type="button" data-imore="{{.Tab}}" class="mt-3 text-xs text-emerald-400 hover:text-emerald-300 cursor-pointer">Ver todas ({{len .Rows}})</button>
 </div>
 {{end}}
