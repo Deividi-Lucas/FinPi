@@ -343,6 +343,9 @@ func (d *DB) UndoLatestBatch() (restored, skipped int, err error) {
 			rows.Close()
 			return 0, 0, err
 		}
+		if it.before.BookID == 0 { // lote antigo, sem o campo
+			it.before.BookID = d.book
+		}
 		if afterJSON.Valid {
 			var a snapshot
 			if err := json.Unmarshal([]byte(afterJSON.String), &a); err != nil {

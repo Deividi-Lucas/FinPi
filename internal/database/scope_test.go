@@ -172,3 +172,31 @@ func TestBulk_IsScopedByBook(t *testing.T) {
 		t.Error("lançamento do PJ foi excluído")
 	}
 }
+
+func TestUndo_OldBatchWithoutBookIDFallsBackToTheBook(t *testing.T) {
+	pessoal, _ := twoBooks(t)
+	for _, action := range []string{"edit", "delete"} {
+		tr := mustCreate(t, pessoal, models.Transaction{Description: "Antigo " + action, AmountCents: 100, Type: "expense", Category: "Outros", Date: "2026-10-05"})
+		if action == "edit" {
+			if _, _, err := pessoal.ApplyEdits("Edição", []int64{tr.ID}, func(t models.Transaction) (models.Transaction, error) {
+				t.Category = "Lazer"
+				return t, nil
+			}); err != nil {
+				t.Fatal(err)
+			}
+		} else if _, _, err := pessoal.ApplyDeletes("Exclusão", []int64{tr.ID}); err != nil {
+			t.Fatal(err)
+		}
+		// simula um lote antigo, gravado antes de existir book_id
+		if _, err := pessoal.conn.Exec(`UPDATE batch_items SET before_json = json_remove(before_json, '$.book_id'), after_json = json_remove(after_json, '$.book_id')`); err != nil {
+			t.Fatal(err)
+		}
+		if restored, _, err := pessoal.UndoLatestBatch(); err != nil || restored != 1 {
+			t.Fatalf("%s: desfazer = %d, %v", action, restored, err)
+		}
+		got, _ := pessoal.GetTransactionsByIDs([]int64{tr.ID})
+		if len(got) != 1 || got[0].BookID != pessoal.book {
+			t.Errorf("%s: lançamento restaurado ficou órfão: %+v", action, got)
+		}
+	}
+}
