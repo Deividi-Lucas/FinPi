@@ -10,14 +10,14 @@ func brl(c int64) string { return "R$" + strconv.FormatInt(c, 10) }
 
 func TestCompactMoney(t *testing.T) {
 	cases := map[int64]string{
-		0:          "R$ 0",
-		85000:      "R$ 850",
-		100000:     "R$ 1 mil",
-		123456:     "R$ 1,2 mil",
-		-123456:    "-R$ 1,2 mil",
-		100000000:  "R$ 1 mi",
-		250000000:  "R$ 2,5 mi",
-		5000000:    "R$ 50 mil",
+		0:         "R$ 0",
+		85000:     "R$ 850",
+		100000:    "R$ 1 mil",
+		123456:    "R$ 1,2 mil",
+		-123456:   "-R$ 1,2 mil",
+		100000000: "R$ 1 mi",
+		250000000: "R$ 2,5 mi",
+		5000000:   "R$ 50 mil",
 	}
 	for in, want := range cases {
 		if got := CompactMoney(in); got != want {

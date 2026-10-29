@@ -32,9 +32,11 @@
                 <span class="px-3 py-2 rounded-xl bg-slate-800/80 border border-slate-700 text-sm text-slate-200">{{formatDate .From}} a {{formatDate .To}}</span>
                 <a href="{{.YearURL}}" class="text-xs text-emerald-400 hover:text-emerald-300">Ver o ano completo</a>
                 {{else}}
-                <a href="{{.PrevURL}}" class="px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm" title="Ano anterior" aria-label="Ano anterior">&lsaquo;</a>
+                {{if .PrevURL}}<a href="{{.PrevURL}}" class="px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm" title="Ano anterior" aria-label="Ano anterior">&lsaquo;</a>
+                {{else}}<span class="px-3 py-2 rounded-xl bg-slate-800 border border-slate-800 text-slate-600 text-sm cursor-not-allowed" aria-hidden="true">&lsaquo;</span>{{end}}
                 <span class="px-4 py-2 rounded-xl bg-slate-800/80 border border-slate-700 text-sm font-semibold text-white">{{.Year}}</span>
-                <a href="{{.NextURL}}" class="px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm" title="Próximo ano" aria-label="Próximo ano">&rsaquo;</a>
+                {{if .NextURL}}<a href="{{.NextURL}}" class="px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm" title="Próximo ano" aria-label="Próximo ano">&rsaquo;</a>
+                {{else}}<span class="px-3 py-2 rounded-xl bg-slate-800 border border-slate-800 text-slate-600 text-sm cursor-not-allowed" aria-hidden="true">&rsaquo;</span>{{end}}
                 {{end}}
             </div>
 
@@ -76,11 +78,13 @@
                 <p class="text-xs uppercase tracking-wider text-slate-400">Resultado</p>
                 <p class="mt-2 text-2xl font-extrabold {{if ge .Cards.Net 0}}text-emerald-400{{else}}text-rose-400{{end}}">{{formatCurrency .Cards.Net}}</p>
                 {{if .Cards.HasNetPercent}}<p class="mt-1 text-xs text-slate-500">{{formatPercent .Cards.NetPercent}} das entradas</p>{{end}}
+                {{if .Cards.WithProjected}}<p class="mt-1 text-xs text-slate-500">(com previstas)</p>{{end}}
             </div>
             {{if .Cards.HasAvg}}
             <div class="p-5 rounded-2xl bg-slate-800/40 border border-slate-800">
                 <p class="text-xs uppercase tracking-wider text-slate-400">Média de saídas por mês</p>
                 <p class="mt-2 text-2xl font-extrabold text-white">{{formatCurrency .Cards.AvgExpense}}</p>
+                {{if .Cards.WithProjected}}<p class="mt-1 text-xs text-slate-500">(com previstas)</p>{{end}}
             </div>
             {{end}}
         </section>
@@ -171,6 +175,13 @@
     </div>
 
     <script>
+        // Tempo real: não recarrega se você estiver mexendo nas datas do período (foco ou valor alterado).
+        startLiveUpdates(function () {
+            const form = document.getElementById('period-form');
+            if (form.contains(document.activeElement)) return true;
+            return Array.from(form.querySelectorAll('input[type="date"]')).some(function (el) { return el.value !== el.defaultValue; });
+        });
+
         // Abas, ordenação e "Ver todas" dos gastos recorrentes. O estado fica no sessionStorage para sobreviver
         // ao recarregamento automático do tempo real.
         const REPORT_STATE_KEY = 'finpi:relatorio';
@@ -207,6 +218,7 @@
                 const tab = panel.dataset.panel;
                 panel.classList.toggle('hidden', tab !== state.tab);
                 const body = panel.querySelector('tbody');
+                if (!body) return; // painel vazio: só a mensagem, sem tabela
                 const rows = Array.from(body.querySelectorAll('[data-row]'));
                 rows.sort(function (a, b) {
                     const byCount = Number(b.dataset.count) - Number(a.dataset.count);
@@ -238,13 +250,6 @@
         });
         loadState();
         renderRecurring();
-
-        // Tempo real: não recarrega se você estiver mexendo nas datas do período (foco ou valor alterado).
-        startLiveUpdates(function () {
-            const form = document.getElementById('period-form');
-            if (form.contains(document.activeElement)) return true;
-            return Array.from(form.querySelectorAll('input[type="date"]')).some(function (el) { return el.value !== el.defaultValue; });
-        });
     </script>
 </body>
 </html>

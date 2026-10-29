@@ -206,9 +206,7 @@ func (h *Handler) Report(w http.ResponseWriter, r *http.Request) {
 	buckets := report.BuildFlow(txs, projected, q.From, q.To, granularity)
 	page := reportPage{
 		Version: h.version, Warning: warning, Custom: q.Custom, Year: q.Year, From: q.From, To: q.To,
-		PrevURL:          q.URL(func(x *reportQuery) { x.Custom, x.Year = false, q.Year-1 }),
-		NextURL:          q.URL(func(x *reportQuery) { x.Custom, x.Year = false, q.Year+1 }),
-		YearURL:          q.URL(func(x *reportQuery) { x.Custom, x.Year = false, time.Now().Year() }),
+		YearURL:          q.URL(func(x *reportQuery) { x.Custom = false }), // em modo personalizado q.Year já é o ano atual
 		IncludeProjected: q.Projected,
 		ToggleProjected:  q.URL(func(x *reportQuery) { x.Projected = !x.Projected }),
 		Group:            string(granularity), GroupExplicit: explicit,
@@ -229,6 +227,13 @@ func (h *Handler) Report(w http.ResponseWriter, r *http.Request) {
 			Active:   o.g == granularity,
 			Disabled: !report.Allowed(o.g, q.From, q.To),
 		})
+	}
+	// Nos limites da faixa aceita a seta correspondente fica desativada (URL vazia).
+	if q.Year > reportMinYear {
+		page.PrevURL = q.URL(func(x *reportQuery) { x.Custom, x.Year = false, q.Year-1 })
+	}
+	if q.Year < reportMaxYear {
+		page.NextURL = q.URL(func(x *reportQuery) { x.Custom, x.Year = false, q.Year+1 })
 	}
 	if !page.Empty {
 		page.Chart = report.BuildChart(buckets, formatCurrencyBRL)

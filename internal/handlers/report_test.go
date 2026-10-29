@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -118,7 +119,7 @@ func TestReport_CustomPeriodUsesDays(t *testing.T) {
 
 func TestReport_InvalidPeriodsShowWarningAndFallBackToCurrentYear(t *testing.T) {
 	h, _ := newTestHandler(t)
-	year := fmt.Sprint(time.Now().Year())
+	year := time.Now().Year()
 	for name, q := range map[string]string{
 		"de depois de até": "de=2026-05-01&ate=2026-04-01",
 		"mais de 5 anos":   "de=2020-01-01&ate=2026-01-01",
@@ -128,9 +129,91 @@ func TestReport_InvalidPeriodsShowWarningAndFallBackToCurrentYear(t *testing.T) 
 		"ano texto":        "ano=abc",
 	} {
 		code, body := getReport(h, "/relatorio?"+q)
-		if code != http.StatusOK || !strings.Contains(body, "Período inválido") || !strings.Contains(body, year) {
-			t.Errorf("%s: status=%d, aviso/ano atual ausentes", name, code)
+		if code != http.StatusOK || !strings.Contains(body, "Período inválido") {
+			t.Errorf("%s: status=%d, aviso ausente", name, code)
 		}
+		for _, want := range []string{fmt.Sprintf(`value="%d-01-01"`, year), fmt.Sprintf(`value="%d-12-31"`, year)} {
+			if !strings.Contains(body, want) {
+				t.Errorf("%s: campo de data sem %s (não voltou ao ano atual)", name, want)
+			}
+		}
+	}
+}
+
+func TestReport_OnlyIncomeKeepsLiveUpdatesAndEmptyPanels(t *testing.T) {
+	h, db := newTestHandler(t)
+	mustTx(t, db, "Salário", "Salário", "income", 500000, "2026-01-05")
+	code, body := getReport(h, "/relatorio?ano=2026")
+	if code != http.StatusOK {
+		t.Fatalf("status = %d", code)
+	}
+	if !strings.Contains(panel(body, "panel-descricao"), "Nenhum gasto se repetiu neste período.") {
+		t.Error("painel Descrição sem a mensagem de vazio")
+	}
+	if !strings.Contains(panel(body, "panel-categoria"), "Sem despesas neste período.") {
+		t.Error("painel Categoria sem a mensagem de vazio")
+	}
+	// Painel vazio não tem <tbody>: o tempo real precisa ser ligado antes de qualquer renderização da interface.
+	live := strings.Index(body, "startLiveUpdates(function")
+	render := strings.LastIndex(body, "renderRecurring()")
+	if live < 0 || render < 0 || live > render {
+		t.Errorf("startLiveUpdates (%d) deve vir antes da renderização dos recorrentes (%d)", live, render)
+	}
+	if !strings.Contains(body, "if (!body) return;") {
+		t.Error("renderRecurring deve tolerar painel sem tbody")
+	}
+}
+
+func TestReport_YearArrowsStopAtBounds(t *testing.T) {
+	h, _ := newTestHandler(t)
+	_, low := getReport(h, "/relatorio?ano=2000")
+	if strings.Contains(low, "ano=1999") || !strings.Contains(low, "ano=2001") {
+		t.Error("em 2000 não deve haver link para 1999, mas deve haver para 2001")
+	}
+	_, high := getReport(h, "/relatorio?ano=2100")
+	if strings.Contains(high, "ano=2101") || !strings.Contains(high, "ano=2099") {
+		t.Error("em 2100 não deve haver link para 2101, mas deve haver para 2099")
+	}
+}
+
+func TestParseReportQuery(t *testing.T) {
+	now := time.Date(2026, 6, 15, 12, 0, 0, 0, time.UTC)
+	cases := []struct {
+		name         string
+		query        string
+		wantFrom     string
+		wantTo       string
+		wantCustom   bool
+		wantWarnPart string
+	}{
+		{"cinco anos exatos aceito", "de=2026-01-01&ate=2030-12-31", "2026-01-01", "2030-12-31", true, ""},
+		{"cinco anos e um dia rejeitado", "de=2026-01-01&ate=2031-01-01", "2026-01-01", "2026-12-31", false, "no máximo 5 anos"},
+		{"de/ate têm prioridade sobre ano", "ano=2020&de=2026-03-01&ate=2026-03-31", "2026-03-01", "2026-03-31", true, ""},
+		{"ano sozinho", "ano=2024", "2024-01-01", "2024-12-31", false, ""},
+		{"padrão é o ano atual", "", "2026-01-01", "2026-12-31", false, ""},
+	}
+	for _, c := range cases {
+		v, _ := url.ParseQuery(c.query)
+		q, warn := parseReportQuery(v, now)
+		if q.From != c.wantFrom || q.To != c.wantTo || q.Custom != c.wantCustom {
+			t.Errorf("%s: got %s..%s custom=%v", c.name, q.From, q.To, q.Custom)
+		}
+		if (c.wantWarnPart == "") != (warn == "") || !strings.Contains(warn, c.wantWarnPart) {
+			t.Errorf("%s: aviso = %q, quer conter %q", c.name, warn, c.wantWarnPart)
+		}
+	}
+}
+
+func TestReport_SingleMonthHidesMonthlyAverage(t *testing.T) {
+	h, db := newTestHandler(t)
+	mustTx(t, db, "Mercado", "Alimentação", "expense", 12000, "2026-02-10")
+	_, one := getReport(h, "/relatorio?de=2026-02-01&ate=2026-02-28")
+	if strings.Contains(one, "Média de saídas por mês") {
+		t.Error("período de um único mês não deve mostrar a média mensal")
+	}
+	_, year := getReport(h, "/relatorio?ano=2026")
+	if !strings.Contains(year, "Média de saídas por mês") {
+		t.Error("o ano completo deve mostrar a média mensal")
 	}
 }
 
@@ -163,6 +246,9 @@ func TestReport_ProjectedInstallmentsOnlyWhenAsked(t *testing.T) {
 	_, on := getReport(h, "/relatorio?ano=2026&previstas=1")
 	if n := strings.Count(on, "data-projected"); n != 2 {
 		t.Errorf("fatias previstas = %d, quer 2 (novembro e dezembro)", n)
+	}
+	if n := strings.Count(on, "(com previstas)"); n != 4 {
+		t.Errorf("rótulo (com previstas) = %d vezes, quer 4 (um por cartão)", n)
 	}
 	if !strings.Contains(on, "com previstas") || !strings.Contains(on, "R$ 750,00") { // 250 + 250 + 250
 		t.Error("totais com previstas ausentes")

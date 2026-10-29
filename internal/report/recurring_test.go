@@ -68,7 +68,7 @@ func TestRecurring_OrderCountThenTotalThenName(t *testing.T) {
 		ex(1, "B", "B", 100, "2026-01-01"), ex(2, "B", "B", 100, "2026-01-02"), // 2 × 100 = 200
 		ex(3, "A", "A", 300, "2026-01-03"), ex(4, "A", "A", 300, "2026-01-04"), // 2 × 300 = 600 (mais total)
 		ex(5, "C", "C", 100, "2026-01-05"), ex(6, "C", "C", 100, "2026-01-06"), // empata com B: ordem por nome
-		ex(7, "D", "D", 9999, "2026-01-07"),                                    // 1 vez
+		ex(7, "D", "D", 9999, "2026-01-07"), // 1 vez
 	}
 	r := Recurring(txs)
 	var names []string
