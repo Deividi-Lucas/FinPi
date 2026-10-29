@@ -201,13 +201,13 @@ func (h *Handler) Report(w http.ResponseWriter, r *http.Request) {
 	}
 
 	q, warning := parseReportQuery(r.URL.Query(), time.Now())
-	db, book, books, _, err := h.bookScope(r)
+	db, book, books, invalid, err := h.bookScope(r)
 	if err != nil {
 		serverError(w, "Erro ao carregar os livros", err)
 		return
 	}
-	if r.URL.Query().Get("livro") != "" {
-		q.Book = book.ID // só entra nos endereços quando veio explícito
+	if r.URL.Query().Get("livro") != "" && !invalid {
+		q.Book = book.ID // só entra nos endereços quando veio explícito e válido
 	}
 
 	txs, err := db.GetTransactionsBetween(q.From, q.To)

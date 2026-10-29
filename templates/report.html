@@ -8,7 +8,7 @@
     {{template "liveUpdates"}}
     <div class="max-w-6xl mx-auto px-4 py-8">
 
-        <header class="flex flex-col sm:flex-row items-center justify-between pb-6 border-b border-slate-800 gap-4">
+        <header class="flex flex-col sm:flex-row items-center justify-between pb-6 border-b border-slate-800 gap-4" style="border-bottom-color: {{.Book.Hex}}">
             <div class="flex items-center gap-3">
                 <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-xl">🪙</div>
                 <div>
@@ -16,7 +16,10 @@
                     <p class="text-xs text-slate-400">Fluxo de caixa e gastos recorrentes por período</p>
                 </div>
             </div>
-            <a href="/" class="inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-sm font-medium px-3 py-2 rounded-xl border border-slate-700 transition">Voltar ao mês</a>
+            <div class="flex flex-wrap items-center justify-center gap-2">
+            {{template "bookBar" .}}
+            <a href="/?livro={{.BookID}}" class="inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-sm font-medium px-3 py-2 rounded-xl border border-slate-700 transition">Voltar ao mês</a>
+            </div>
         </header>
 
         {{if .Warning}}
@@ -41,6 +44,7 @@
             </div>
 
             <form id="period-form" method="GET" action="/relatorio" class="flex flex-wrap items-center gap-2">
+                <input type="hidden" name="livro" value="{{.BookID}}">
                 <label class="text-xs text-slate-300">De
                     <input type="date" name="de" value="{{.From}}" required class="ml-1 bg-slate-900 text-slate-200 text-sm rounded-lg px-2 py-1.5 border border-slate-700 focus:outline-none focus:border-emerald-500">
                 </label>
@@ -62,6 +66,7 @@
         <!-- Filtros: todos os números do relatório (cartões, fluxo de caixa, recorrentes e receitas) respeitam o filtro -->
         <section id="filters" class="mt-4 p-4 rounded-2xl bg-slate-800/40 border border-slate-800">
             <form id="filters-form" method="GET" action="/relatorio" class="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
+                <input type="hidden" name="livro" value="{{.BookID}}">
                 {{if .Custom}}<input type="hidden" name="de" value="{{.From}}"><input type="hidden" name="ate" value="{{.To}}">{{else}}<input type="hidden" name="ano" value="{{.Year}}">{{end}}
                 {{if .GroupExplicit}}<input type="hidden" name="agrupar" value="{{.Group}}">{{end}}
                 {{if .IncludeProjected}}<input type="hidden" name="previstas" value="1">{{end}}

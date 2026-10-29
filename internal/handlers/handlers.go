@@ -221,7 +221,8 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	h.renderDashboard(w, r, http.StatusOK, "", r.URL.Query().Get("categorias") == "1")
+	q := r.URL.Query()
+	h.renderPage(w, r, pageOpts{Status: http.StatusOK, ShowCategories: q.Get("categorias") == "1", ShowBooks: q.Get("livros") == "1"})
 }
 
 // requestMonth lê o mês (AAAA-MM) da URL ou, em envios de formulário, do corpo.
@@ -248,9 +249,23 @@ func visibleCategories(all []models.Category) []models.Category {
 	return out
 }
 
+// pageOpts reúne o que muda numa renderização da tela principal além do pedido.
+type pageOpts struct {
+	Status         int
+	CategoryError  string
+	ShowCategories bool
+	BookError      string
+	ShowBooks      bool
+}
+
 // renderDashboard monta e renderiza a página. Em erros do menu de categorias, devolve o status
 // correspondente com a mensagem dentro do pop-up (aberto).
 func (h *Handler) renderDashboard(w http.ResponseWriter, r *http.Request, status int, categoryError string, showCategories bool) {
+	h.renderPage(w, r, pageOpts{Status: status, CategoryError: categoryError, ShowCategories: showCategories})
+}
+
+// renderPage monta e renderiza a tela principal; erros dos pop-ups (categorias, livros) vêm em o, com o pop-up aberto.
+func (h *Handler) renderPage(w http.ResponseWriter, r *http.Request, o pageOpts) {
 	now := time.Now()
 	selectedMonth := requestMonth(r)
 	if selectedMonth == "" {
@@ -375,18 +390,21 @@ func (h *Handler) renderDashboard(w http.ResponseWriter, r *http.Request, status
 
 		Categories:     visibleCategories(categories),
 		AllCategories:  categories,
-		ShowCategories: showCategories,
-		CategoryError:  categoryError,
+		ShowCategories: o.ShowCategories,
+		CategoryError:  o.CategoryError,
 
-		Book:     book,
-		BookID:   book.ID,
-		Books:    activeBooks(books),
-		AllBooks: books,
-		BookPath: "/",
+		Book:       book,
+		BookID:     book.ID,
+		Books:      activeBooks(books),
+		AllBooks:   books,
+		BookPath:   "/",
+		BookError:  o.BookError,
+		ShowBooks:  o.ShowBooks,
+		BookColors: models.BookColors,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(status)
+	w.WriteHeader(o.Status)
 	if err := h.tmpl.ExecuteTemplate(w, "index.html", data); err != nil {
 		serverError(w, "Erro ao renderizar página", err)
 	}

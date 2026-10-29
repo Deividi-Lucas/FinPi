@@ -77,6 +77,10 @@ type PageData struct {
 	Books    []Book // livros ativos
 	AllBooks []Book // todos, para o cadastro
 	BookPath string // página atual, para o seletor de livro
+
+	BookError  string      // erro exibido dentro do pop-up de livros
+	ShowBooks  bool        // abre o pop-up de livros ao carregar
+	BookColors []BookColor // paleta para os formulários do cadastro de livros
 }
 
 // FilterView são os filtros da lista, prontos para o formulário e para os campos ocultos.

@@ -21,10 +21,7 @@ func (h *Handler) resolveBook(r *http.Request) (db *database.DB, book models.Boo
 
 // bookScope é o resolveBook que também devolve a lista de todos os livros (para o seletor), sem consultar duas vezes.
 func (h *Handler) bookScope(r *http.Request) (db *database.DB, book models.Book, books []models.Book, invalid bool, err error) {
-	raw := strings.TrimSpace(r.URL.Query().Get("livro"))
-	if raw == "" {
-		raw = strings.TrimSpace(r.PostForm.Get("livro"))
-	}
+	raw := requestBook(r)
 	books, err = h.db.ListBooks()
 	if err != nil {
 		return nil, book, nil, false, err
@@ -68,9 +65,18 @@ func (h *Handler) postScope(w http.ResponseWriter, r *http.Request) (*database.D
 	return db, book, true
 }
 
-// bookQuery devolve "&livro=ID" para um endereço de retorno, ou "" se o formulário não trouxe um livro válido.
+// requestBook lê o livro pedido: parâmetro livro da URL ou, sem ele, do corpo do formulário.
+func requestBook(r *http.Request) string {
+	if raw := strings.TrimSpace(r.URL.Query().Get("livro")); raw != "" {
+		return raw
+	}
+	return strings.TrimSpace(r.PostForm.Get("livro"))
+}
+
+// bookQuery devolve "&livro=ID" para um endereço de retorno, ou "" se o pedido não trouxe um livro. Lê da mesma
+// fonte que resolveBook, para o retorno nunca levar um livro diferente do usado na ação.
 func bookQuery(r *http.Request) string {
-	raw := strings.TrimSpace(r.PostForm.Get("livro"))
+	raw := requestBook(r)
 	if id, err := strconv.ParseInt(raw, 10, 64); err == nil && id > 0 {
 		return "&livro=" + strconv.FormatInt(id, 10)
 	}

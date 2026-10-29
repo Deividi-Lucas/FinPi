@@ -122,3 +122,15 @@
                     </div>
                 </div>
 {{end}}
+
+{{/* bookBar: seletor do livro. O ponto precisa ter .Book, .Books e .BookPath. */}}
+{{define "bookBar"}}
+        <details class="relative" data-book-bar>
+            <summary class="list-none inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-100 text-sm font-medium px-3 py-2 rounded-xl border cursor-pointer" style="border-color: {{.Book.Hex}}">
+                <span class="inline-block h-2.5 w-2.5 rounded-full" style="background: {{.Book.Hex}}"></span>{{.Book.Name}} <span class="text-slate-400">&#9662;</span>
+            </summary>
+            <div class="absolute z-40 mt-2 min-w-[12rem] rounded-xl border border-slate-700 bg-slate-900 shadow-2xl p-1">
+                {{range .Books}}<a href="{{$.BookPath}}?livro={{.ID}}" class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-200 hover:bg-slate-800"><span class="inline-block h-2.5 w-2.5 rounded-full" style="background: {{.Hex}}"></span>{{.Name}}</a>{{end}}
+            </div>
+        </details>
+{{end}}
