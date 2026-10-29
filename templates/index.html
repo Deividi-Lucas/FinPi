@@ -66,6 +66,18 @@
         </div>
         {{end}}
 
+        {{with .BulkResult}}
+        <div id="bulk-result" class="mt-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm">
+            {{if eq .Kind "edit"}}{{.Count}} {{plural .Count "lançamento alterado" "lançamentos alterados"}}{{else if eq .Kind "delete"}}{{.Count}} {{plural .Count "lançamento excluído" "lançamentos excluídos"}}{{else}}{{.Count}} {{plural .Count "lançamento restaurado" "lançamentos restaurados"}}{{end}}{{if gt .Skipped 0}} &middot; {{.Skipped}} {{if eq .Kind "undo"}}{{plural .Skipped "foi alterado depois e ficou como está" "foram alterados depois e ficaram como estão"}}{{else}}{{plural .Skipped "sem mudança ou inexistente" "sem mudança ou inexistentes"}}{{end}}{{end}}.
+            {{if and $.Undo (ne .Kind "undo")}}
+            <form method="POST" action="/bulk/undo" onsubmit="return confirm('Desfazer a última edição em lote?');" class="inline ml-2">
+                {{template "stateFields" $}}
+                <button type="submit" class="underline hover:text-emerald-100 cursor-pointer">Desfazer</button>
+            </form>
+            {{end}}
+        </div>
+        {{end}}
+
         <!-- Mensagens de Erro / Alerta -->
         {{if .ErrorMessage}}
         <div class="mt-4 p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm flex items-center gap-2">
@@ -254,11 +266,27 @@
             </div>
             <p id="history-summary" class="px-6 py-2 text-xs text-slate-400 border-b border-slate-800/60">{{.HistoryCount}} {{plural .HistoryCount "lançamento" "lançamentos"}} &middot; receitas {{formatCurrency .HistoryIncome}} &middot; despesas {{formatCurrency .HistoryExpense}}{{if .Filter.AllMonths}} &middot; todos os meses{{end}}</p>
             {{if .HistoryTruncated}}<p class="px-6 py-2 text-xs text-amber-300 bg-amber-500/10 border-b border-amber-500/20">Mostrando os 500 mais recentes. Refine os filtros para ver os demais.</p>{{end}}
+            {{with .Undo}}
+            <div id="undo-bar" class="px-6 py-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300 bg-slate-900/40 border-b border-slate-800/60">
+                <span>Desfazer última edição em lote: {{.Summary}} &middot; {{.Count}} {{plural .Count "lançamento" "lançamentos"}} &middot; {{.At}}</span>
+                <form method="POST" action="/bulk/undo" onsubmit="return confirm('Desfazer a edição de {{.Count}} {{plural .Count "lançamento" "lançamentos"}}?');" class="inline">
+                    {{template "stateFields" $}}
+                    <button type="submit" class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 cursor-pointer">Desfazer</button>
+                </form>
+            </div>
+            {{end}}
+            <div id="bulk-bar" class="hidden px-6 py-3 flex flex-wrap items-center gap-3 text-sm bg-emerald-500/10 border-b border-emerald-500/30 text-emerald-200">
+                <span><strong id="bulk-count">0</strong> selecionados</span>
+                <button type="button" onclick="openBulkEdit()" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium cursor-pointer">Editar…</button>
+                <button type="button" onclick="openBulkDelete()" class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-medium cursor-pointer">Excluir</button>
+                <button type="button" onclick="clearBulkSelection()" class="px-3 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-slate-800 cursor-pointer">Limpar seleção</button>
+            </div>
 
             <div class="overflow-x-auto">
                 <table class="w-full text-left text-sm text-slate-300">
                     <thead class="bg-slate-900/60 text-xs uppercase tracking-wider text-slate-400 border-b border-slate-800">
                         <tr>
+                            <th scope="col" class="px-3 py-3.5"><input type="checkbox" id="bulk-all" title="Selecionar todos da lista" aria-label="Selecionar todos da lista" class="cursor-pointer"></th>
                             <th scope="col" class="px-6 py-3.5">Data</th>
                             <th scope="col" class="px-6 py-3.5">Descrição</th>
                             <th scope="col" class="px-6 py-3.5">Categoria</th>
@@ -270,6 +298,7 @@
                     <tbody class="divide-y divide-slate-800/60">
                         {{range .History}}
                         <tr class="hover:bg-slate-800/50 transition">
+                            <td class="px-3 py-4"><input type="checkbox" data-bulk-id="{{.ID}}" class="cursor-pointer" aria-label="Selecionar lançamento"></td>
                             <td class="px-6 py-4 whitespace-nowrap text-xs text-slate-400">
                                 {{formatDate .Date}}
                             </td>
@@ -342,7 +371,7 @@
                         </tr>
                         {{else}}
                         <tr>
-                            <td colspan="6" class="px-6 py-12 text-center text-slate-500 text-sm">
+                            <td colspan="7" class="px-6 py-12 text-center text-slate-500 text-sm">
                                 <svg class="w-10 h-10 mx-auto mb-3 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                 </svg>
@@ -709,6 +738,75 @@
         </div>
     </div>
 
+    <!-- Pop-up de edição múltipla (edição ou exclusão em lote, sempre com prévia) -->
+    <div id="bulk-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 backdrop-blur-sm p-4" onclick="closeBulkModal()">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl p-6 relative" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-5">
+                <h3 id="bulk-modal-title" class="text-lg font-semibold text-white">Editar lançamentos</h3>
+                <button type="button" onclick="closeBulkModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer" title="Fechar">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+
+            <div id="bulk-error" role="alert" class="hidden mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm"></div>
+
+            <form id="bulk-form" method="POST" action="/bulk/preview" class="space-y-4">
+                {{template "stateFields" .}}
+                <input type="hidden" name="acao" value="editar">
+                <p class="text-xs text-slate-400">Cada campo começa em "não alterar". Você verá a prévia antes de gravar.</p>
+
+                <label class="block text-xs font-medium text-slate-300">Categoria
+                    <select name="categoria" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100">
+                        <option value="">Não alterar</option>
+                        {{range .Categories}}<option value="{{.Name}}">{{.Name}}</option>{{end}}
+                    </select>
+                </label>
+
+                <label class="block text-xs font-medium text-slate-300">Prioridade (só despesas)
+                    <select name="prioridade" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100">
+                        <option value="">Não alterar</option>
+                        <option value="seguir">Seguir a categoria</option>
+                        <option value="essential">Essencial</option>
+                        <option value="superfluous">Supérfluo</option>
+                    </select>
+                </label>
+
+                <div class="text-xs font-medium text-slate-300">Data
+                    <select name="data_modo" id="bulk-date-mode" onchange="syncBulkDateMode()" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100">
+                        <option value="">Não alterar</option>
+                        <option value="definir">Definir uma data</option>
+                        <option value="deslocar">Deslocar</option>
+                    </select>
+                    <div id="bulk-date-set" class="hidden mt-2">
+                        <input type="date" name="data" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100">
+                    </div>
+                    <div id="bulk-date-shift" class="hidden mt-2 flex items-center gap-2">
+                        <input type="number" name="desloca" step="1" placeholder="Ex.: 1 ou -3" class="w-32 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100">
+                        <select name="desloca_unidade" class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100">
+                            <option value="dias">dias</option>
+                            <option value="meses">meses</option>
+                        </select>
+                        <span class="text-slate-500">(o dia que não existir vai para o fim do mês)</span>
+                    </div>
+                </div>
+
+                <div class="text-xs font-medium text-slate-300">Descrição: localizar e substituir
+                    <div class="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <input type="text" name="localizar" maxlength="100" placeholder="Localizar (ignora maiúsculas)" class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100">
+                        <input type="text" name="substituir" maxlength="200" placeholder="Substituir por (vazio remove)" class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100">
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-end gap-3 pt-2 border-t border-slate-800">
+                    <button type="button" onclick="closeBulkModal()" class="px-4 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition cursor-pointer">Cancelar</button>
+                    <button id="bulk-form-submit" type="submit" class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-medium text-sm px-5 py-2 rounded-xl transition cursor-pointer">Ver prévia</button>
+                </div>
+            </form>
+
+            <div id="bulk-preview" class="mt-2"></div>
+        </div>
+    </div>
+
     <!-- Pop-up de Categorias -->
     <div id="categories-modal" data-open="{{.ShowCategories}}" class="fixed inset-0 z-50 {{if .ShowCategories}}flex{{else}}hidden{{end}} items-center justify-center bg-black/60 backdrop-blur-sm p-4" onclick="closeCategoriesModal()">
         <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl p-6 relative" onclick="event.stopPropagation()">
@@ -924,6 +1022,7 @@
                 closeCategoriesModal();
                 closeNewModal();
                 closeImportModal();
+                closeBulkModal();
             }
         });
 
@@ -1358,8 +1457,155 @@
             }
         })();
 
+        // Edição múltipla: seleção no histórico, edição/exclusão em lote e prévia (nada é gravado até "Aplicar").
+        const bulkBar = document.getElementById('bulk-bar');
+        const bulkCount = document.getElementById('bulk-count');
+        const bulkAll = document.getElementById('bulk-all');
+        const bulkModal = document.getElementById('bulk-modal');
+        const bulkForm = document.getElementById('bulk-form');
+        const bulkPreview = document.getElementById('bulk-preview');
+        const bulkError = document.getElementById('bulk-error');
+        const bulkSubmit = document.getElementById('bulk-form-submit');
+
+        function bulkBoxes() { return Array.from(document.querySelectorAll('input[data-bulk-id]')); }
+        function bulkSelected() { return bulkBoxes().filter(function (b) { return b.checked; }).map(function (b) { return b.dataset.bulkId; }); }
+
+        function refreshBulkBar() {
+            const n = bulkSelected().length, total = bulkBoxes().length;
+            bulkBar.classList.toggle('hidden', n === 0);
+            bulkCount.textContent = String(n);
+            bulkAll.checked = n > 0 && n === total;
+            bulkAll.indeterminate = n > 0 && n < total;
+        }
+
+        function clearBulkSelection() {
+            bulkBoxes().forEach(function (b) { b.checked = false; });
+            refreshBulkBar();
+        }
+
+        function showBulkError(message) {
+            bulkError.textContent = message;
+            bulkError.classList.toggle('hidden', !message);
+        }
+
+        function hasBulkPending() {
+            return bulkSelected().length > 0 || !bulkModal.classList.contains('hidden') || bulkPreview.childElementCount > 0;
+        }
+
+        function syncBulkDateMode() {
+            const mode = document.getElementById('bulk-date-mode').value;
+            document.getElementById('bulk-date-set').classList.toggle('hidden', mode !== 'definir');
+            document.getElementById('bulk-date-shift').classList.toggle('hidden', mode !== 'deslocar');
+        }
+
+        function showBulkModal(title) {
+            document.getElementById('bulk-modal-title').textContent = title;
+            bulkModal.classList.remove('hidden');
+            bulkModal.classList.add('flex');
+        }
+
+        function closeBulkModal() {
+            bulkModal.classList.add('hidden');
+            bulkModal.classList.remove('flex');
+        }
+
+        function openBulkEdit() {
+            const n = bulkSelected().length;
+            if (!n) return;
+            bulkPreview.innerHTML = '';
+            bulkForm.classList.remove('hidden');
+            showBulkError('');
+            showBulkModal('Editar ' + n + ' ' + (n === 1 ? 'lançamento' : 'lançamentos'));
+        }
+
+        function bulkParamsFrom(form) {
+            const params = new URLSearchParams(new FormData(form));
+            bulkSelected().forEach(function (id) { params.append('ids', id); });
+            return params;
+        }
+
+        async function requestBulkPreview(params, title) {
+            showBulkError('');
+            try {
+                const resp = await fetch('/bulk/preview', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: params,
+                    credentials: 'same-origin'
+                });
+                const text = await resp.text();
+                if (!resp.ok) { showBulkError(text.trim() || 'Não foi possível montar a prévia.'); return; }
+                bulkPreview.dataset.mode = params.get('acao') === 'excluir' ? 'delete' : 'edit';
+                bulkPreview.innerHTML = text;
+                bulkForm.classList.add('hidden');
+                if (title) showBulkModal(title);
+            } catch (err) {
+                showBulkError('Sem conexão com o servidor.');
+            }
+        }
+
+        function openBulkDelete() {
+            const n = bulkSelected().length;
+            if (!n) return;
+            const params = new URLSearchParams();
+            params.set('acao', 'excluir');
+            bulkForm.querySelectorAll('input[type="hidden"]').forEach(function (i) { if (i.name !== 'acao') params.set(i.name, i.value); });
+            bulkSelected().forEach(function (id) { params.append('ids', id); });
+            requestBulkPreview(params, 'Excluir ' + n + ' ' + (n === 1 ? 'lançamento' : 'lançamentos'));
+        }
+
+        bulkForm.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            if (!window.fetch) { showBulkError('Este navegador não suporta a edição em lote.'); return; }
+            bulkSubmit.disabled = true;
+            await requestBulkPreview(bulkParamsFrom(bulkForm));
+            bulkSubmit.disabled = false;
+        });
+
+        bulkPreview.addEventListener('click', async function (e) {
+            if (e.target.closest('[data-bulk-cancel]')) {
+                bulkPreview.innerHTML = '';
+                if (bulkPreview.dataset.mode === 'delete') { closeBulkModal(); } else { bulkForm.classList.remove('hidden'); }
+                return;
+            }
+            const apply = e.target.closest('[data-bulk-apply]');
+            if (!apply) return;
+
+            const body = bulkPreview.querySelector('#bulk-preview-body');
+            const params = new URLSearchParams();
+            body.querySelectorAll('input[type="hidden"]').forEach(function (i) { params.append(i.name, i.value); });
+            body.querySelectorAll('input[type="checkbox"][name="ids"]:checked').forEach(function (i) { params.append('ids', i.value); });
+
+            showBulkError('');
+            apply.disabled = true;
+            try {
+                const resp = await fetch('/bulk/apply', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: params,
+                    credentials: 'same-origin'
+                });
+                if (resp.ok) { window.location.href = resp.url; return; }
+                showBulkError((await resp.text()).trim() || 'Não foi possível aplicar. Nada foi alterado.');
+            } catch (err) {
+                showBulkError('Sem conexão com o servidor. Nada foi alterado.');
+            }
+            apply.disabled = false;
+        });
+
+        document.addEventListener('change', function (e) {
+            if (e.target === bulkAll) {
+                bulkBoxes().forEach(function (b) { b.checked = bulkAll.checked; });
+                refreshBulkBar();
+            } else if (e.target.matches && e.target.matches('input[data-bulk-id]')) {
+                refreshBulkBar();
+            }
+        });
+        refreshBulkBar();
+
         // Tempo real (SSE): se você estiver no meio de uma edição, mostra um aviso em vez de recarregar.
         startLiveUpdates(function () {
+            if (hasBulkPending()) return true; // seleção, pop-up ou prévia em andamento
             if (hasPendingImport()) return true; // revisão de extrato em andamento: não recarregar
             // Formulário de filtros em edição (foco ou valor alterado): não recarregar e perder o que foi digitado.
             const filters = document.getElementById('filters-form');
