@@ -287,11 +287,11 @@ func (d *DB) CreateTransaction(t *models.Transaction) error {
 		return ErrInvalidPriority
 	}
 	query := `
-		INSERT INTO transactions (description, amount_cents, type, category, date, priority, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO transactions (description, amount_cents, type, category, date, priority, created_at, book_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	now := time.Now()
-	res, err := d.conn.Exec(query, t.Description, t.AmountCents, t.Type, t.Category, t.Date, t.Priority, now)
+	res, err := d.conn.Exec(query, t.Description, t.AmountCents, t.Type, t.Category, t.Date, t.Priority, now, d.book)
 	if err != nil {
 		return err
 	}
@@ -312,17 +312,19 @@ func (d *DB) GetTransactions(yearMonth string) ([]models.Transaction, error) {
 		query = `
 			SELECT ` + transactionColumns + `
 			FROM transactions
-			WHERE strftime('%Y-%m', date) = ?
+			WHERE book_id = ? AND strftime('%Y-%m', date) = ?
 			ORDER BY date DESC, id DESC
 		`
-		args = append(args, yearMonth)
+		args = append(args, d.book, yearMonth)
 	} else {
 		query = `
 			SELECT ` + transactionColumns + `
 			FROM transactions
+			WHERE book_id = ?
 			ORDER BY date DESC, id DESC
 			LIMIT 100
 		`
+		args = append(args, d.book)
 	}
 
 	rows, err := d.conn.Query(query, args...)
@@ -340,9 +342,9 @@ func (d *DB) GetTransactionsBetween(from, to string) ([]models.Transaction, erro
 	rows, err := d.conn.Query(`
 		SELECT `+transactionColumns+`
 		FROM transactions
-		WHERE date >= ? AND date <= ?
+		WHERE book_id = ? AND date >= ? AND date <= ?
 		ORDER BY date ASC, id ASC
-	`, from, to)
+	`, d.book, from, to)
 	if err != nil {
 		return nil, err
 	}
@@ -358,9 +360,9 @@ func (d *DB) GetInstallmentCandidates() ([]models.Transaction, error) {
 	rows, err := d.conn.Query(`
 		SELECT ` + transactionColumns + `
 		FROM transactions
-		WHERE description LIKE '%/%' OR description LIKE '%parcela%'
+		WHERE book_id = ? AND (description LIKE '%/%' OR description LIKE '%parcela%')
 		ORDER BY date ASC, id ASC
-	`)
+	`, d.book)
 	if err != nil {
 		return nil, err
 	}
@@ -376,10 +378,10 @@ func (d *DB) GetSummaryByMonth(yearMonth string) (models.Summary, error) {
 			COALESCE(SUM(CASE WHEN type = 'income' THEN amount_cents ELSE 0 END), 0) AS total_income,
 			COALESCE(SUM(CASE WHEN type = 'expense' THEN amount_cents ELSE 0 END), 0) AS total_expense
 		FROM transactions
-		WHERE strftime('%Y-%m', date) = ?
+		WHERE book_id = ? AND strftime('%Y-%m', date) = ?
 	`
 	var s models.Summary
-	row := d.conn.QueryRow(query, yearMonth)
+	row := d.conn.QueryRow(query, d.book, yearMonth)
 	if err := row.Scan(&s.TotalIncome, &s.TotalExpense); err != nil {
 		return s, err
 	}
@@ -395,9 +397,9 @@ func (d *DB) UpdateTransaction(t *models.Transaction) error {
 	query := `
 		UPDATE transactions
 		SET description = ?, amount_cents = ?, type = ?, category = ?, date = ?, priority = ?
-		WHERE id = ?
+		WHERE id = ? AND book_id = ?
 	`
-	res, err := d.conn.Exec(query, t.Description, t.AmountCents, t.Type, t.Category, t.Date, t.Priority, t.ID)
+	res, err := d.conn.Exec(query, t.Description, t.AmountCents, t.Type, t.Category, t.Date, t.Priority, t.ID, d.book)
 	if err != nil {
 		return err
 	}
@@ -406,7 +408,7 @@ func (d *DB) UpdateTransaction(t *models.Transaction) error {
 
 // DeleteTransaction exclui um lançamento pelo ID.
 func (d *DB) DeleteTransaction(id int64) error {
-	res, err := d.conn.Exec(`DELETE FROM transactions WHERE id = ?`, id)
+	res, err := d.conn.Exec(`DELETE FROM transactions WHERE id = ? AND book_id = ?`, id, d.book)
 	if err != nil {
 		return err
 	}
