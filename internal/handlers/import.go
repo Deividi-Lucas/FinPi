@@ -30,6 +30,7 @@ type importView struct {
 	Options          []string // categorias da lista de cada linha
 	SelectedMonth    string
 	IncludeProjected bool
+	Filter           models.FilterView // vazio: o trecho da revisão reaproveita o stateFields da página
 }
 
 func importError(w http.ResponseWriter, err error) {

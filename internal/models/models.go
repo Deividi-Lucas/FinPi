@@ -60,6 +60,27 @@ type PageData struct {
 	Stats MonthStats // números do dashboard do mês
 
 	ImportResult *ImportResult // aviso após importar um extrato (nil = sem aviso)
+
+	// Histórico filtrado (a lista de lançamentos); os cartões e o dashboard do mês continuam usando Transactions.
+	History          []Transaction
+	HistoryCount     int   // lançamentos que passaram pelos filtros (antes do limite de exibição)
+	HistoryIncome    int64 // soma das receitas da lista filtrada, em centavos
+	HistoryExpense   int64 // soma das despesas da lista filtrada, em centavos
+	HistoryTruncated bool  // a lista mostra só os mais recentes
+	Filter           FilterView
+}
+
+// FilterView são os filtros da lista, prontos para o formulário e para os campos ocultos.
+type FilterView struct {
+	Text       string
+	Type       string          // "", "receita" ou "despesa" (valor da URL)
+	Min, Max   string          // "12,50" ou ""
+	AllMonths  bool            // procurar em todos os meses
+	Active     int             // quantos filtros estão ligados
+	Query      string          // parâmetros normalizados (sem "?"); "" sem filtros
+	Warning    string          // avisos de valores inválidos
+	Categories []string        // categorias marcadas, como vieram
+	Selected   map[string]bool // categoria (nome exibido) → marcada
 }
 
 // ImportResult é o resultado de uma importação, exibido num aviso após o redirecionamento.
