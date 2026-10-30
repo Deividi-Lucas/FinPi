@@ -12,9 +12,10 @@ import (
 type Bank string
 
 const (
-	BankMercadoPago Bank = "mercadopago"
-	BankNubank      Bank = "nubank"
-	BankSicredi     Bank = "sicredi"
+	BankMercadoPago   Bank = "mercadopago"
+	BankNubank        Bank = "nubank"
+	BankSicredi       Bank = "sicredi"
+	BankBancoDoBrasil Bank = "bancodobrasil"
 )
 
 // Label devolve o nome do banco para exibição.
@@ -24,6 +25,8 @@ func (b Bank) Label() string {
 		return "Nubank"
 	case BankSicredi:
 		return "Sicredi"
+	case BankBancoDoBrasil:
+		return "Banco do Brasil"
 	}
 	return "Mercado Pago"
 }
@@ -147,6 +150,8 @@ func CleanDescription(bank Bank, original string) string {
 		out = cleanNubank(text)
 	case BankSicredi:
 		out = cleanSicredi(text)
+	case BankBancoDoBrasil:
+		return tidy(text)
 	default:
 		if out = tidy(text); out == "" {
 			out = capRunes(text)

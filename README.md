@@ -59,6 +59,7 @@ finpi/
 │   │   ├── csv.go              # Leitor de CSV (separador e codificação)
 │   │   ├── xlsx.go             # Leitor de XLSX (biblioteca padrão, sem dependências)
 │   │   ├── banks.go            # Detecção do cabeçalho e leitura das linhas do Nubank (CSV) e do Sicredi
+│   │   ├── bb.go               # Leitura do CSV do Banco do Brasil (ignora saldos) e limpeza da descrição
 │   │   ├── clean.go            # Limpeza da descrição (sem CPF/CNPJ, banco, agência e conta); guarda o texto original
 │   │   ├── ofx.go              # Leitor de OFX (extrato do Nubank)
 │   │   └── preview.go          # Revisão: situação de cada linha, categoria sugerida, tipos conhecidos e identificador de origem por banco
@@ -212,11 +213,12 @@ entram (as parcelas previstas ficam de fora).
 
 ## 🏦 Importar extrato
 
-O botão **Importar extrato** lê extratos de três bancos, reconhecidos **pelo conteúdo do arquivo** (não pelo nome):
+O botão **Importar extrato** lê extratos de quatro bancos, reconhecidos **pelo conteúdo do arquivo** (não pelo nome):
 
 - **Mercado Pago:** `.xlsx` ou `.csv`, **sem abrir e salvar no Excel** (o Excel destrói o identificador das transações e o sistema recusa o arquivo).
 - **Nubank:** **OFX** ou **CSV**. O mesmo extrato em OFX e em CSV não duplica (identificador `nu:<uuid>`).
 - **Sicredi:** planilha **XLSX**, mesmo quando o arquivo se chama `.csv` (identificador `sic:<identificador>|<data>|<centavos>`).
+- **Banco do Brasil:** **CSV** do extrato da conta corrente. O identificador é `bb:<documento>|<data>|<centavos>`, porque o número do documento se repete entre lançamentos diferentes; as linhas de saldo (Saldo Anterior, Saldo do dia, S A L D O) são ignoradas.
 
 Nada é gravado antes da **revisão**: cada linha mostra a categoria sugerida pelo histórico (você pode trocar; as linhas
 com a mesma descrição acompanham), e uma situação: *Novo*, *Já importado*, *Possível duplicado* (já existe um
@@ -225,6 +227,7 @@ arquivo, que vem sem marcação). Só as linhas *Novas* vêm marcadas. Os tipos 
 
 - **Nubank:** Pix recebido/enviado, Transferência recebida/enviada, Pagamento de boleto, Pagamento de fatura, Resgate RDB e Aplicação RDB.
 - **Sicredi:** Pix recebido/enviado, Pagamento de boleto, Débito automático, Integralização de capital, Compra no débito, Recarga de celular, Transferência conta salário e Devolução Pix.
+- **Banco do Brasil:** Pix recebido/enviado, Transferência recebida/enviada, TED, TEDinternet e Telefone. Os demais lançamentos aparecem como *Tipo novo*.
 
 Reimportar o mesmo extrato não duplica nada. Fechar o pop-up mantém a revisão; **Descartar** ou recarregar a página a apagam.
 
