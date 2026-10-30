@@ -199,3 +199,17 @@ func TestParse_UnrecognizedMentionsBancoDoBrasil(t *testing.T) {
 		t.Errorf("mensagem: %v", ErrUnrecognized)
 	}
 }
+
+func TestParse_BancoDoBrasilSignComesFromValor(t *testing.T) {
+	rows := []string{
+		"\"01/10/2021\",\"TED\",\"d\",\"1\",\"-5,00\",\"Entrada\"",
+		"\"01/10/2021\",\"TED\",\"d\",\"2\",\"7,00\",\"" + bbSaida + "\"",
+	}
+	st, err := Parse("a.csv", bbCSV(rows...))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Rows[0].AmountCents != -500 || st.Rows[1].AmountCents != 700 {
+		t.Errorf("valores = %d / %d, quer -500 / 700", st.Rows[0].AmountCents, st.Rows[1].AmountCents)
+	}
+}

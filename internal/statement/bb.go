@@ -61,9 +61,8 @@ func bbHashRef(label, details string) string {
 func parseBancoDoBrasil(grid [][]cell, header int, col map[string]int) (Statement, error) {
 	docCol, hasDoc := 0, false
 	for k, j := range col {
-		if strings.HasSuffix(k, "documento") {
+		if strings.HasSuffix(k, "documento") && (!hasDoc || j < docCol) {
 			docCol, hasDoc = j, true
-			break
 		}
 	}
 	st := Statement{Bank: BankBancoDoBrasil}

@@ -150,8 +150,6 @@ func CleanDescription(bank Bank, original string) string {
 		out = cleanNubank(text)
 	case BankSicredi:
 		out = cleanSicredi(text)
-	case BankBancoDoBrasil:
-		return tidy(text)
 	default:
 		if out = tidy(text); out == "" {
 			out = capRunes(text)
