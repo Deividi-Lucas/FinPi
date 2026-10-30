@@ -36,6 +36,13 @@ func TestCleanDescription(t *testing.T) {
 		{"sicredi débito automático", BankSicredi, "DEBITO AUTOMATICO - 98765432000199 SEGURO EXEMPLO", "Débito automático SEGURO EXEMPLO"},
 		{"sicredi integralização", BankSicredi, "INTEGRALIZACAO DE CAPITAL POR DEB CONTA", "Integralização de capital"},
 		{"sicredi desconhecido", BankSicredi, "TARIFA PACOTE SERVICOS 12345678901 REF", "TARIFA PACOTE SERVICOS REF"},
+		{"sicredi cartão débito", BankSicredi, "CARTAO DEBITO - MERCADO EXEMPLO CENTRO - BR", "Compra no débito MERCADO EXEMPLO CENTRO"},
+		{"sicredi cartão débito com raiz de CNPJ", BankSicredi, "CARTAO DEBITO - 11.222.333 LOJA EXEMPLO - BR", "Compra no débito LOJA EXEMPLO"},
+		{"sicredi cartão débito com asterisco", BankSicredi, "CARTAO DEBITO - SPG*GRILL EXEMPLO - BR", "Compra no débito SPG*GRILL EXEMPLO"},
+		{"sicredi recarga", BankSicredi, "RECARGA CELULAR", "Recarga de celular"},
+		{"sicredi conta salário", BankSicredi, "TRANSFERÊNCIA CONTA SALÁRIO - 12345678901 MARIA DA SILVA", "Transferência conta salário MARIA DA SILVA"},
+		{"sicredi devolução pix", BankSicredi, "DEVOLUCAO PIX - 12345678901 MARIA DA SILVA", "Devolução Pix MARIA DA SILVA"},
+		{"sicredi boleto mantém sufixo de duas letras", BankSicredi, "PAGAMENTO BOLETO - 12345678000100 EMPRESA EXEMPLO - SP", "Pagamento de boleto EMPRESA EXEMPLO - SP"},
 		{"mercado pago não muda", BankMercadoPago, "Pix recebido  Fulano", "Pix recebido Fulano"},
 	}
 	for _, c := range cases {

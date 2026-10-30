@@ -38,6 +38,8 @@ var (
 	accountRe  = regexp.MustCompile(`(?i)\s*conta:\s*\S+`)
 	// raiz de CNPJ solta, como "11.222.333 ", no começo do nome (Sicredi).
 	cnpjRootRe = regexp.MustCompile(`^\d{1,3}(\.\d{3}){1,2}\s+`)
+	// código do país no fim da compra no cartão, como " - BR".
+	countrySuffixRe = regexp.MustCompile(`\s-\s[A-Za-z]{2}$`)
 )
 
 type kind struct{ prefix, label string }
@@ -60,6 +62,10 @@ var sicrediKinds = []kind{
 	{"pagamento boleto", "Pagamento de boleto"},
 	{"debito automatico", "Débito automático"},
 	{"integralizacao de capital", "Integralização de capital"},
+	{"cartao debito", "Compra no débito"},
+	{"recarga celular", "Recarga de celular"},
+	{"transferencia conta salario", "Transferência conta salário"},
+	{"devolucao pix", "Devolução Pix"},
 }
 
 func tidy(s string) string {
@@ -119,7 +125,11 @@ func cleanSicredi(text string) string {
 	if k.prefix == "integralizacao de capital" || len(parts) == 1 {
 		return k.label
 	}
-	rest := tidy(stripNoise(strings.Join(parts[1:], " - ")))
+	body := strings.Join(parts[1:], " - ")
+	if k.prefix == "cartao debito" {
+		body = countrySuffixRe.ReplaceAllString(body, "")
+	}
+	rest := tidy(stripNoise(body))
 	rest = cnpjRootRe.ReplaceAllString(rest, "")
 	if rest == "" {
 		return k.label
