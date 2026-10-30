@@ -3,7 +3,18 @@ package models
 import (
 	"strconv"
 	"time"
+
+	"finpi/internal/textutil"
 )
+
+// InternalCategory é a categoria das movimentações entre contas do próprio dono (ex.: resgate de investimento):
+// ela fica fora das receitas e despesas dos totais.
+const InternalCategory = "Movimentação interna"
+
+// IsInternal diz se a categoria é a de movimentação interna (ignora caixa e acentos).
+func IsInternal(category string) bool {
+	return textutil.Fold(category) == textutil.Fold(InternalCategory)
+}
 
 // Transaction representa um lançamento financeiro no banco de dados.
 type Transaction struct {

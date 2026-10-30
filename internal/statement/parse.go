@@ -77,7 +77,7 @@ func Parse(filename string, data []byte) (Statement, error) {
 		return parseOFX(data)
 	}
 	var (
-		grid  [][]cell
+		grid   [][]cell
 		err    error
 		format string
 	)
