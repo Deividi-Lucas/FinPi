@@ -744,7 +744,7 @@
             <div id="import-error" role="alert" class="hidden mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm"></div>
 
             <div id="import-picker">
-                <p class="text-sm text-slate-400 mb-3">Envie o extrato do Mercado Pago (<strong>.xlsx</strong> ou <strong>.csv</strong>), do Nubank (<strong>.ofx</strong> ou <strong>.csv</strong>) ou do Sicredi (<strong>.xlsx</strong>, mesmo que o arquivo venha com extensão .csv), sem abrir e salvar no Excel. Você revisa tudo antes de gravar.</p>
+                <p class="text-sm text-slate-400 mb-3">Envie o extrato do Mercado Pago (<strong>.xlsx</strong> ou <strong>.csv</strong>), do Nubank (<strong>.ofx</strong> ou <strong>.csv</strong>), do Sicredi (<strong>.xlsx</strong>, mesmo que o arquivo venha com extensão .csv) ou do Banco do Brasil (<strong>.csv</strong>, extrato da conta corrente), sem abrir e salvar no Excel. Você revisa tudo antes de gravar.</p>
                 <form id="import-form" method="POST" action="/import/preview" enctype="multipart/form-data" class="flex flex-col gap-3 sm:flex-row sm:items-center">
                     {{template "stateFields" .}}
                     <input type="file" name="file" accept=".xlsx,.csv,.ofx" required class="flex-1 text-sm text-slate-300 file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border-0 file:bg-slate-800 file:text-slate-200 file:cursor-pointer">

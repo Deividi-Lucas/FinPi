@@ -23,6 +23,7 @@ func truncateRunes(s string, n int) string {
 var (
 	sicrediColumns = []string{"data", "descricao", "identificador", "tipo", "valor"}
 	nubankColumns  = []string{"data", "valor", "identificador", "descricao"}
+	bbColumns      = []string{"data", "lancamento", "detalhes", "valor", "tipo lancamento"}
 )
 
 func headerKey(s string) string {
@@ -54,7 +55,7 @@ func findHeader(grid [][]cell, required []string) (int, map[string]int, bool) {
 	return 0, nil, false
 }
 
-// parseGrid reconhece o banco pelo cabeçalho: Mercado Pago (RELEASE_DATE), Sicredi (tem Tipo) ou Nubank.
+// parseGrid reconhece o banco pelo cabeçalho: Mercado Pago (RELEASE_DATE), Sicredi (tem Tipo), Banco do Brasil (Lançamento e Detalhes) ou Nubank.
 func parseGrid(grid [][]cell) (Statement, error) {
 	for _, row := range grid {
 		for _, c := range row {
@@ -62,6 +63,10 @@ func parseGrid(grid [][]cell) (Statement, error) {
 				return parseMercadoPago(grid)
 			}
 		}
+	}
+	// O Banco do Brasil não tem a coluna Identificador, então nunca confunde com os outros.
+	if i, col, ok := findHeader(grid, bbColumns); ok {
+		return parseBancoDoBrasil(grid, i, col)
 	}
 	// As colunas do Nubank são um subconjunto das do Sicredi: o Sicredi vem primeiro.
 	if i, col, ok := findHeader(grid, sicrediColumns); ok {

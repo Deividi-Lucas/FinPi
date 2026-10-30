@@ -14,6 +14,7 @@ const ExternalIDPrefix = "mp:"
 const (
 	externalIDPrefixNubank  = "nu:"
 	externalIDPrefixSicredi = "sic:"
+	externalIDPrefixBB      = "bb:"
 )
 
 type Status string
@@ -74,6 +75,8 @@ func ExternalIDFor(bank Bank, ref, date string, cents int64) string {
 	switch bank {
 	case BankNubank:
 		return externalIDPrefixNubank + ref
+	case BankBancoDoBrasil:
+		return externalIDPrefixBB + ref + "|" + date + "|" + strconv.FormatInt(cents, 10)
 	case BankSicredi:
 		return externalIDPrefixSicredi + ref + "|" + date + "|" + strconv.FormatInt(cents, 10)
 	}
@@ -82,7 +85,7 @@ func ExternalIDFor(bank Bank, ref, date string, cents int64) string {
 
 // ValidExternalID diz se o identificador tem um dos prefixos aceitos.
 func ValidExternalID(id string) bool {
-	for _, p := range []string{ExternalIDPrefix, externalIDPrefixNubank, externalIDPrefixSicredi} {
+	for _, p := range []string{ExternalIDPrefix, externalIDPrefixNubank, externalIDPrefixSicredi, externalIDPrefixBB} {
 		if strings.HasPrefix(id, p) && len(id) > len(p) {
 			return true
 		}
@@ -96,6 +99,7 @@ var knownTypes = map[Bank][]string{
 		"pagamento de boleto", "pagamento de fatura", "resgate rdb", "aplicacao rdb"},
 	BankSicredi: {"pix recebido", "pix enviado", "pagamento de boleto", "debito automatico", "integralizacao de capital",
 		"compra no debito", "recarga de celular", "transferencia conta salario", "devolucao pix"},
+	BankBancoDoBrasil: {"pix recebido", "pix enviado", "transferencia recebida", "transferencia enviada", "ted", "tedinternet", "telefone"},
 }
 
 func isKnownType(bank Bank, description string) bool {
@@ -159,7 +163,7 @@ func BuildPreview(st Statement, in PreviewInput) Preview {
 			category = c
 		}
 
-		if bank != BankMercadoPago && isInternalMovement(r.Description) {
+		if (bank == BankNubank || bank == BankSicredi) && isInternalMovement(r.Description) {
 			category = models.InternalCategory
 		}
 

@@ -23,7 +23,7 @@ const (
 var (
 	ErrUnsupportedFormat = errors.New("formato de arquivo não suportado: envie um extrato .xlsx, .csv ou .ofx")
 	ErrInvalidFile       = errors.New("não foi possível ler o arquivo: ele parece corrompido")
-	ErrUnrecognized      = errors.New("formato não reconhecido: envie um extrato do Mercado Pago (XLSX ou CSV), do Nubank (OFX ou CSV) ou do Sicredi (planilha)")
+	ErrUnrecognized      = errors.New("formato não reconhecido: envie um extrato do Mercado Pago (XLSX ou CSV), do Nubank (OFX ou CSV), do Sicredi (planilha) ou do Banco do Brasil (CSV)")
 	ErrScientificID      = errors.New("o identificador (REFERENCE_ID) está em notação científica: o arquivo foi aberto e salvo no Excel. Baixe o extrato de novo e envie o arquivo original, sem abrir no Excel")
 	ErrTooLarge          = errors.New("o arquivo é grande demais (máximo de 5 MB)")
 	ErrTooManyRows       = fmt.Errorf("o extrato tem mais de %d lançamentos", MaxRows)

@@ -12,9 +12,10 @@ import (
 type Bank string
 
 const (
-	BankMercadoPago Bank = "mercadopago"
-	BankNubank      Bank = "nubank"
-	BankSicredi     Bank = "sicredi"
+	BankMercadoPago   Bank = "mercadopago"
+	BankNubank        Bank = "nubank"
+	BankSicredi       Bank = "sicredi"
+	BankBancoDoBrasil Bank = "bancodobrasil"
 )
 
 // Label devolve o nome do banco para exibição.
@@ -24,6 +25,8 @@ func (b Bank) Label() string {
 		return "Nubank"
 	case BankSicredi:
 		return "Sicredi"
+	case BankBancoDoBrasil:
+		return "Banco do Brasil"
 	}
 	return "Mercado Pago"
 }
