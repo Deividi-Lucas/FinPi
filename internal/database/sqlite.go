@@ -147,6 +147,9 @@ func migrate(conn *sql.DB) error {
 			return fmt.Errorf("erro ao adicionar book_id em %s: %w", table, err)
 		}
 	}
+	if err := ensureColumn(conn, "transactions", "original_description", originalDescriptionColumnSQL); err != nil {
+		return fmt.Errorf("erro ao adicionar a coluna original_description: %w", err)
+	}
 	if err := migrateCategoriesPerBook(conn); err != nil {
 		return fmt.Errorf("erro ao separar as categorias por livro: %w", err)
 	}
@@ -170,6 +173,9 @@ const createBooksSQL = `
 	)`
 
 const bookColumnSQL = `book_id INTEGER NOT NULL DEFAULT 1`
+
+// originalDescriptionColumnSQL guarda o texto original do extrato; vazio nos lançamentos antigos e manuais.
+const originalDescriptionColumnSQL = "original_description TEXT NOT NULL DEFAULT ''"
 
 // migrateCategoriesPerBook reconstrói a tabela categories (formato antigo: name_key UNIQUE no banco todo)
 // com book_id e UNIQUE(book_id, name_key). Tudo numa transação; os dados ficam no livro 1.
@@ -267,13 +273,13 @@ func (d *DB) Close() error {
 var ErrInvalidPriority = errors.New("prioridade inválida: use essential, superfluous ou vazio")
 
 // transactionColumns é a lista de colunas lidas por scanTransactions.
-const transactionColumns = `id, description, amount_cents, type, category, date, priority, created_at`
+const transactionColumns = `id, description, amount_cents, type, category, date, priority, created_at, original_description`
 
 func scanTransactions(rows *sql.Rows) ([]models.Transaction, error) {
 	var list []models.Transaction
 	for rows.Next() {
 		var t models.Transaction
-		if err := rows.Scan(&t.ID, &t.Description, &t.AmountCents, &t.Type, &t.Category, &t.Date, &t.Priority, &t.CreatedAt); err != nil {
+		if err := rows.Scan(&t.ID, &t.Description, &t.AmountCents, &t.Type, &t.Category, &t.Date, &t.Priority, &t.CreatedAt, &t.OriginalDescription); err != nil {
 			return nil, err
 		}
 		list = append(list, t)

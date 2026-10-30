@@ -30,6 +30,8 @@ type Transaction struct {
 	ExternalID string `json:"-"`        // identificador de origem (importação); usado só na gravação em lote
 	BookID     int64  `json:"-"`        // livro do lançamento; preenchido onde o livro importa (lotes e movimentação)
 
+	OriginalDescription string `json:"-"` // texto original do banco (importação); vazio nos lançamentos manuais
+
 	Installment       *InstallmentInfo `json:"-"` // dados de exibição da parcela; não é gravado
 	EffectivePriority string           `json:"-"` // classificação efetiva (própria ou da categoria); não é gravada
 }

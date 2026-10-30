@@ -52,12 +52,15 @@ type snapshot struct {
 	ExternalID  string `json:"external_id"`
 	CreatedAt   string `json:"created_at"`
 	BookID      int64  `json:"book_id"`
+
+	OriginalDescription string `json:"original_description"`
 }
 
 func snapshotOf(t models.Transaction) snapshot {
 	return snapshot{
 		ID: t.ID, Description: t.Description, AmountCents: t.AmountCents, Type: t.Type, Category: t.Category,
 		Date: t.Date, Priority: t.Priority, ExternalID: t.ExternalID, CreatedAt: t.CreatedAt.UTC().Format(time.RFC3339Nano), BookID: t.BookID,
+		OriginalDescription: t.OriginalDescription,
 	}
 }
 
@@ -67,7 +70,7 @@ func (s snapshot) sameState(o snapshot) bool {
 		s.Category == o.Category && s.Date == o.Date && s.Priority == o.Priority && s.ExternalID == o.ExternalID && s.BookID == o.BookID
 }
 
-const loadColumns = `id, description, amount_cents, type, category, date, priority, external_id, created_at, book_id`
+const loadColumns = `id, description, amount_cents, type, category, date, priority, external_id, created_at, book_id, original_description`
 
 // loadTransactions lê os lançamentos que existem entre os ids (com o identificador de origem).
 // Com book > 0 só alcança os daquele livro; com book == 0, os de qualquer livro.
@@ -93,7 +96,7 @@ func loadTransactions(q queryer, ids []int64, book int64) (map[int64]models.Tran
 	defer rows.Close()
 	for rows.Next() {
 		var t models.Transaction
-		if err := rows.Scan(&t.ID, &t.Description, &t.AmountCents, &t.Type, &t.Category, &t.Date, &t.Priority, &t.ExternalID, &t.CreatedAt, &t.BookID); err != nil {
+		if err := rows.Scan(&t.ID, &t.Description, &t.AmountCents, &t.Type, &t.Category, &t.Date, &t.Priority, &t.ExternalID, &t.CreatedAt, &t.BookID, &t.OriginalDescription); err != nil {
 			return nil, err
 		}
 		out[t.ID] = t
@@ -418,9 +421,9 @@ func (d *DB) UndoLatestBatch() (restored, skipped int, err error) {
 		if err := ensureCategoryInBook(tx, it.before.BookID, it.before.Category); err != nil {
 			return 0, 0, err
 		}
-		if _, err := tx.Exec(`INSERT INTO transactions (`+loadColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		if _, err := tx.Exec(`INSERT INTO transactions (`+loadColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			it.before.ID, it.before.Description, it.before.AmountCents, it.before.Type, it.before.Category,
-			it.before.Date, it.before.Priority, it.before.ExternalID, created, it.before.BookID); err != nil {
+			it.before.Date, it.before.Priority, it.before.ExternalID, created, it.before.BookID, it.before.OriginalDescription); err != nil {
 			return 0, 0, err
 		}
 		restored++
