@@ -58,10 +58,10 @@ finpi/
 │   │   ├── parse.go            # Leitura do extrato (cabeçalho, datas, valores) e reconhecimento do banco
 │   │   ├── csv.go              # Leitor de CSV (separador e codificação)
 │   │   ├── xlsx.go             # Leitor de XLSX (biblioteca padrão, sem dependências)
-│   │   ├── banks.go            # Layouts por banco (Mercado Pago, Nubank, Sicredi): identificador, tipos conhecidos e categoria
+│   │   ├── banks.go            # Detecção do cabeçalho e leitura das linhas do Nubank (CSV) e do Sicredi
 │   │   ├── clean.go            # Limpeza da descrição (sem CPF/CNPJ, banco, agência e conta); guarda o texto original
 │   │   ├── ofx.go              # Leitor de OFX (extrato do Nubank)
-│   │   └── preview.go          # Revisão: situação de cada linha e categoria sugerida
+│   │   └── preview.go          # Revisão: situação de cada linha, categoria sugerida, tipos conhecidos e identificador de origem por banco
 │   ├── installments/
 │   │   ├── parse.go            # Lê a parcela da descrição (3/10, parcela 3 de 10)
 │   │   ├── project.go          # Projeta as parcelas previstas dos meses seguintes
@@ -216,7 +216,7 @@ O botão **Importar extrato** lê extratos de três bancos, reconhecidos **pelo 
 
 - **Mercado Pago:** `.xlsx` ou `.csv`, **sem abrir e salvar no Excel** (o Excel destrói o identificador das transações e o sistema recusa o arquivo).
 - **Nubank:** **OFX** ou **CSV**. O mesmo extrato em OFX e em CSV não duplica (identificador `nu:<uuid>`).
-- **Sicredi:** planilha **XLSX**, mesmo quando o arquivo se chama `.csv` (identificador `sic:<identificador>`).
+- **Sicredi:** planilha **XLSX**, mesmo quando o arquivo se chama `.csv` (identificador `sic:<identificador>|<data>|<centavos>`).
 
 Nada é gravado antes da **revisão**: cada linha mostra a categoria sugerida pelo histórico (você pode trocar; as linhas
 com a mesma descrição acompanham), e uma situação: *Novo*, *Já importado*, *Possível duplicado* (já existe um
@@ -229,7 +229,7 @@ arquivo, que vem sem marcação). Só as linhas *Novas* vêm marcadas. Os tipos 
 Reimportar o mesmo extrato não duplica nada. Fechar o pop-up mantém a revisão; **Descartar** ou recarregar a página a apagam.
 
 **Descrição limpa:** o sistema tira da descrição o CPF/CNPJ, o banco, a agência e a conta (fica, por exemplo,
-"Pix enviado: Maria Souza"). O texto original do banco é guardado na coluna `original_description` do lançamento e
+"Pix enviado Maria Souza"). O texto original do banco é guardado na coluna `original_description` do lançamento e
 aparece ao passar o mouse sobre a descrição.
 
 **Movimentação interna:** *Resgate RDB* e *Aplicação RDB* vão (já marcados) para a categoria **Movimentação interna**,
