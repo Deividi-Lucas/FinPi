@@ -153,3 +153,95 @@ func TestBuildPreview_SummaryCheck(t *testing.T) {
 		t.Error("sem resumo não há conferência")
 	}
 }
+
+func TestExternalIDFor_PerBank(t *testing.T) {
+	if got := ExternalIDFor(BankNubank, "uuid-1", "2026-10-01", 100); got != "nu:uuid-1" {
+		t.Errorf("nubank = %q", got)
+	}
+	if got := ExternalIDFor(BankSicredi, "E123", "2026-10-01", 100); got != "sic:E123|2026-10-01|100" {
+		t.Errorf("sicredi = %q", got)
+	}
+	if got := ExternalIDFor(BankMercadoPago, "99", "2026-10-01", -100); got != ExternalID("99", "2026-10-01", -100) {
+		t.Errorf("mercado pago = %q", got)
+	}
+	for _, id := range []string{"mp:1|2026-10-01|1", "nu:abc", "sic:abc|2026-10-01|1"} {
+		if !ValidExternalID(id) {
+			t.Errorf("%q deveria ser válido", id)
+		}
+	}
+	for _, id := range []string{"", "xx:abc", "nu", "NU:abc"} {
+		if ValidExternalID(id) {
+			t.Errorf("%q não deveria ser válido", id)
+		}
+	}
+}
+
+func bankStatement(bank Bank, rows ...Row) Statement { return Statement{Bank: bank, Rows: rows} }
+
+func TestBuildPreview_NubankKnownTypesAndInternalMovement(t *testing.T) {
+	st := bankStatement(BankNubank,
+		Row{Date: "2026-10-01", Description: "Pix recebido MARIA DA SILVA", Original: "orig 1", AmountCents: 1000, RefID: "u1"},
+		Row{Date: "2026-10-02", Description: "Resgate RDB", Original: "Resgate RDB", AmountCents: 93365, RefID: "u2"},
+		Row{Date: "2026-10-03", Description: "Aplicação RDB", AmountCents: -500, RefID: "u3"},
+		Row{Date: "2026-10-04", Description: "Tarifa qualquer", AmountCents: -100, RefID: "u4"},
+	)
+	p := BuildPreview(st, PreviewInput{Bank: BankNubank, Categories: []string{"Outros", models.InternalCategory}})
+	if p.Bank != BankNubank {
+		t.Errorf("Preview.Bank = %s", p.Bank)
+	}
+	r := p.Rows
+	if r[0].ExternalID != "nu:u1" || r[0].Status != StatusNew || !r[0].Selected || r[0].Original != "orig 1" || r[0].Category != "Outros" {
+		t.Errorf("Pix recebido = %+v", r[0])
+	}
+	for _, i := range []int{1, 2} {
+		if r[i].Category != models.InternalCategory || r[i].Status != StatusNew || !r[i].Selected {
+			t.Errorf("linha %d deveria vir marcada na categoria %q: %+v", i, models.InternalCategory, r[i])
+		}
+	}
+	if r[3].Status != StatusTypeNew || r[3].Selected {
+		t.Errorf("tipo desconhecido deveria vir desmarcado: %+v", r[3])
+	}
+}
+
+func TestBuildPreview_SicrediKnownTypes(t *testing.T) {
+	st := bankStatement(BankSicredi,
+		Row{Date: "2026-10-01", Description: "Débito automático SEGURO EXEMPLO", AmountCents: -58, RefID: "i1"},
+		Row{Date: "2026-10-02", Description: "Integralização de capital", AmountCents: -5000, RefID: "i2"},
+		Row{Date: "2026-10-03", Description: "Resgate RDB", AmountCents: 100, RefID: "i3"}, // não é tipo conhecido do Sicredi
+		Row{Date: "2026-10-04", Description: "Compra no débito MERCADO EXEMPLO CENTRO", AmountCents: -3500, RefID: "i4"},
+		Row{Date: "2026-10-05", Description: "Recarga de celular", AmountCents: -2000, RefID: "i5"},
+		Row{Date: "2026-10-06", Description: "Transferência conta salário MARIA DA SILVA", AmountCents: 300000, RefID: "i6"},
+		Row{Date: "2026-10-07", Description: "Devolução Pix MARIA DA SILVA", AmountCents: 1000, RefID: "i7"},
+	)
+	p := BuildPreview(st, PreviewInput{Bank: BankSicredi, Categories: []string{"Outros"}})
+	if p.Rows[0].ExternalID != "sic:i1|2026-10-01|-58" || p.Rows[0].Status != StatusNew || p.Rows[1].Status != StatusNew {
+		t.Errorf("tipos do Sicredi: %+v", p.Rows)
+	}
+	if p.Rows[2].Status != StatusTypeNew {
+		t.Errorf("RDB não é tipo do Sicredi: %+v", p.Rows[2])
+	}
+	for _, i := range []int{3, 4, 5, 6} {
+		if p.Rows[i].Status != StatusNew || !p.Rows[i].Selected {
+			t.Errorf("linha %d (%s) deveria vir marcada: %+v", i, p.Rows[i].Description, p.Rows[i])
+		}
+	}
+}
+
+func TestBuildPreview_RepeatedBankIDGetsSuffix(t *testing.T) {
+	st := bankStatement(BankSicredi,
+		Row{Date: "2026-10-01", Description: "Pix recebido A", AmountCents: 100, RefID: "dup"},
+		Row{Date: "2026-10-01", Description: "Pix recebido A", AmountCents: 100, RefID: "dup"},
+	)
+	p := BuildPreview(st, PreviewInput{Bank: BankSicredi, Categories: []string{"Outros"}})
+	if p.Rows[0].ExternalID != "sic:dup|2026-10-01|100" || p.Rows[1].ExternalID != "sic:dup|2026-10-01|100#2" {
+		t.Errorf("ids = %q, %q", p.Rows[0].ExternalID, p.Rows[1].ExternalID)
+	}
+}
+
+func TestBuildPreview_SameNubankIDInOFXAndCSVIsAlreadyImported(t *testing.T) {
+	row := Row{Date: "2026-10-01", Description: "Pagamento de fatura", AmountCents: -100, RefID: "u9"}
+	p := BuildPreview(bankStatement(BankNubank, row), PreviewInput{Bank: BankNubank, ExistingIDs: map[string]bool{"nu:u9": true}, Categories: []string{"Outros"}})
+	if p.Rows[0].Status != StatusImported || !p.Rows[0].Locked {
+		t.Errorf("deveria vir como já importado: %+v", p.Rows[0])
+	}
+}

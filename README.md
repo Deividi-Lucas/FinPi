@@ -55,10 +55,13 @@ finpi/
 │   ├── dashboard/
 │   │   └── dashboard.go        # Cálculo puro do dashboard do mês (maior/menor gasto, essencial × supérfluo)
 │   ├── statement/
-│   │   ├── parse.go            # Leitura do extrato (cabeçalho, datas, valores)
+│   │   ├── parse.go            # Leitura do extrato (cabeçalho, datas, valores) e reconhecimento do banco
 │   │   ├── csv.go              # Leitor de CSV (separador e codificação)
 │   │   ├── xlsx.go             # Leitor de XLSX (biblioteca padrão, sem dependências)
-│   │   └── preview.go          # Revisão: situação de cada linha e categoria sugerida
+│   │   ├── banks.go            # Detecção do cabeçalho e leitura das linhas do Nubank (CSV) e do Sicredi
+│   │   ├── clean.go            # Limpeza da descrição (sem CPF/CNPJ, banco, agência e conta); guarda o texto original
+│   │   ├── ofx.go              # Leitor de OFX (extrato do Nubank)
+│   │   └── preview.go          # Revisão: situação de cada linha, categoria sugerida, tipos conhecidos e identificador de origem por banco
 │   ├── installments/
 │   │   ├── parse.go            # Lê a parcela da descrição (3/10, parcela 3 de 10)
 │   │   ├── project.go          # Projeta as parcelas previstas dos meses seguintes
@@ -209,13 +212,35 @@ entram (as parcelas previstas ficam de fora).
 
 ## 🏦 Importar extrato
 
-O botão **Importar extrato** lê o extrato do **Mercado Pago** (`.xlsx` ou `.csv`, **sem abrir e salvar no Excel**:
-o Excel destrói o identificador das transações e o sistema recusa o arquivo). Nada é gravado antes da **revisão**:
-cada linha mostra a categoria sugerida pelo histórico (você pode trocar; as linhas com a mesma descrição acompanham),
-e uma situação: *Novo*, *Já importado*, *Possível duplicado* (já existe um lançamento seu com a mesma data, valor e
-tipo) ou *Tipo novo* (tipo de transação ainda não conhecido). Só as linhas *Novas* vêm marcadas. Reimportar o mesmo
-extrato não duplica nada. Fechar o pop-up mantém a revisão; **Descartar** ou recarregar a página a apagam.
-Transferências entre as suas próprias contas contam como despesa/receita: desmarque-as na revisão.
+O botão **Importar extrato** lê extratos de três bancos, reconhecidos **pelo conteúdo do arquivo** (não pelo nome):
+
+- **Mercado Pago:** `.xlsx` ou `.csv`, **sem abrir e salvar no Excel** (o Excel destrói o identificador das transações e o sistema recusa o arquivo).
+- **Nubank:** **OFX** ou **CSV**. O mesmo extrato em OFX e em CSV não duplica (identificador `nu:<uuid>`).
+- **Sicredi:** planilha **XLSX**, mesmo quando o arquivo se chama `.csv` (identificador `sic:<identificador>|<data>|<centavos>`).
+
+Nada é gravado antes da **revisão**: cada linha mostra a categoria sugerida pelo histórico (você pode trocar; as linhas
+com a mesma descrição acompanham), e uma situação: *Novo*, *Já importado*, *Possível duplicado* (já existe um
+lançamento seu com a mesma data, valor e tipo) ou *Tipo novo* (tipo de transação ainda não conhecido pelo banco do
+arquivo, que vem sem marcação). Só as linhas *Novas* vêm marcadas. Os tipos conhecidos são:
+
+- **Nubank:** Pix recebido/enviado, Transferência recebida/enviada, Pagamento de boleto, Pagamento de fatura, Resgate RDB e Aplicação RDB.
+- **Sicredi:** Pix recebido/enviado, Pagamento de boleto, Débito automático, Integralização de capital, Compra no débito, Recarga de celular, Transferência conta salário e Devolução Pix.
+
+Reimportar o mesmo extrato não duplica nada. Fechar o pop-up mantém a revisão; **Descartar** ou recarregar a página a apagam.
+
+**Descrição limpa:** o sistema tira da descrição o CPF/CNPJ, o banco, a agência e a conta (fica, por exemplo,
+"Pix enviado Maria Souza"). O texto original do banco é guardado na coluna `original_description` do lançamento e
+aparece ao passar o mouse sobre a descrição.
+
+**Movimentação interna:** *Resgate RDB* e *Aplicação RDB* vão (já marcados) para a categoria **Movimentação interna**,
+que fica **fora dos totais** de receitas e despesas (cartões, estatísticas, relatório e fontes de receita), em
+qualquer livro. Elas aparecem numa linha separada, "Movimentações internas (fora dos totais)", e com o selo
+**interna** na lista. Um livro sem categorias (um PJ novo, por exemplo) recebe "Outros" e "Movimentação interna" na
+revisão, com "(será criada)", e as cria ao confirmar. A importação vai para o livro aberto.
+
+Pix entre as suas próprias contas ou livros ainda contam como despesa/receita: desmarque-os na revisão até que uma
+versão futura ligue as transferências entre livros.
+
 Guarde os arquivos reais em `extratos/` (ignorada pelo git).
 
 ---

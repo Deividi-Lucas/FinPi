@@ -18,9 +18,10 @@ import (
 
 const (
 	maxImportBody    = statement.MaxFileBytes + 1<<20 // arquivo + folga do multipart
-	maxConfirmBody   = 4 << 20
+	maxConfirmBody   = 8 << 20
 	maxImportDescLen = 200
 	maxExternalIDLen = 200
+	maxImportOrigLen = 300 // runas da descrição original guardada
 )
 
 // importView são os dados do trecho de HTML da revisão.
@@ -33,6 +34,9 @@ type importView struct {
 	Filter           models.FilterView // vazio: o trecho da revisão reaproveita o stateFields da página
 	Book             models.Book       // livro que recebe a importação
 	BookID           int64
+	Bank             string          // rótulo do banco do extrato
+	Format           string          // formato do arquivo, em maiúsculas
+	NewOptions       map[string]bool // opções que ainda não existem no livro (criadas na confirmação)
 }
 
 func importError(w http.ResponseWriter, err error) {
@@ -58,7 +62,7 @@ func (h *Handler) ImportPreview(w http.ResponseWriter, r *http.Request) {
 			importError(w, statement.ErrTooLarge)
 			return
 		}
-		http.Error(w, "Envie um arquivo de extrato (.xlsx ou .csv).", http.StatusBadRequest)
+		http.Error(w, "Envie um arquivo de extrato (.xlsx, .csv ou .ofx).", http.StatusBadRequest)
 		return
 	}
 	db, book, ok := h.postScope(w, r)
@@ -67,7 +71,7 @@ func (h *Handler) ImportPreview(w http.ResponseWriter, r *http.Request) {
 	}
 	file, header, err := r.FormFile("file")
 	if err != nil {
-		http.Error(w, "Envie um arquivo de extrato (.xlsx ou .csv).", http.StatusBadRequest)
+		http.Error(w, "Envie um arquivo de extrato (.xlsx, .csv ou .ofx).", http.StatusBadRequest)
 		return
 	}
 	defer file.Close()
@@ -92,6 +96,19 @@ func (h *Handler) ImportPreview(w http.ResponseWriter, r *http.Request) {
 	var options []string
 	for _, c := range visibleCategories(categories) {
 		options = append(options, c.Name)
+	}
+	// "Outros" e "Movimentação interna" sempre aparecem: se o livro não as tem, a confirmação as cria.
+	newOptions := map[string]bool{}
+	for _, name := range []string{"Outros", models.InternalCategory} {
+		if hasFold(options, name) {
+			continue
+		}
+		if hasCategory(categories, name) { // existe, mas está oculta
+			options = append(options, name)
+			continue
+		}
+		options = append(options, name)
+		newOptions[name] = true
 	}
 
 	existing, err := db.ImportedExternalIDs()
@@ -120,8 +137,10 @@ func (h *Handler) ImportPreview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	preview := statement.BuildPreview(st, statement.PreviewInput{
-		ExistingIDs: existing, ManualKeys: manual, CategoryByDesc: byDesc, Categories: options,
+		Bank: st.Bank, ExistingIDs: existing, ManualKeys: manual, CategoryByDesc: byDesc, Categories: options,
 	})
+	preview.Bank = st.Bank
+	preview.Format = st.Format
 
 	// A categoria sugerida pode estar oculta: precisa existir como opção da linha.
 	have := map[string]bool{}
@@ -139,10 +158,33 @@ func (h *Handler) ImportPreview(w http.ResponseWriter, r *http.Request) {
 	view := importView{
 		FileName: header.Filename, Preview: preview, Options: options,
 		SelectedMonth: requestMonth(r), IncludeProjected: wantsProjected(r), Book: book, BookID: book.ID,
+		Bank: st.Bank.Label(), Format: strings.ToUpper(st.Format), NewOptions: newOptions,
 	}
 	if err := h.tmpl.ExecuteTemplate(w, "importPreview", view); err != nil {
 		serverError(w, "Erro ao renderizar a revisão", err)
 	}
+}
+
+// hasFold diz se a lista tem o nome, ignorando maiúsculas e acentos.
+func hasFold(list []string, name string) bool {
+	key := textutil.Fold(name)
+	for _, s := range list {
+		if textutil.Fold(s) == key {
+			return true
+		}
+	}
+	return false
+}
+
+// hasCategory diz se o livro já tem a categoria (visível ou oculta), ignorando maiúsculas e acentos.
+func hasCategory(cats []models.Category, name string) bool {
+	key := textutil.Fold(name)
+	for _, c := range cats {
+		if textutil.Fold(c.Name) == key {
+			return true
+		}
+	}
+	return false
 }
 
 // parseImportRow valida a linha i do formulário de confirmação (nunca confia no que veio do navegador).
@@ -166,15 +208,19 @@ func parseImportRow(form url.Values, i int, canonical map[string]string) (models
 		return t, errors.New("valor inválido")
 	}
 	ref := strings.TrimSpace(form.Get("ref_" + s))
-	if !strings.HasPrefix(ref, statement.ExternalIDPrefix) || len(ref) > maxExternalIDLen {
+	if !statement.ValidExternalID(ref) || len(ref) > maxExternalIDLen {
 		return t, errors.New("identificador inválido")
 	}
 	category, ok := canonical[textutil.Fold(form.Get("cat_"+s))]
 	if !ok {
 		return t, errors.New("categoria inexistente")
 	}
+	orig := strings.Join(strings.Fields(form.Get("orig_"+s)), " ")
+	if utf8.RuneCountInString(orig) > maxImportOrigLen {
+		orig = string([]rune(orig)[:maxImportOrigLen])
+	}
 
-	t = models.Transaction{Description: desc, Date: date, Category: category, ExternalID: ref, Type: "income", AmountCents: cents}
+	t = models.Transaction{Description: desc, Date: date, Category: category, ExternalID: ref, Type: "income", AmountCents: cents, OriginalDescription: orig}
 	if cents < 0 {
 		t.Type, t.AmountCents = "expense", -cents
 	}
@@ -212,6 +258,25 @@ func (h *Handler) ImportConfirm(w http.ResponseWriter, r *http.Request) {
 	canonical := map[string]string{}
 	for _, c := range categories {
 		canonical[textutil.Fold(c.Name)] = c.Name
+	}
+	// Só estas duas podem nascer na confirmação (a prévia as oferece mesmo num livro sem categorias).
+	creatable := map[string]string{textutil.Fold("Outros"): "Outros", textutil.Fold(models.InternalCategory): models.InternalCategory}
+	for i := 0; i < n; i++ {
+		if r.PostForm.Get("sel_"+strconv.Itoa(i)) != "1" {
+			continue
+		}
+		key := textutil.Fold(r.PostForm.Get("cat_" + strconv.Itoa(i)))
+		if _, have := canonical[key]; have {
+			continue
+		}
+		if name, ok := creatable[key]; ok {
+			c, err := db.GetOrCreateCategory(name)
+			if err != nil {
+				serverError(w, "Erro ao criar a categoria", err)
+				return
+			}
+			canonical[key] = c.Name
+		}
 	}
 
 	var rows []models.Transaction

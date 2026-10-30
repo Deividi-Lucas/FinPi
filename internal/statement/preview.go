@@ -11,6 +11,11 @@ import (
 // ExternalIDPrefix marca lançamentos importados do Mercado Pago.
 const ExternalIDPrefix = "mp:"
 
+const (
+	externalIDPrefixNubank  = "nu:"
+	externalIDPrefixSicredi = "sic:"
+)
+
 type Status string
 
 const (
@@ -20,11 +25,10 @@ const (
 	StatusPossibleDup Status = "possivel_duplicado"
 )
 
-var knownTypePrefixes = []string{"rendimentos", "pix recebido", "pix enviado"}
-
 // PreviewInput reúne o que vem do banco: identificadores já importados, chaves de lançamentos manuais,
 // a última categoria por descrição normalizada (textutil.Fold) e os nomes de categoria disponíveis.
 type PreviewInput struct {
+	Bank           Bank // vazio = Mercado Pago
 	ExistingIDs    map[string]bool
 	ManualKeys     map[string]bool
 	CategoryByDesc map[string]string
@@ -35,6 +39,7 @@ type PreviewRow struct {
 	Index       int
 	Date        string
 	Description string
+	Original    string // descrição como veio no arquivo
 	Type        string // "income" ou "expense"
 	AmountCents int64  // módulo
 	SignedCents int64
@@ -46,6 +51,8 @@ type PreviewRow struct {
 }
 
 type Preview struct {
+	Bank            Bank
+	Format          string // preenchido pelo handler
 	Rows            []PreviewRow
 	Credits, Debits int64 // somas das linhas lidas (débitos em módulo)
 	FileCredits     int64 // resumo do arquivo
@@ -61,14 +68,50 @@ func ExternalID(ref, date string, cents int64) string {
 	return ExternalIDPrefix + ref + "|" + date + "|" + strconv.FormatInt(cents, 10)
 }
 
-func isKnownType(description string) bool {
+// ExternalIDFor monta o identificador de origem do lançamento: nu:<uuid>, sic:<identificador>|<data>|<centavos> ou,
+// no Mercado Pago, mp:<ref>|<data>|<centavos>.
+func ExternalIDFor(bank Bank, ref, date string, cents int64) string {
+	switch bank {
+	case BankNubank:
+		return externalIDPrefixNubank + ref
+	case BankSicredi:
+		return externalIDPrefixSicredi + ref + "|" + date + "|" + strconv.FormatInt(cents, 10)
+	}
+	return ExternalID(ref, date, cents)
+}
+
+// ValidExternalID diz se o identificador tem um dos prefixos aceitos.
+func ValidExternalID(id string) bool {
+	for _, p := range []string{ExternalIDPrefix, externalIDPrefixNubank, externalIDPrefixSicredi} {
+		if strings.HasPrefix(id, p) && len(id) > len(p) {
+			return true
+		}
+	}
+	return false
+}
+
+var knownTypes = map[Bank][]string{
+	BankMercadoPago: {"rendimentos", "pix recebido", "pix enviado"},
+	BankNubank: {"pix recebido", "pix enviado", "transferencia recebida", "transferencia enviada",
+		"pagamento de boleto", "pagamento de fatura", "resgate rdb", "aplicacao rdb"},
+	BankSicredi: {"pix recebido", "pix enviado", "pagamento de boleto", "debito automatico", "integralizacao de capital",
+		"compra no debito", "recarga de celular", "transferencia conta salario", "devolucao pix"},
+}
+
+func isKnownType(bank Bank, description string) bool {
 	folded := textutil.Fold(description)
-	for _, p := range knownTypePrefixes {
+	for _, p := range knownTypes[bank] {
 		if strings.HasPrefix(folded, p) {
 			return true
 		}
 	}
 	return false
+}
+
+// isInternalMovement: resgate e aplicação de RDB são movimentação entre contas do próprio dono.
+func isInternalMovement(description string) bool {
+	folded := textutil.Fold(description)
+	return strings.HasPrefix(folded, "resgate rdb") || strings.HasPrefix(folded, "aplicacao rdb")
 }
 
 func defaultCategory(cats []string) string {
@@ -86,6 +129,11 @@ func defaultCategory(cats []string) string {
 // BuildPreview classifica cada linha (situação, seleção padrão, categoria sugerida) sem gravar nada.
 func BuildPreview(st Statement, in PreviewInput) Preview {
 	p := Preview{Rows: make([]PreviewRow, 0, len(st.Rows)), HasSummary: st.Summary.HasSummary}
+	bank := in.Bank
+	if bank == "" {
+		bank = BankMercadoPago
+	}
+	p.Bank = bank
 	fallback := defaultCategory(in.Categories)
 	seen := map[string]int{}
 
@@ -100,7 +148,7 @@ func BuildPreview(st Statement, in PreviewInput) Preview {
 			p.Credits += abs
 		}
 
-		id := ExternalID(r.RefID, r.Date, r.AmountCents)
+		id := ExternalIDFor(bank, r.RefID, r.Date, r.AmountCents)
 		seen[id]++
 		if n := seen[id]; n > 1 {
 			id += "#" + strconv.Itoa(n)
@@ -111,14 +159,18 @@ func BuildPreview(st Statement, in PreviewInput) Preview {
 			category = c
 		}
 
+		if bank != BankMercadoPago && isInternalMovement(r.Description) {
+			category = models.InternalCategory
+		}
+
 		row := PreviewRow{
-			Index: i, Date: r.Date, Description: r.Description, Type: typ,
+			Index: i, Date: r.Date, Description: r.Description, Original: r.Original, Type: typ,
 			AmountCents: abs, SignedCents: r.AmountCents, ExternalID: id, Category: category,
 		}
 		switch {
 		case in.ExistingIDs[id]:
 			row.Status, row.Locked = StatusImported, true
-		case !isKnownType(r.Description):
+		case !isKnownType(bank, r.Description):
 			row.Status = StatusTypeNew
 		case in.ManualKeys[models.TransactionKey(r.Date, abs, typ)]:
 			row.Status = StatusPossibleDup

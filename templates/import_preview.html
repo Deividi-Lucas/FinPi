@@ -1,6 +1,7 @@
 {{define "importPreview"}}
 <div class="space-y-4">
     <p class="text-sm" style="color: {{.Book.Hex}}">Importando para o livro <strong>{{.Book.Name}}</strong></p>
+    <p class="text-xs text-slate-400">Extrato <strong>{{.Bank}}</strong> ({{.Format}})</p>
     <div class="p-4 rounded-xl bg-slate-800/60 border border-slate-700 text-sm text-slate-300">
         <p class="font-medium text-slate-100 break-all">{{.FileName}}</p>
         <p class="mt-1 text-xs text-slate-400">
@@ -29,15 +30,15 @@
             </thead>
             <tbody class="divide-y divide-slate-800/60">
                 {{range .Preview.Rows}}
-                <tr data-import-row data-date="{{.Date}}" data-desc="{{.Description}}" data-amount="{{.SignedCents}}" data-ref="{{.ExternalID}}" class="{{if .Locked}}opacity-50{{end}}">
+                <tr data-import-row data-date="{{.Date}}" data-desc="{{.Description}}" data-amount="{{.SignedCents}}" data-ref="{{.ExternalID}}" data-orig="{{.Original}}" class="{{if .Locked}}opacity-50{{end}}">
                     <td class="px-3 py-2"><input type="checkbox" data-sel {{if .Selected}}checked{{end}} {{if .Locked}}disabled{{end}} class="cursor-pointer"></td>
                     <td class="px-3 py-2 whitespace-nowrap text-slate-400">{{formatDate .Date}}</td>
-                    <td class="px-3 py-2 text-slate-100">{{.Description}}</td>
+                    <td class="px-3 py-2 text-slate-100" {{with .Original}}title="{{.}}"{{end}}>{{.Description}}</td>
                     <td class="px-3 py-2 whitespace-nowrap text-right font-semibold {{if eq .Type "income"}}text-emerald-400{{else}}text-rose-400{{end}}">{{if eq .Type "income"}}+{{else}}-{{end}} {{formatCurrency .AmountCents}}</td>
                     <td class="px-3 py-2">
                         {{$cat := .Category}}
                         <select data-cat {{if .Locked}}disabled{{end}} class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-100 cursor-pointer">
-                            {{range $.Options}}<option value="{{.}}" {{if eq . $cat}}selected{{end}}>{{.}}</option>{{end}}
+                            {{range $.Options}}<option value="{{.}}" {{if eq . $cat}}selected{{end}}>{{.}}{{if index $.NewOptions .}} (será criada){{end}}</option>{{end}}
                         </select>
                     </td>
                     <td class="px-3 py-2 whitespace-nowrap">

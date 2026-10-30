@@ -86,8 +86,8 @@ func (d *DB) ImportTransactions(rows []models.Transaction) (inserted, skipped in
 	defer tx.Rollback()
 
 	stmt, err := tx.Prepare(`
-		INSERT INTO transactions (description, amount_cents, type, category, date, priority, external_id, book_id)
-		VALUES (?, ?, ?, ?, ?, '', ?, ?)
+		INSERT INTO transactions (description, amount_cents, type, category, date, priority, external_id, book_id, original_description)
+		VALUES (?, ?, ?, ?, ?, '', ?, ?, ?)
 		ON CONFLICT(external_id) WHERE external_id <> '' DO NOTHING`)
 	if err != nil {
 		return 0, 0, err
@@ -95,7 +95,7 @@ func (d *DB) ImportTransactions(rows []models.Transaction) (inserted, skipped in
 	defer stmt.Close()
 
 	for _, t := range rows {
-		res, err := stmt.Exec(t.Description, t.AmountCents, t.Type, t.Category, t.Date, t.ExternalID, d.book)
+		res, err := stmt.Exec(t.Description, t.AmountCents, t.Type, t.Category, t.Date, t.ExternalID, d.book, t.OriginalDescription)
 		if err != nil {
 			return 0, 0, err
 		}

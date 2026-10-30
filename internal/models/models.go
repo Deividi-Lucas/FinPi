@@ -3,7 +3,18 @@ package models
 import (
 	"strconv"
 	"time"
+
+	"finpi/internal/textutil"
 )
+
+// InternalCategory é a categoria das movimentações entre contas do próprio dono (ex.: resgate de investimento):
+// ela fica fora das receitas e despesas dos totais.
+const InternalCategory = "Movimentação interna"
+
+// IsInternal diz se a categoria é a de movimentação interna (ignora caixa e acentos).
+func IsInternal(category string) bool {
+	return textutil.Fold(category) == textutil.Fold(InternalCategory)
+}
 
 // Transaction representa um lançamento financeiro no banco de dados.
 type Transaction struct {
@@ -18,6 +29,8 @@ type Transaction struct {
 	Priority   string `json:"priority"` // "", "essential" ou "superfluous"; vazio segue a categoria
 	ExternalID string `json:"-"`        // identificador de origem (importação); usado só na gravação em lote
 	BookID     int64  `json:"-"`        // livro do lançamento; preenchido onde o livro importa (lotes e movimentação)
+
+	OriginalDescription string `json:"-"` // texto original do banco (importação); vazio nos lançamentos manuais
 
 	Installment       *InstallmentInfo `json:"-"` // dados de exibição da parcela; não é gravado
 	EffectivePriority string           `json:"-"` // classificação efetiva (própria ou da categoria); não é gravada
@@ -59,6 +72,9 @@ type PageData struct {
 	CategoryError  string     // erro exibido dentro do pop-up de categorias
 
 	Stats MonthStats // números do dashboard do mês
+
+	InternalIn  int64 // entradas de Movimentação interna no mês (fora dos totais), em centavos
+	InternalOut int64 // saídas de Movimentação interna no mês (fora dos totais), em centavos
 
 	ImportResult *ImportResult // aviso após importar um extrato (nil = sem aviso)
 	BulkResult   *BulkResult   // aviso após uma edição em lote (nil = sem aviso)
