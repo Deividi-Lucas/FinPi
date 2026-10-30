@@ -291,7 +291,7 @@ func TestDashboard_ShowsImportResultBanner(t *testing.T) {
 func TestTemplate_ImportControls(t *testing.T) {
 	h, _ := newTestHandler(t)
 	body := getDashboard(h, "/?month=2026-08")
-	for _, want := range []string{"Importar extrato", `id="import-modal"`, `id="import-form"`, `action="/import/preview"`, `id="import-preview"`, `accept=".xlsx,.csv"`} {
+	for _, want := range []string{"Importar extrato", `id="import-modal"`, `id="import-form"`, `action="/import/preview"`, `id="import-preview"`, `accept=".xlsx,.csv,.ofx"`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("página sem %q", want)
 		}

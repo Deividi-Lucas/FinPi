@@ -744,10 +744,10 @@
             <div id="import-error" role="alert" class="hidden mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm"></div>
 
             <div id="import-picker">
-                <p class="text-sm text-slate-400 mb-3">Envie o extrato do Mercado Pago (<strong>.xlsx</strong> ou <strong>.csv</strong>, sem abrir e salvar no Excel). Você revisa tudo antes de gravar.</p>
+                <p class="text-sm text-slate-400 mb-3">Envie o extrato do Mercado Pago (<strong>.xlsx</strong> ou <strong>.csv</strong>), do Nubank (<strong>.ofx</strong> ou <strong>.csv</strong>) ou do Sicredi (<strong>.xlsx</strong>, mesmo que o arquivo venha com extensão .csv), sem abrir e salvar no Excel. Você revisa tudo antes de gravar.</p>
                 <form id="import-form" method="POST" action="/import/preview" enctype="multipart/form-data" class="flex flex-col gap-3 sm:flex-row sm:items-center">
                     {{template "stateFields" .}}
-                    <input type="file" name="file" accept=".xlsx,.csv" required class="flex-1 text-sm text-slate-300 file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border-0 file:bg-slate-800 file:text-slate-200 file:cursor-pointer">
+                    <input type="file" name="file" accept=".xlsx,.csv,.ofx" required class="flex-1 text-sm text-slate-300 file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border-0 file:bg-slate-800 file:text-slate-200 file:cursor-pointer">
                     <button id="import-submit" type="submit" class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-medium text-sm px-5 py-2 rounded-xl transition cursor-pointer">Ler arquivo</button>
                 </form>
             </div>
@@ -1497,7 +1497,7 @@
             e.preventDefault();
             showImportError('');
             if (!window.fetch) { showImportError('Este navegador não suporta o envio do extrato.'); return; }
-            if (!importForm.elements['file'].files.length) { showImportError('Escolha um arquivo .xlsx ou .csv.'); return; }
+            if (!importForm.elements['file'].files.length) { showImportError('Escolha um arquivo .xlsx, .csv ou .ofx.'); return; }
             importSubmit.disabled = true;
             try {
                 const resp = await fetch(importForm.action, { method: 'POST', body: new FormData(importForm), credentials: 'same-origin' });
@@ -1546,6 +1546,7 @@
                 params.set('desc_' + i, row.dataset.desc);
                 params.set('amount_' + i, row.dataset.amount);
                 params.set('ref_' + i, row.dataset.ref);
+                params.set('orig_' + i, row.dataset.orig || '');
                 params.set('cat_' + i, row.querySelector('select[data-cat]').value);
             });
 
