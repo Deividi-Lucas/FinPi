@@ -158,13 +158,13 @@ func TestExternalIDFor_PerBank(t *testing.T) {
 	if got := ExternalIDFor(BankNubank, "uuid-1", "2026-10-01", 100); got != "nu:uuid-1" {
 		t.Errorf("nubank = %q", got)
 	}
-	if got := ExternalIDFor(BankSicredi, "E123", "2026-10-01", 100); got != "sic:E123" {
+	if got := ExternalIDFor(BankSicredi, "E123", "2026-10-01", 100); got != "sic:E123|2026-10-01|100" {
 		t.Errorf("sicredi = %q", got)
 	}
 	if got := ExternalIDFor(BankMercadoPago, "99", "2026-10-01", -100); got != ExternalID("99", "2026-10-01", -100) {
 		t.Errorf("mercado pago = %q", got)
 	}
-	for _, id := range []string{"mp:1|2026-10-01|1", "nu:abc", "sic:abc"} {
+	for _, id := range []string{"mp:1|2026-10-01|1", "nu:abc", "sic:abc|2026-10-01|1"} {
 		if !ValidExternalID(id) {
 			t.Errorf("%q deveria ser válido", id)
 		}
@@ -214,7 +214,7 @@ func TestBuildPreview_SicrediKnownTypes(t *testing.T) {
 		Row{Date: "2026-10-07", Description: "Devolução Pix MARIA DA SILVA", AmountCents: 1000, RefID: "i7"},
 	)
 	p := BuildPreview(st, PreviewInput{Bank: BankSicredi, Categories: []string{"Outros"}})
-	if p.Rows[0].ExternalID != "sic:i1" || p.Rows[0].Status != StatusNew || p.Rows[1].Status != StatusNew {
+	if p.Rows[0].ExternalID != "sic:i1|2026-10-01|-58" || p.Rows[0].Status != StatusNew || p.Rows[1].Status != StatusNew {
 		t.Errorf("tipos do Sicredi: %+v", p.Rows)
 	}
 	if p.Rows[2].Status != StatusTypeNew {
@@ -233,7 +233,7 @@ func TestBuildPreview_RepeatedBankIDGetsSuffix(t *testing.T) {
 		Row{Date: "2026-10-01", Description: "Pix recebido A", AmountCents: 100, RefID: "dup"},
 	)
 	p := BuildPreview(st, PreviewInput{Bank: BankSicredi, Categories: []string{"Outros"}})
-	if p.Rows[0].ExternalID != "sic:dup" || p.Rows[1].ExternalID != "sic:dup#2" {
+	if p.Rows[0].ExternalID != "sic:dup|2026-10-01|100" || p.Rows[1].ExternalID != "sic:dup|2026-10-01|100#2" {
 		t.Errorf("ids = %q, %q", p.Rows[0].ExternalID, p.Rows[1].ExternalID)
 	}
 }

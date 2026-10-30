@@ -2,7 +2,9 @@ package statement
 
 import (
 	"errors"
+	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 const nubankCSV = "Data,Valor,Identificador,Descrição\n" +
@@ -48,8 +50,8 @@ func sicrediHeader() []xc {
 func TestParse_SicrediXLSXWithCSVExtension(t *testing.T) {
 	data := buildXLSX(t, [][]xc{
 		sicrediHeader(),
-		{num("46006"), inline("DEBITO AUTOMATICO - 98765432000199 SEGURO EXEMPLO"), num("521"), inline("id-1"), inline("DEBITO"), num("-0.57999999999999996"), num("0")},
-		{num("46002"), inline("RECEBIMENTO PIX - 12345678901 MARIA DA SILVA"), num("668"), inline("id-2"), inline("CREDITO"), num("100.5"), num("100.5")},
+		{num("46012"), inline("DEBITO AUTOMATICO - 98765432000199 SEGURO EXEMPLO"), num("111"), inline("id-1"), inline("DEBITO"), num("-0.37"), num("0")},
+		{num("46003"), inline("RECEBIMENTO PIX - 12345678901 MARIA DA SILVA"), num("222"), inline("id-2"), inline("CREDITO"), num("100.5"), num("100.5")},
 	})
 	st, err := Parse("Sicredi_Extrato.csv", data) // planilha com extensão .csv: vale o conteúdo
 	if err != nil {
@@ -59,7 +61,7 @@ func TestParse_SicrediXLSXWithCSVExtension(t *testing.T) {
 		t.Fatalf("Bank=%s Format=%s linhas=%d", st.Bank, st.Format, len(st.Rows))
 	}
 	r := st.Rows[0]
-	if r.Date != "2025-12-15" || r.AmountCents != -58 || r.RefID != "id-1" || r.Description != "Débito automático SEGURO EXEMPLO" {
+	if r.Date != "2025-12-21" || r.AmountCents != -37 || r.RefID != "id-1" || r.Description != "Débito automático SEGURO EXEMPLO" {
 		t.Errorf("linha 1 = %+v", r)
 	}
 	if got := st.Rows[1]; got.AmountCents != 10050 || got.Description != "Pix recebido MARIA DA SILVA" || got.Original != "RECEBIMENTO PIX - 12345678901 MARIA DA SILVA" {
@@ -99,5 +101,30 @@ func TestParse_MercadoPagoStillSetsBank(t *testing.T) {
 	}
 	if st.Bank != BankMercadoPago || st.Format != "csv" {
 		t.Errorf("Bank=%s Format=%s", st.Bank, st.Format)
+	}
+}
+
+func TestParse_OriginalCappedAt300Runes(t *testing.T) {
+	long := "Pix recebido " + strings.Repeat("é", 400)
+	st, err := Parse("a.csv", []byte("Data,Valor,Identificador,Descrição\n19/11/2025,10.00,id-1,"+long+"\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := utf8.RuneCountInString(st.Rows[0].Original); n != 300 || !utf8.ValidString(st.Rows[0].Original) {
+		t.Errorf("Original com %d runes, quer 300 válidos", n)
+	}
+	if !strings.HasPrefix(st.Rows[0].Description, "Pix recebido") {
+		t.Errorf("descrição = %q", st.Rows[0].Description)
+	}
+}
+
+func TestParse_RefTooLong(t *testing.T) {
+	_, err := Parse("a.csv", []byte("Data,Valor,Identificador,Descrição\n19/11/2025,10.00,"+strings.Repeat("x", 151)+",Pagamento de fatura\n"))
+	var re *RowError
+	if !errors.As(err, &re) || re.Line != 2 || re.Msg != "identificador longo demais" {
+		t.Errorf("erro = %v", err)
+	}
+	if _, err := Parse("a.csv", []byte("Data,Valor,Identificador,Descrição\n19/11/2025,10.00,"+strings.Repeat("x", 150)+",Pagamento de fatura\n")); err != nil {
+		t.Errorf("150 caracteres deveria passar: %v", err)
 	}
 }

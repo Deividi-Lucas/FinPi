@@ -4,12 +4,13 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func ofxFile(org string, txns ...string) string {
 	return "OFXHEADER:100\r\nDATA:OFXSGML\r\nVERSION:102\r\nSECURITY:NONE\r\nENCODING:UTF-8\r\nCHARSET:NONE\r\n\r\n" +
 		"<OFX>\r\n<SIGNONMSGSRSV1>\r\n<SONRS>\r\n<STATUS>\r\n<CODE>0</CODE>\r\n<SEVERITY>INFO</SEVERITY>\r\n</STATUS>\r\n" +
-		"<DTSERVER>20261029191606[0:GMT]</DTSERVER>\r\n<LANGUAGE>POR</LANGUAGE>\r\n<FI>\r\n<ORG>" + org + "</ORG>\r\n<FID>260</FID>\r\n</FI>\r\n</SONRS>\r\n</SIGNONMSGSRSV1>\r\n" +
+		"<DTSERVER>20260101000000[0:GMT]</DTSERVER>\r\n<LANGUAGE>POR</LANGUAGE>\r\n<FI>\r\n<ORG>" + org + "</ORG>\r\n<FID>260</FID>\r\n</FI>\r\n</SONRS>\r\n</SIGNONMSGSRSV1>\r\n" +
 		"<BANKMSGSRSV1>\r\n<STMTTRNRS>\r\n<STMTRS>\r\n<BANKTRANLIST>\r\n" + strings.Join(txns, "") +
 		"</BANKTRANLIST>\r\n</STMTRS>\r\n</STMTTRNRS>\r\n</BANKMSGSRSV1>\r\n</OFX>\r\n"
 }
@@ -89,5 +90,21 @@ func TestParse_OFXErrors(t *testing.T) {
 		if !errors.As(err, &re) || re.Line != 1 || re.Msg != want {
 			t.Errorf("%s: erro = %v", want, err)
 		}
+	}
+}
+
+func TestParse_OFXOriginalCappedAndLongID(t *testing.T) {
+	long := strings.Repeat("é", 400)
+	st, err := Parse("a.ofx", []byte(ofxFile("NU PAGAMENTOS S.A.", ofxTxn("20251119", "1.00", "id-1", long))))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := utf8.RuneCountInString(st.Rows[0].Original); n != 300 {
+		t.Errorf("Original com %d runes, quer 300", n)
+	}
+	_, err = Parse("a.ofx", []byte(ofxFile("NU PAGAMENTOS S.A.", ofxTxn("20251119", "1.00", strings.Repeat("x", 151), "Pix"))))
+	var re *RowError
+	if !errors.As(err, &re) || re.Msg != "identificador longo demais" {
+		t.Errorf("erro = %v", err)
 	}
 }

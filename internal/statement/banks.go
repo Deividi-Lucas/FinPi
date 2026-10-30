@@ -2,9 +2,23 @@ package statement
 
 import (
 	"strings"
+	"unicode/utf8"
 
 	"finpi/internal/textutil"
 )
+
+const (
+	maxOriginalRunes = 300 // tamanho máximo da descrição original guardada
+	maxRefLen        = 150 // tamanho máximo do identificador do banco
+)
+
+// truncateRunes corta o texto em n runes, sempre numa fronteira de caractere.
+func truncateRunes(s string, n int) string {
+	if utf8.RuneCountInString(s) <= n {
+		return s
+	}
+	return string([]rune(s)[:n])
+}
 
 var (
 	sicrediColumns = []string{"data", "descricao", "identificador", "tipo", "valor"}
@@ -86,6 +100,9 @@ func parseBankRows(bank Bank, grid [][]cell, header int, col map[string]int) (St
 		if ref == "" {
 			return Statement{}, &RowError{line, "sem identificador"}
 		}
+		if utf8.RuneCountInString(ref) > maxRefLen {
+			return Statement{}, &RowError{line, "identificador longo demais"}
+		}
 		cents, err := parseCents(get("valor"))
 		if err != nil {
 			return Statement{}, &RowError{line, "valor inválido"}
@@ -94,7 +111,7 @@ func parseBankRows(bank Bank, grid [][]cell, header int, col map[string]int) (St
 			return Statement{}, ErrTooManyRows
 		}
 		st.Rows = append(st.Rows, Row{
-			Line: line, Date: date, Description: CleanDescription(bank, original), Original: original,
+			Line: line, Date: date, Description: CleanDescription(bank, original), Original: truncateRunes(original, maxOriginalRunes),
 			AmountCents: cents, RefID: ref,
 		})
 	}

@@ -1546,7 +1546,7 @@
                 params.set('desc_' + i, row.dataset.desc);
                 params.set('amount_' + i, row.dataset.amount);
                 params.set('ref_' + i, row.dataset.ref);
-                params.set('orig_' + i, row.dataset.orig || '');
+                if (box.checked && !box.disabled) params.set('orig_' + i, row.dataset.orig || '');
                 params.set('cat_' + i, row.querySelector('select[data-cat]').value);
             });
 

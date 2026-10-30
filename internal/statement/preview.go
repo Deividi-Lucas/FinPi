@@ -68,14 +68,14 @@ func ExternalID(ref, date string, cents int64) string {
 	return ExternalIDPrefix + ref + "|" + date + "|" + strconv.FormatInt(cents, 10)
 }
 
-// ExternalIDFor monta o identificador de origem do lançamento: nu:<uuid>, sic:<identificador> ou, no Mercado Pago,
-// mp:<ref>|<data>|<centavos>.
+// ExternalIDFor monta o identificador de origem do lançamento: nu:<uuid>, sic:<identificador>|<data>|<centavos> ou,
+// no Mercado Pago, mp:<ref>|<data>|<centavos>.
 func ExternalIDFor(bank Bank, ref, date string, cents int64) string {
 	switch bank {
 	case BankNubank:
 		return externalIDPrefixNubank + ref
 	case BankSicredi:
-		return externalIDPrefixSicredi + ref
+		return externalIDPrefixSicredi + ref + "|" + date + "|" + strconv.FormatInt(cents, 10)
 	}
 	return ExternalID(ref, date, cents)
 }

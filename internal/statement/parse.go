@@ -21,7 +21,7 @@ const (
 )
 
 var (
-	ErrUnsupportedFormat = errors.New("formato de arquivo não suportado: envie um extrato .xlsx ou .csv")
+	ErrUnsupportedFormat = errors.New("formato de arquivo não suportado: envie um extrato .xlsx, .csv ou .ofx")
 	ErrInvalidFile       = errors.New("não foi possível ler o arquivo: ele parece corrompido")
 	ErrUnrecognized      = errors.New("formato não reconhecido: envie um extrato do Mercado Pago (XLSX ou CSV), do Nubank (OFX ou CSV) ou do Sicredi (planilha)")
 	ErrScientificID      = errors.New("o identificador (REFERENCE_ID) está em notação científica: o arquivo foi aberto e salvo no Excel. Baixe o extrato de novo e envie o arquivo original, sem abrir no Excel")
@@ -59,7 +59,7 @@ type Statement struct {
 	Rows    []Row
 	Summary Summary
 	Bank    Bank
-	Format  string // "xlsx" ou "csv"
+	Format  string // "xlsx", "csv" ou "ofx"
 }
 
 // cell é uma célula já lida; numeric indica célula numérica do XLSX (valor cru, com ponto decimal).
@@ -73,9 +73,6 @@ func Parse(filename string, data []byte) (Statement, error) {
 	if len(data) > MaxFileBytes {
 		return Statement{}, ErrTooLarge
 	}
-	if isOFX(data) {
-		return parseOFX(data)
-	}
 	var (
 		grid   [][]cell
 		err    error
@@ -83,8 +80,11 @@ func Parse(filename string, data []byte) (Statement, error) {
 	)
 	switch {
 	case bytes.HasPrefix(data, []byte("PK\x03\x04")):
+		// A assinatura ZIP vem antes da detecção de OFX: uma planilha nunca vai para o leitor de OFX.
 		grid, err = readXLSX(data)
 		format = "xlsx"
+	case isOFX(data):
+		return parseOFX(data)
 	case strings.HasSuffix(strings.ToLower(filename), ".csv"):
 		grid, err = readCSV(data)
 		format = "csv"

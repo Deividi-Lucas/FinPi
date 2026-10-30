@@ -164,3 +164,14 @@ func TestParse_SummaryAbsentIsNotAnError(t *testing.T) {
 		t.Errorf("err=%v resumo=%+v", err, st.Summary)
 	}
 }
+
+func TestParse_SpreadsheetMentioningOFXIsNotOFX(t *testing.T) {
+	data := buildXLSX(t, [][]xc{
+		sicrediHeader(),
+		{num("46003"), inline("<OFX> teste"), num("1"), inline("id-1"), inline("CREDITO"), num("10"), num("10")},
+	})
+	st, err := Parse("a.xlsx", data)
+	if err != nil || st.Format != "xlsx" || st.Bank != BankSicredi {
+		t.Fatalf("Parse = %+v, %v", st, err)
+	}
+}

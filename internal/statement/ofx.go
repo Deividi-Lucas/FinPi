@@ -88,6 +88,9 @@ func parseOFX(data []byte) (Statement, error) {
 		if ref == "" {
 			return Statement{}, &RowError{line, "sem identificador"}
 		}
+		if utf8.RuneCountInString(ref) > maxRefLen {
+			return Statement{}, &RowError{line, "identificador longo demais"}
+		}
 		cents, err := parseCents(cell{text: ofxField(ofxAmountRe, block)})
 		if err != nil {
 			return Statement{}, &RowError{line, "valor inválido"}
@@ -97,7 +100,7 @@ func parseOFX(data []byte) (Statement, error) {
 		}
 		st.Rows = append(st.Rows, Row{
 			Line: line, Date: date.Format("2006-01-02"), Description: CleanDescription(BankNubank, original),
-			Original: original, AmountCents: cents, RefID: ref,
+			Original: truncateRunes(original, maxOriginalRunes), AmountCents: cents, RefID: ref,
 		})
 	}
 	if len(st.Rows) == 0 {
