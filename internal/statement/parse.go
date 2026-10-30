@@ -23,7 +23,7 @@ const (
 var (
 	ErrUnsupportedFormat = errors.New("formato de arquivo não suportado: envie um extrato .xlsx ou .csv")
 	ErrInvalidFile       = errors.New("não foi possível ler o arquivo: ele parece corrompido")
-	ErrUnrecognized      = errors.New("formato não reconhecido: não encontrei as colunas RELEASE_DATE, TRANSACTION_TYPE, REFERENCE_ID e TRANSACTION_NET_AMOUNT")
+	ErrUnrecognized      = errors.New("formato não reconhecido: envie um extrato do Mercado Pago (XLSX ou CSV), do Nubank (OFX ou CSV) ou do Sicredi (planilha)")
 	ErrScientificID      = errors.New("o identificador (REFERENCE_ID) está em notação científica: o arquivo foi aberto e salvo no Excel. Baixe o extrato de novo e envie o arquivo original, sem abrir no Excel")
 	ErrTooLarge          = errors.New("o arquivo é grande demais (máximo de 5 MB)")
 	ErrTooManyRows       = fmt.Errorf("o extrato tem mais de %d lançamentos", MaxRows)
@@ -45,6 +45,7 @@ type Row struct {
 	Description string
 	AmountCents int64
 	RefID       string
+	Original    string // descrição como veio do banco (vazia no Mercado Pago)
 }
 
 // Summary é o resumo do topo do arquivo; Debits é negativo, como no arquivo.
@@ -57,6 +58,8 @@ type Summary struct {
 type Statement struct {
 	Rows    []Row
 	Summary Summary
+	Bank    Bank
+	Format  string // "xlsx" ou "csv"
 }
 
 // cell é uma célula já lida; numeric indica célula numérica do XLSX (valor cru, com ponto decimal).
@@ -71,21 +74,29 @@ func Parse(filename string, data []byte) (Statement, error) {
 		return Statement{}, ErrTooLarge
 	}
 	var (
-		grid [][]cell
-		err  error
+		grid   [][]cell
+		err    error
+		format string
 	)
 	switch {
 	case bytes.HasPrefix(data, []byte("PK\x03\x04")):
 		grid, err = readXLSX(data)
+		format = "xlsx"
 	case strings.HasSuffix(strings.ToLower(filename), ".csv"):
 		grid, err = readCSV(data)
+		format = "csv"
 	default:
 		return Statement{}, ErrUnsupportedFormat
 	}
 	if err != nil {
 		return Statement{}, err
 	}
-	return parseGrid(grid)
+	st, err := parseGrid(grid)
+	if err != nil {
+		return Statement{}, err
+	}
+	st.Format = format
+	return st, nil
 }
 
 var requiredColumns = []string{"RELEASE_DATE", "TRANSACTION_TYPE", "REFERENCE_ID", "TRANSACTION_NET_AMOUNT"}
@@ -103,7 +114,8 @@ func rowEmpty(row []cell) bool {
 	return true
 }
 
-func parseGrid(grid [][]cell) (Statement, error) {
+// parseMercadoPago lê o extrato do Mercado Pago (cabeçalho RELEASE_DATE).
+func parseMercadoPago(grid [][]cell) (Statement, error) {
 	headerRow := -1
 	for i, row := range grid {
 		for _, c := range row {
@@ -134,7 +146,7 @@ func parseGrid(grid [][]cell) (Statement, error) {
 		}
 	}
 
-	st := Statement{Summary: readSummary(grid[:headerRow])}
+	st := Statement{Summary: readSummary(grid[:headerRow]), Bank: BankMercadoPago}
 	for i := headerRow + 1; i < len(grid); i++ {
 		row := grid[i]
 		if rowEmpty(row) {
