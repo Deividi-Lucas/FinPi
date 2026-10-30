@@ -73,8 +73,11 @@ func Parse(filename string, data []byte) (Statement, error) {
 	if len(data) > MaxFileBytes {
 		return Statement{}, ErrTooLarge
 	}
+	if isOFX(data) {
+		return parseOFX(data)
+	}
 	var (
-		grid   [][]cell
+		grid  [][]cell
 		err    error
 		format string
 	)
