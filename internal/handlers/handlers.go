@@ -37,6 +37,7 @@ func NewHandler(db *database.DB, templateFS fs.FS, version string) (*Handler, er
 
 	funcMap := template.FuncMap{
 		"formatCurrency": formatCurrencyBRL,
+		"isInternal":     models.IsInternal,
 		"centsInput":     formatCentsInput,
 		"formatDate":     formatDateBR,
 		"plural": func(n int, one, many string) string {
@@ -188,7 +189,8 @@ func applyFilter(f filter.Filter, list []models.Transaction) (shown []models.Tra
 			continue
 		}
 		count++
-		if t.Type == "income" {
+		if models.IsInternal(t.Category) { // aparece na lista, mas não entra nas somas
+		} else if t.Type == "income" {
 			income += t.AmountCents
 		} else {
 			expense += t.AmountCents
@@ -278,12 +280,6 @@ func (h *Handler) renderPage(w http.ResponseWriter, r *http.Request, o pageOpts)
 		return
 	}
 
-	summary, err := db.GetSummaryByMonth(selectedMonth)
-	if err != nil {
-		serverError(w, "Erro ao carregar resumo financeiro", err)
-		return
-	}
-
 	transactions, err := db.GetTransactions(selectedMonth)
 	if err != nil {
 		serverError(w, "Erro ao carregar lançamentos", err)
@@ -297,11 +293,8 @@ func (h *Handler) renderPage(w http.ResponseWriter, r *http.Request, o pageOpts)
 		serverError(w, "Erro ao carregar parcelas", err)
 		return
 	}
-	projected := installments.Project(candidates, selectedMonth)
+	projected := withoutInternal(installments.Project(candidates, selectedMonth))
 	projectedIncome, projectedExpense := projectedTotals(projected)
-	if includeProjected {
-		summary = withProjected(summary, projectedIncome, projectedExpense)
-	}
 	installments.Annotate(transactions)
 
 	categories, err := db.ListCategories()
@@ -310,7 +303,13 @@ func (h *Handler) renderPage(w http.ResponseWriter, r *http.Request, o pageOpts)
 		return
 	}
 	dashboard.Annotate(transactions, categories)
-	stats := dashboard.Compute(transactions, categories)
+	// Movimentação interna (resgates, transferências entre contas) fica fora dos totais e do dashboard.
+	regular, internalIn, internalOut := dashboard.SplitInternal(transactions)
+	summary := dashboard.Summarize(regular)
+	if includeProjected {
+		summary = withProjected(summary, projectedIncome, projectedExpense)
+	}
+	stats := dashboard.Compute(regular, categories)
 
 	// A lista do histórico segue os filtros; os cartões e o dashboard do mês continuam sendo do mês inteiro.
 	f, filterWarnings := requestFilter(r)
@@ -372,6 +371,8 @@ func (h *Handler) renderPage(w http.ResponseWriter, r *http.Request, o pageOpts)
 		TodayDate:     now.Format("2006-01-02"),
 		Version:       h.version,
 		Stats:         stats,
+		InternalIn:    internalIn,
+		InternalOut:   internalOut,
 		ImportResult:  importResult,
 		BulkResult:    bulkResult,
 		Undo:          undo,
@@ -383,7 +384,7 @@ func (h *Handler) renderPage(w http.ResponseWriter, r *http.Request, o pageOpts)
 		HistoryTruncated: count > len(shown),
 		Filter:           filterView(f, filterWarnings, categories),
 
-		Projected:       projected,
+		Projected:        projected,
 		ProjectedIncome:  projectedIncome,
 		ProjectedExpense: projectedExpense,
 		IncludeProjected: includeProjected,
@@ -523,6 +524,17 @@ func (h *Handler) DeleteTransaction(w http.ResponseWriter, r *http.Request) {
 		month = time.Now().Format("2006-01")
 	}
 	redirectToMonth(w, r, month)
+}
+
+// withoutInternal descarta as parcelas previstas da categoria Movimentação interna.
+func withoutInternal(p []models.ProjectedInstallment) []models.ProjectedInstallment {
+	var out []models.ProjectedInstallment
+	for _, x := range p {
+		if !models.IsInternal(x.Category) {
+			out = append(out, x)
+		}
+	}
+	return out
 }
 
 // projectedTotals soma, em centavos, as receitas e as despesas previstas.

@@ -73,6 +73,9 @@ type PageData struct {
 
 	Stats MonthStats // números do dashboard do mês
 
+	InternalIn  int64 // entradas de Movimentação interna no mês (fora dos totais), em centavos
+	InternalOut int64 // saídas de Movimentação interna no mês (fora dos totais), em centavos
+
 	ImportResult *ImportResult // aviso após importar um extrato (nil = sem aviso)
 	BulkResult   *BulkResult   // aviso após uma edição em lote (nil = sem aviso)
 	Undo         *UndoView     // edição em lote que ainda pode ser desfeita (nil = nenhuma)

@@ -83,6 +83,7 @@
 
         {{if .Empty}}
         <p class="mt-8 p-6 rounded-2xl bg-slate-800/40 border border-slate-800 text-sm text-slate-500 text-center">{{if .Filter.Active}}Nenhum lançamento corresponde aos filtros neste período.{{else}}Sem lançamentos neste período.{{end}}</p>
+        {{if or .InternalIn .InternalOut}}<p class="mt-3 text-xs text-slate-400">Movimentações internas (fora dos totais): entradas {{formatCurrency .InternalIn}} &middot; saídas {{formatCurrency .InternalOut}}</p>{{end}}
         {{else}}
 
         <!-- Cartões -->
@@ -111,6 +112,7 @@
             </div>
             {{end}}
         </section>
+        {{if or .InternalIn .InternalOut}}<p class="mt-3 text-xs text-slate-400">Movimentações internas (fora dos totais): entradas {{formatCurrency .InternalIn}} &middot; saídas {{formatCurrency .InternalOut}}</p>{{end}}
 
         <!-- Fluxo de caixa -->
         <section class="mt-8 p-5 rounded-2xl bg-slate-800/40 border border-slate-800">

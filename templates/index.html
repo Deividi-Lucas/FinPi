@@ -154,7 +154,7 @@
                 <p class="text-xs text-slate-500 mt-2">Diferença entre receitas e despesas{{if and .IncludeProjected .Projected}} (com previstas){{end}}</p>
             </div>
         </section>
-
+        {{if or .InternalIn .InternalOut}}<p class="mt-3 text-xs text-slate-400">Movimentações internas (fora dos totais): entradas {{formatCurrency .InternalIn}} &middot; saídas {{formatCurrency .InternalOut}}</p>{{end}}
 
         <!-- Dashboard do mês -->
         <section id="month-dashboard" class="mb-8">
@@ -313,7 +313,7 @@
                             <td class="px-6 py-4 whitespace-nowrap text-xs text-slate-400">
                                 {{formatDate .Date}}
                             </td>
-                            <td class="px-6 py-4 font-medium text-slate-100">
+                            <td class="px-6 py-4 font-medium text-slate-100" {{with .OriginalDescription}}title="{{.}}"{{end}}>
                                 {{.Description}}
                                 {{with .Installment}}
                                 <span class="ml-2 px-2 py-0.5 rounded-md text-xs font-medium bg-sky-500/10 text-sky-300 border border-sky-500/20">{{.Number}}/{{.Total}}</span>
@@ -326,6 +326,7 @@
                                 <span class="px-2.5 py-1 rounded-md text-xs bg-slate-800 text-slate-300 border border-slate-700">
                                     {{.Category}}
                                 </span>
+                                {{if isInternal .Category}}<span class="ml-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-slate-700/60 text-slate-300 border border-slate-600">interna</span>{{end}}
                                 {{if eq .EffectivePriority "essential"}}<span data-priority-badge="essential" class="ml-1 px-2 py-0.5 rounded-md text-xs bg-sky-500/10 text-sky-300 border border-sky-500/20">Essencial</span>{{else if eq .EffectivePriority "superfluous"}}<span data-priority-badge="superfluous" class="ml-1 px-2 py-0.5 rounded-md text-xs bg-violet-500/10 text-violet-300 border border-violet-500/20">Supérfluo</span>{{end}}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">

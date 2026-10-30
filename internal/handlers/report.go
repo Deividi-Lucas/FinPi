@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"finpi/internal/dashboard"
 	"finpi/internal/filter"
 	"finpi/internal/installments"
 	"finpi/internal/models"
@@ -175,6 +176,8 @@ type reportPage struct {
 	AutoURL          string
 	Options          []granOption
 
+	InternalIn, InternalOut int64 // movimentação interna do período (fora dos totais), em centavos
+
 	Cards      reportCards
 	Empty      bool
 	Buckets    []report.Bucket
@@ -216,6 +219,8 @@ func (h *Handler) Report(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	txs = filterTransactions(q.Filter, txs)
+	var internalIn, internalOut int64
+	txs, internalIn, internalOut = dashboard.SplitInternal(txs) // movimentação interna fica fora do fluxo
 
 	categories, err := db.ListCategories()
 	if err != nil {
@@ -233,7 +238,7 @@ func (h *Handler) Report(w http.ResponseWriter, r *http.Request) {
 		}
 		for _, m := range months {
 			for _, p := range installments.Project(candidates, m) {
-				if p.Date >= q.From && p.Date <= q.To && q.Filter.Match(p.Category, p.Name, p.Type, p.AmountCents) {
+				if p.Date >= q.From && p.Date <= q.To && !models.IsInternal(p.Category) && q.Filter.Match(p.Category, p.Name, p.Type, p.AmountCents) {
 					projected = append(projected, p)
 				}
 			}
@@ -254,6 +259,7 @@ func (h *Handler) Report(w http.ResponseWriter, r *http.Request) {
 		ToggleProjected:  q.URL(func(x *reportQuery) { x.Projected = !x.Projected }),
 		Group:            string(granularity), GroupExplicit: explicit,
 		AutoURL:    q.URL(func(x *reportQuery) { x.Group = "" }),
+		InternalIn: internalIn, InternalOut: internalOut,
 		Empty:      len(txs) == 0 && len(projected) == 0,
 		Buckets:    buckets,
 		Cards:      buildCards(buckets, len(months), q.Projected && len(projected) > 0),
