@@ -30,6 +30,7 @@ type Transaction struct {
 	Priority   string `json:"priority"` // "", "essential" ou "superfluous"; vazio segue a categoria
 	ExternalID string `json:"-"`        // identificador de origem (importação); usado só na gravação em lote
 	BookID     int64  `json:"-"`        // livro do lançamento; preenchido onde o livro importa (lotes e movimentação)
+	AccountID  int64  `json:"-"`        // conta do lançamento (0 = sem conta); precisa ser do mesmo livro
 
 	OriginalDescription string `json:"-"` // texto original do banco (importação); vazio nos lançamentos manuais
 

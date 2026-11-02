@@ -301,13 +301,13 @@ func (d *DB) Close() error {
 var ErrInvalidPriority = errors.New("prioridade inválida: use essential, superfluous ou vazio")
 
 // transactionColumns é a lista de colunas lidas por scanTransactions.
-const transactionColumns = `id, description, amount_cents, type, category, date, priority, created_at, original_description`
+const transactionColumns = `id, description, amount_cents, type, category, date, priority, created_at, original_description, account_id`
 
 func scanTransactions(rows *sql.Rows) ([]models.Transaction, error) {
 	var list []models.Transaction
 	for rows.Next() {
 		var t models.Transaction
-		if err := rows.Scan(&t.ID, &t.Description, &t.AmountCents, &t.Type, &t.Category, &t.Date, &t.Priority, &t.CreatedAt, &t.OriginalDescription); err != nil {
+		if err := rows.Scan(&t.ID, &t.Description, &t.AmountCents, &t.Type, &t.Category, &t.Date, &t.Priority, &t.CreatedAt, &t.OriginalDescription, &t.AccountID); err != nil {
 			return nil, err
 		}
 		list = append(list, t)
@@ -320,12 +320,15 @@ func (d *DB) CreateTransaction(t *models.Transaction) error {
 	if !models.ValidPriority(t.Priority) {
 		return ErrInvalidPriority
 	}
+	if err := checkAccount(d.conn, d.book, t.AccountID, 0); err != nil {
+		return err
+	}
 	query := `
-		INSERT INTO transactions (description, amount_cents, type, category, date, priority, created_at, book_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO transactions (description, amount_cents, type, category, date, priority, created_at, book_id, account_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	now := time.Now()
-	res, err := d.conn.Exec(query, t.Description, t.AmountCents, t.Type, t.Category, t.Date, t.Priority, now, d.book)
+	res, err := d.conn.Exec(query, t.Description, t.AmountCents, t.Type, t.Category, t.Date, t.Priority, now, d.book, t.AccountID)
 	if err != nil {
 		return err
 	}
@@ -428,12 +431,19 @@ func (d *DB) UpdateTransaction(t *models.Transaction) error {
 	if !models.ValidPriority(t.Priority) {
 		return ErrInvalidPriority
 	}
+	cur, err := currentAccount(d.conn, d.book, t.ID)
+	if err != nil {
+		return err
+	}
+	if err := checkAccount(d.conn, d.book, t.AccountID, cur); err != nil {
+		return err
+	}
 	query := `
 		UPDATE transactions
-		SET description = ?, amount_cents = ?, type = ?, category = ?, date = ?, priority = ?
+		SET description = ?, amount_cents = ?, type = ?, category = ?, date = ?, priority = ?, account_id = ?
 		WHERE id = ? AND book_id = ?
 	`
-	res, err := d.conn.Exec(query, t.Description, t.AmountCents, t.Type, t.Category, t.Date, t.Priority, t.ID, d.book)
+	res, err := d.conn.Exec(query, t.Description, t.AmountCents, t.Type, t.Category, t.Date, t.Priority, t.AccountID, t.ID, d.book)
 	if err != nil {
 		return err
 	}
