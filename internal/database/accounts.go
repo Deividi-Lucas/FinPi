@@ -43,6 +43,15 @@ func cleanAccountName(name string) (string, error) {
 	return name, nil
 }
 
+// accountUniqueErr traduz a violação do índice único idx_accounts_book_name (corrida entre a checagem do nome e a
+// gravação) para ErrAccountDuplicate; outros erros passam intactos.
+func accountUniqueErr(err error) error {
+	if err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed: accounts.") {
+		return ErrAccountDuplicate
+	}
+	return err
+}
+
 type rowScanner interface{ Scan(dest ...any) error }
 
 func scanAccount(s rowScanner) (models.Account, error) {
@@ -131,7 +140,7 @@ func (d *DB) CreateAccount(name, bank string) (models.Account, error) {
 	}
 	res, err := d.conn.Exec(`INSERT INTO accounts (book_id, name, name_key, bank) VALUES (?, ?, ?, ?)`, d.book, clean, key, bank)
 	if err != nil {
-		return models.Account{}, err
+		return models.Account{}, accountUniqueErr(err)
 	}
 	id, err := res.LastInsertId()
 	if err != nil {
@@ -158,7 +167,7 @@ func (d *DB) RenameAccount(id int64, name string) error {
 		return ErrAccountDuplicate
 	}
 	_, err = d.conn.Exec(`UPDATE accounts SET name = ?, name_key = ? WHERE id = ? AND book_id = ?`, clean, key, id, d.book)
-	return err
+	return accountUniqueErr(err)
 }
 
 // SetAccountArchived arquiva ou reativa uma conta do livro (contas nunca são apagadas).
@@ -299,9 +308,9 @@ func migrateAccounts(conn *sql.DB) error {
 			return err
 		}
 	}
-	if err := tx.Commit(); err != nil {
+	// Dentro da transação: a atribuição e a marca de versão são gravadas juntas (ou nenhuma).
+	if _, err := tx.Exec(`PRAGMA user_version = 3`); err != nil {
 		return err
 	}
-	_, err = conn.Exec(`PRAGMA user_version = 3`)
-	return err
+	return tx.Commit()
 }

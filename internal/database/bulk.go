@@ -328,6 +328,16 @@ func ensureCategoryInBook(tx *sql.Tx, bookID int64, category string) error {
 	return err
 }
 
+// legacyAccountTx escolhe a conta de um lançamento restaurado a partir de um lote sem account_id: a conta ativa
+// do banco de origem (external_id) no livro, criada se faltar; sem banco, 0.
+func legacyAccountTx(tx *sql.Tx, book int64, externalID string) (int64, error) {
+	bank := models.BankFromExternalID(externalID)
+	if bank == "" {
+		return 0, nil
+	}
+	return bankAccountTx(tx, book, bank)
+}
+
 // UndoLatestBatch desfaz o lote mais recente ainda não desfeito, numa transação. Só restaura o que continua
 // exatamente como o lote deixou (edição) ou o que ainda não existe (exclusão); o resto é pulado.
 func (d *DB) UndoLatestBatch() (restored, skipped int, err error) {
@@ -407,11 +417,21 @@ func (d *DB) UndoLatestBatch() (restored, skipped int, err error) {
 				it.before.Description, it.before.Category, it.before.Date, it.before.Priority, it.before.BookID, it.before.ID); err != nil {
 				return 0, 0, err
 			}
-			if it.before.AccountID != nil { // lote antigo, sem o campo: mantém a conta atual
+			switch {
+			case it.before.AccountID != nil:
 				if _, err := tx.Exec(`UPDATE transactions SET account_id = ? WHERE id = ?`, *it.before.AccountID, it.before.ID); err != nil {
 					return 0, 0, err
 				}
-			}
+			case it.before.BookID != now.BookID:
+				// lote antigo de movimentação, sem o campo: a conta atual é do outro livro; usa a do banco no livro de volta
+				account, err := legacyAccountTx(tx, it.before.BookID, now.ExternalID)
+				if err != nil {
+					return 0, 0, err
+				}
+				if _, err := tx.Exec(`UPDATE transactions SET account_id = ? WHERE id = ?`, account, it.before.ID); err != nil {
+					return 0, 0, err
+				}
+			} // lote antigo no mesmo livro: mantém a conta atual
 			restored++
 			continue
 		}
@@ -441,6 +461,8 @@ func (d *DB) UndoLatestBatch() (restored, skipped int, err error) {
 		var account int64
 		if it.before.AccountID != nil {
 			account = *it.before.AccountID
+		} else if account, err = legacyAccountTx(tx, it.before.BookID, it.before.ExternalID); err != nil { // lote antigo
+			return 0, 0, err
 		}
 		if _, err := tx.Exec(`INSERT INTO transactions (`+loadColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			it.before.ID, it.before.Description, it.before.AmountCents, it.before.Type, it.before.Category,

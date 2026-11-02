@@ -40,7 +40,7 @@ func (d *DB) ImportTransactionsToAccount(rows []models.Transaction, acc ImportAc
 			}
 			res, err := tx.Exec(`INSERT INTO accounts (book_id, name, name_key, bank) VALUES (?, ?, ?, '')`, d.book, name, key)
 			if err != nil {
-				return 0, err
+				return 0, accountUniqueErr(err)
 			}
 			return res.LastInsertId()
 		case acc.Bank != "":
