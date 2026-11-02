@@ -34,6 +34,7 @@ type Transaction struct {
 
 	Installment       *InstallmentInfo `json:"-"` // dados de exibição da parcela; não é gravado
 	EffectivePriority string           `json:"-"` // classificação efetiva (própria ou da categoria); não é gravada
+	TransferNote      string           `json:"-"` // selo de transferência (exibição); não é gravado
 }
 
 // InstallmentInfo reúne os dados de exibição de um lançamento parcelado.

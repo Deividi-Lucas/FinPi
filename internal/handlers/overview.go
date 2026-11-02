@@ -294,3 +294,45 @@ func parseLooseCents(s string) (int64, error) {
 	}
 	return parseAmountCents(s)
 }
+
+// markTransfers preenche o selo de transferência (TransferNote) das linhas do histórico:
+// "↔ livro do outro lado" nas ligações válidas e "fora do FinPi" nos lançamentos marcados.
+func (h *Handler) markTransfers(rows []models.Transaction) error {
+	if len(rows) == 0 {
+		return nil
+	}
+	links, err := h.db.ListTransferLinks()
+	if err != nil {
+		return err
+	}
+	solo, err := h.db.ListSolo()
+	if err != nil {
+		return err
+	}
+	if len(links) == 0 && len(solo) == 0 {
+		return nil
+	}
+	books, err := h.db.ListBooks()
+	if err != nil {
+		return err
+	}
+	names := make(map[int64]string, len(books))
+	for _, b := range books {
+		names[b.ID] = b.Name
+	}
+	notes := make(map[int64]string, 2*len(links)+len(solo))
+	for _, l := range links {
+		if !l.Valid {
+			continue
+		}
+		notes[l.Out.ID] = "↔ " + names[l.In.BookID]
+		notes[l.In.ID] = "↔ " + names[l.Out.BookID]
+	}
+	for _, s := range solo {
+		notes[s.ID] = "fora do FinPi"
+	}
+	for i := range rows {
+		rows[i].TransferNote = notes[rows[i].ID]
+	}
+	return nil
+}

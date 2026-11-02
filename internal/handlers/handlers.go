@@ -328,6 +328,10 @@ func (h *Handler) renderPage(w http.ResponseWriter, r *http.Request, o pageOpts)
 		list = all
 	}
 	shown, count, histIncome, histExpense := applyFilter(f, list)
+	if err := h.markTransfers(shown); err != nil {
+		serverError(w, "Erro ao carregar as transferências", err)
+		return
+	}
 
 	var importResult *models.ImportResult
 	if v := r.URL.Query().Get("importados"); v != "" {

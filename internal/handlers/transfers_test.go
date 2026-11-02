@@ -173,3 +173,44 @@ func TestTransfers_TabLinksKeepThePeriodUnescaped(t *testing.T) {
 		t.Error("os links das abas deveriam manter month=AAAA-MM sem escapar o sinal de igual")
 	}
 }
+
+func TestBookLists_ShowTransferBadgesWithoutChangingTotals(t *testing.T) {
+	h, db := newTestHandler(t)
+	pj, pjID := newPJ(t, db)
+	mustTx(t, db, "Pix para PJ", "Outros", "expense", 5000, "2026-10-05")
+	mustTx(t, pj, "Pix do Pessoal", "Outros", "income", 5000, "2026-10-05")
+	mustTx(t, db, "Pix para conta de fora", "Outros", "expense", 700, "2026-10-06")
+	all, _, _ := db.AllTransactions(100)
+	var outID, inID, soloID int64
+	for _, tx := range all {
+		switch tx.Description {
+		case "Pix para PJ":
+			outID = tx.ID
+		case "Pix do Pessoal":
+			inID = tx.ID
+		case "Pix para conta de fora":
+			soloID = tx.ID
+		}
+	}
+	before := getDashboard(h, "/?month=2026-10")
+	if err := db.LinkTransfer(outID, inID); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := db.MarkSolo([]int64{soloID}); err != nil {
+		t.Fatal(err)
+	}
+
+	pessoal := getDashboard(h, "/?month=2026-10")
+	if !strings.Contains(history(pessoal), "↔ PJ") || !strings.Contains(history(pessoal), "fora do FinPi") {
+		t.Error("o Pessoal deveria mostrar os selos ↔ PJ e fora do FinPi")
+	}
+	if !strings.Contains(history(getDashboard(h, "/?month=2026-10&livro="+pjID)), "↔ Pessoal") {
+		t.Error("o PJ deveria mostrar o selo ↔ Pessoal")
+	}
+	// os cartões do livro não mudam com as ligações
+	for _, want := range []string{"R$ 57,00"} {
+		if strings.Contains(before, want) != strings.Contains(pessoal, want) {
+			t.Errorf("o total %s do livro não pode mudar com a ligação", want)
+		}
+	}
+}
