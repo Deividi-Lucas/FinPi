@@ -72,6 +72,7 @@ func main() {
 	mux.HandleFunc("/import/preview", h.ImportPreview)
 	mux.HandleFunc("/import/confirm", h.ImportConfirm)
 	mux.HandleFunc("/relatorio", h.Report)
+	mux.HandleFunc("/visao-geral", h.Overview)
 	mux.HandleFunc("/livros", h.CreateBook)
 	mux.HandleFunc("/livros/editar", h.UpdateBook)
 	mux.HandleFunc("/livros/arquivar", h.ArchiveBook)

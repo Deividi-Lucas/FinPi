@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    {{template "headCommon"}}
+    <title>FinPi - Visão geral</title>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans antialiased selection:bg-emerald-500 selection:text-white">
+    {{template "liveUpdates"}}
+    <div class="max-w-6xl mx-auto px-4 py-8">
+
+        <header class="flex flex-col sm:flex-row items-center justify-between pb-6 border-b border-slate-800 gap-4">
+            <div class="flex items-center gap-3">
+                <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-xl">🪙</div>
+                <div>
+                    <h1 class="text-2xl font-bold tracking-tight text-white">Visão geral</h1>
+                    <p class="text-xs text-slate-400">Todos os livros, sem contar duas vezes as transferências entre eles</p>
+                </div>
+            </div>
+            <div class="flex flex-wrap items-center justify-center gap-2">
+                <a href="/" class="inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-sm font-medium px-3 py-2 rounded-xl border border-slate-700 transition">Voltar ao mês</a>
+                <a href="/relatorio" class="inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-sm font-medium px-3 py-2 rounded-xl border border-slate-700 transition">Relatório</a>
+            </div>
+        </header>
+
+        {{if .Error}}
+        <div class="mt-4 p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm">{{.Error}}</div>
+        {{end}}
+        {{if .Truncated}}
+        <div class="mt-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm">Há mais lançamentos do que o limite lido para sugerir pares; as sugestões consideram os mais recentes.</div>
+        {{end}}
+
+        {{template "liveBanner"}}
+
+        <!-- Período -->
+        <section class="mt-6 flex flex-wrap items-center gap-3">
+            <div class="flex items-center gap-1">
+                <a href="{{.Period.MonthURL}}" class="px-3 py-2 rounded-xl border text-sm {{if .Period.Year}}bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-200{{else}}bg-emerald-600 border-emerald-500 text-white font-semibold{{end}}">Mês</a>
+                <a href="{{.Period.YearURL}}" class="px-3 py-2 rounded-xl border text-sm {{if .Period.Year}}bg-emerald-600 border-emerald-500 text-white font-semibold{{else}}bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-200{{end}}">Ano</a>
+            </div>
+            <div class="flex items-center gap-2">
+                <a href="{{.Period.PrevURL}}" class="px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm" title="Período anterior" aria-label="Período anterior">&lsaquo;</a>
+                <span class="px-4 py-2 rounded-xl bg-slate-800/80 border border-slate-700 text-sm font-semibold text-white">{{.Period.Label}}</span>
+                <a href="{{.Period.NextURL}}" class="px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm" title="Próximo período" aria-label="Próximo período">&rsaquo;</a>
+            </div>
+            <div class="flex flex-wrap items-center gap-4 sm:ml-auto text-sm">
+                {{if .Pending}}<a href="/visao-geral?{{.State}}&revisao=1&aba=sugeridos" class="text-amber-300 hover:text-amber-200">{{.Pending}} {{plural .Pending "par sugerido" "pares sugeridos"}} para confirmar</a>{{end}}
+                <a href="/visao-geral?{{.State}}&revisao=1&aba=ligados" class="text-xs text-slate-400 hover:text-slate-200">Transferências entre livros</a>
+            </div>
+        </section>
+
+        <!-- Cartões -->
+        <section class="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div class="p-5 rounded-2xl bg-slate-800/60 border border-slate-700/60">
+                <p class="text-xs uppercase tracking-wide text-slate-400">Receitas</p>
+                <p class="mt-1 text-2xl font-bold text-emerald-400">{{formatCurrency .Overview.Total.TotalIncome}}</p>
+            </div>
+            <div class="p-5 rounded-2xl bg-slate-800/60 border border-slate-700/60">
+                <p class="text-xs uppercase tracking-wide text-slate-400">Despesas</p>
+                <p class="mt-1 text-2xl font-bold text-rose-400">{{formatCurrency .Overview.Total.TotalExpense}}</p>
+            </div>
+            <div class="p-5 rounded-2xl bg-slate-800/60 border border-slate-700/60">
+                <p class="text-xs uppercase tracking-wide text-slate-400">Saldo</p>
+                <p class="mt-1 text-2xl font-bold {{if lt .Overview.Total.Balance 0}}text-rose-400{{else}}text-emerald-400{{end}}">{{formatCurrency .Overview.Total.Balance}}</p>
+            </div>
+        </section>
+
+        <!-- Por livro -->
+        <section class="mt-6 rounded-2xl bg-slate-800/60 border border-slate-700/60 overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left text-xs uppercase tracking-wide text-slate-400 border-b border-slate-700/60">
+                        <th class="px-4 py-3 font-medium">Livro</th>
+                        <th class="px-4 py-3 font-medium text-right">Receitas</th>
+                        <th class="px-4 py-3 font-medium text-right">Despesas</th>
+                        <th class="px-4 py-3 font-medium text-right">Saldo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .Overview.Rows}}
+                    <tr class="border-b border-slate-800">
+                        <td class="px-4 py-3"><span class="inline-block h-2.5 w-2.5 rounded-full mr-2" style="background-color: {{.Book.Hex}}"></span>{{.Book.Name}}</td>
+                        <td class="px-4 py-3 text-right text-emerald-400">{{formatCurrency .Summary.TotalIncome}}</td>
+                        <td class="px-4 py-3 text-right text-rose-400">{{formatCurrency .Summary.TotalExpense}}</td>
+                        <td class="px-4 py-3 text-right {{if lt .Summary.Balance 0}}text-rose-400{{else}}text-slate-200{{end}}">{{formatCurrency .Summary.Balance}}</td>
+                    </tr>
+                    {{end}}
+                    {{if or .Overview.LinkedSides .Overview.LinkedIn .Overview.LinkedOut}}
+                    <tr class="border-b border-slate-800 text-slate-300">
+                        <td class="px-4 py-3">Transferências entre livros <span class="text-xs text-slate-500">({{.Overview.LinkedSides}} {{plural .Overview.LinkedSides "lado ligado" "lados ligados"}} no período)</span></td>
+                        <td class="px-4 py-3 text-right">&minus; {{formatCurrency .Overview.LinkedIn}}</td>
+                        <td class="px-4 py-3 text-right">&minus; {{formatCurrency .Overview.LinkedOut}}</td>
+                        <td class="px-4 py-3 text-right"></td>
+                    </tr>
+                    {{end}}
+                    {{if or .Overview.SoloSides .Overview.SoloIn .Overview.SoloOut}}
+                    <tr class="border-b border-slate-800 text-slate-300">
+                        <td class="px-4 py-3">Fora do FinPi <span class="text-xs text-slate-500">({{.Overview.SoloSides}} {{plural .Overview.SoloSides "lançamento marcado" "lançamentos marcados"}} no período)</span></td>
+                        <td class="px-4 py-3 text-right">&minus; {{formatCurrency .Overview.SoloIn}}</td>
+                        <td class="px-4 py-3 text-right">&minus; {{formatCurrency .Overview.SoloOut}}</td>
+                        <td class="px-4 py-3 text-right"></td>
+                    </tr>
+                    {{end}}
+                    <tr class="font-bold text-white">
+                        <td class="px-4 py-3">Total</td>
+                        <td class="px-4 py-3 text-right">{{formatCurrency .Overview.Total.TotalIncome}}</td>
+                        <td class="px-4 py-3 text-right">{{formatCurrency .Overview.Total.TotalExpense}}</td>
+                        <td class="px-4 py-3 text-right">{{formatCurrency .Overview.Total.Balance}}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        {{if or .Overview.InternalIn .Overview.InternalOut}}
+        <p class="mt-4 text-xs text-slate-400">Movimentações internas (fora dos totais): entradas {{formatCurrency .Overview.InternalIn}} &middot; saídas {{formatCurrency .Overview.InternalOut}}</p>
+        {{end}}
+
+        <footer class="mt-12 pt-6 border-t border-slate-800 text-center text-xs text-slate-500">
+            <p>🪙 FinPi &bull; Binário único em Go &bull; Armazenamento SQLite WAL &bull; Otimizado para Raspberry Pi 3</p>
+            <p class="mt-1 text-slate-600">Versão {{.Version}}</p>
+        </footer>
+    </div>
+
+    <script>
+        // Tempo real: a revisão (próxima etapa) trocará este guarda.
+        startLiveUpdates(function () { return false; });
+    </script>
+</body>
+</html>
