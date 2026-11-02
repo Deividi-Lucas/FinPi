@@ -26,6 +26,9 @@ type bulkRequest struct {
 	IDs    []int64
 	Spec   bulk.Spec
 	Dest   int64 // livro de destino (só em "mover")
+
+	Account     int64  // conta a definir (só em "conta"); 0 = sem conta
+	AccountName string // nome da conta escolhida ("Sem conta" quando 0)
 }
 
 type bulkValidationError struct{ msg string }
@@ -58,7 +61,7 @@ func parseBulkRequest(db *database.DB, form url.Values) (bulkRequest, error) {
 	var req bulkRequest
 
 	switch a := strings.TrimSpace(form.Get("acao")); a {
-	case "editar", "excluir", "mover":
+	case "editar", "excluir", "mover", "conta":
 		req.Action = a
 	default:
 		return req, errors.New("Ação inválida.")
@@ -96,6 +99,21 @@ func parseBulkRequest(db *database.DB, form url.Values) (bulkRequest, error) {
 		return req, nil
 	}
 	if req.Action == "excluir" {
+		return req, nil
+	}
+	if req.Action == "conta" {
+		id, err := strconv.ParseInt(strings.TrimSpace(form.Get("conta")), 10, 64)
+		if err != nil || id < 0 {
+			return req, errors.New("Escolha a conta.")
+		}
+		req.Account, req.AccountName = id, "Sem conta"
+		if id > 0 {
+			acc, err := db.GetAccount(id)
+			if err != nil || acc.Archived {
+				return req, errors.New("Conta inválida ou arquivada.")
+			}
+			req.AccountName = acc.Name
+		}
 		return req, nil
 	}
 
@@ -163,6 +181,13 @@ type moveRow struct {
 	NewCat  bool // a categoria não existe no destino e será criada
 }
 
+// accountRow é uma linha da prévia de "Definir conta": o lançamento e a conta que ele tem hoje.
+type accountRow struct {
+	Tx       models.Transaction
+	FromName string
+	Changed  bool
+}
+
 // bulkParam é um campo da operação que a prévia repete em campos ocultos para o "aplicar".
 type bulkParam struct{ Name, Value string }
 
@@ -173,6 +198,8 @@ type bulkView struct {
 	Delete           []models.Transaction // exclusão
 	Move             []moveRow            // movimentação
 	DestName         string               // nome do livro de destino
+	AccountRows      []accountRow         // definir conta
+	AccountName      string               // conta escolhida ("Sem conta" quando 0)
 	PartialSeries    []string             // séries de parcelas que ficariam divididas
 	Changed          int
 	Unchanged        int
@@ -184,7 +211,7 @@ type bulkView struct {
 	BookID           int64 // livro da operação, repetido no "aplicar"
 }
 
-var bulkParamNames = []string{"acao", "categoria", "prioridade", "data_modo", "data", "desloca", "desloca_unidade", "localizar", "substituir", "livro_destino"}
+var bulkParamNames = []string{"acao", "categoria", "prioridade", "data_modo", "data", "desloca", "desloca_unidade", "localizar", "substituir", "livro_destino", "conta"}
 
 func bulkMonth(r *http.Request) string {
 	if m := r.PostForm.Get("month"); m != "" {
@@ -272,6 +299,29 @@ func (h *Handler) BulkPreview(w http.ResponseWriter, r *http.Request) {
 		view.Changed = len(list)
 	} else if req.Action == "excluir" {
 		view.Delete = list
+	} else if req.Action == "conta" {
+		accounts, err := db.ListAccounts()
+		if err != nil {
+			serverError(w, "Erro ao carregar contas", err)
+			return
+		}
+		names := accountNameMap(accounts)
+		view.AccountName = req.AccountName
+		for _, t := range list {
+			from := "Sem conta"
+			if t.AccountID != 0 {
+				if n, ok := names[t.AccountID]; ok {
+					from = n
+				}
+			}
+			row := accountRow{Tx: t, FromName: from, Changed: t.AccountID != req.Account}
+			view.AccountRows = append(view.AccountRows, row)
+			if row.Changed {
+				view.Changed++
+			} else {
+				view.Unchanged++
+			}
+		}
 	} else {
 		view.Rows = bulk.Preview(list, req.Spec)
 		for _, row := range view.Rows {
@@ -321,6 +371,12 @@ func (h *Handler) BulkApply(w http.ResponseWriter, r *http.Request) {
 		summary := fmt.Sprintf("Exclusão de %d %s", len(req.IDs), pluralWord(len(req.IDs), "lançamento", "lançamentos"))
 		applied, skipped, err = db.ApplyDeletes(summary, req.IDs)
 		param = "excluidos"
+	} else if req.Action == "conta" {
+		applied, skipped, err = db.ApplyEdits("conta → "+req.AccountName, req.IDs, func(t models.Transaction) (models.Transaction, error) {
+			t.AccountID = req.Account
+			return t, nil
+		})
+		param = "editados"
 	} else {
 		applied, skipped, err = db.ApplyEdits(bulk.Summary(req.Spec), req.IDs, func(t models.Transaction) (models.Transaction, error) {
 			after, err := bulk.Apply(t, req.Spec)
@@ -339,6 +395,10 @@ func (h *Handler) BulkApply(w http.ResponseWriter, r *http.Request) {
 		}
 		if errors.Is(err, database.ErrBookNotFound) || errors.Is(err, database.ErrSameBook) {
 			http.Error(w, "Livro de destino inválido.", http.StatusBadRequest)
+			return
+		}
+		if errors.Is(err, database.ErrAccountNotFound) || errors.Is(err, database.ErrAccountArchived) {
+			http.Error(w, "Conta inválida ou arquivada.", http.StatusBadRequest)
 			return
 		}
 		if errors.Is(err, database.ErrInvalidPriority) {

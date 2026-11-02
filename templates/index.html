@@ -291,6 +291,7 @@
             <div id="bulk-bar" class="hidden px-6 py-3 flex flex-wrap items-center gap-3 text-sm bg-emerald-500/10 border-b border-emerald-500/30 text-emerald-200">
                 <span><strong id="bulk-count">0</strong> selecionados</span>
                 <button type="button" onclick="openBulkEdit()" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium cursor-pointer">Editar…</button>
+                <button type="button" onclick="openBulkAccount()" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-xs font-medium cursor-pointer">Definir conta…</button>
                 <button type="button" onclick="openBulkDelete()" class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-medium cursor-pointer">Excluir</button>
                 {{if gt (len .Books) 1}}<button type="button" onclick="openBulkMove()" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium cursor-pointer">Mover…</button>{{end}}
                 <button type="button" onclick="clearBulkSelection()" class="px-3 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-slate-800 cursor-pointer">Limpar seleção</button>
@@ -864,6 +865,21 @@
                 <div class="flex items-center justify-end gap-3 pt-2 border-t border-slate-800">
                     <button type="button" onclick="closeBulkModal()" class="px-4 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition cursor-pointer">Cancelar</button>
                     <button type="submit" class="bg-sky-600 hover:bg-sky-500 text-white font-medium text-sm px-5 py-2 rounded-xl transition cursor-pointer">Ver prévia</button>
+                </div>
+            </form>
+
+            <form id="bulk-account-form" class="hidden space-y-4">
+                {{template "stateFields" .}}
+                <input type="hidden" name="acao" value="conta">
+                <label class="block text-xs font-medium text-slate-300">Definir a conta
+                    <select name="conta" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100">
+                        <option value="0">Sem conta</option>
+                        {{range .Accounts}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+                    </select>
+                </label>
+                <div class="flex items-center justify-end gap-3 pt-2 border-t border-slate-800">
+                    <button type="button" onclick="closeBulkModal()" class="px-4 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition cursor-pointer">Cancelar</button>
+                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm px-5 py-2 rounded-xl transition cursor-pointer">Ver prévia</button>
                 </div>
             </form>
 
@@ -1719,6 +1735,7 @@
 
         function closeBulkModal() {
             if (bulkMoveForm) bulkMoveForm.classList.add('hidden');
+            bulkAccountForm.classList.add('hidden');
             bulkModal.classList.add('hidden');
             bulkModal.classList.remove('flex');
         }
@@ -1729,6 +1746,7 @@
             bulkPreview.innerHTML = '';
             bulkForm.classList.remove('hidden');
             if (bulkMoveForm) bulkMoveForm.classList.add('hidden');
+            bulkAccountForm.classList.add('hidden');
             showBulkError('');
             showBulkModal('Editar ' + n + ' ' + (n === 1 ? 'lançamento' : 'lançamentos'));
         }
@@ -1750,10 +1768,11 @@
                 });
                 const text = await resp.text();
                 if (!resp.ok) { showBulkError(text.trim() || 'Não foi possível montar a prévia.'); return; }
-                bulkPreview.dataset.mode = params.get('acao') === 'excluir' ? 'delete' : (params.get('acao') === 'mover' ? 'move' : 'edit');
+                bulkPreview.dataset.mode = params.get('acao') === 'excluir' ? 'delete' : (params.get('acao') === 'mover' ? 'move' : (params.get('acao') === 'conta' ? 'account' : 'edit'));
                 bulkPreview.innerHTML = text;
                 bulkForm.classList.add('hidden');
                 if (bulkMoveForm) bulkMoveForm.classList.add('hidden');
+                bulkAccountForm.classList.add('hidden');
                 if (title) showBulkModal(title);
             } catch (err) {
                 showBulkError('Sem conexão com o servidor.');
@@ -1761,12 +1780,30 @@
         }
 
         const bulkMoveForm = document.getElementById('bulk-move-form');
+        const bulkAccountForm = document.getElementById('bulk-account-form');
+
+        function openBulkAccount() {
+            const n = bulkSelected().length;
+            if (!n) return;
+            bulkPreview.innerHTML = '';
+            bulkForm.classList.add('hidden');
+            if (bulkMoveForm) bulkMoveForm.classList.add('hidden');
+            bulkAccountForm.classList.remove('hidden');
+            showBulkError('');
+            showBulkModal('Definir conta de ' + n + ' ' + (n === 1 ? 'lançamento' : 'lançamentos'));
+        }
+
+        bulkAccountForm.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            await requestBulkPreview(bulkParamsFrom(bulkAccountForm));
+        });
 
         function openBulkMove() {
             const n = bulkSelected().length;
             if (!n || !bulkMoveForm) return;
             bulkPreview.innerHTML = '';
             bulkForm.classList.add('hidden');
+            bulkAccountForm.classList.add('hidden');
             bulkMoveForm.classList.remove('hidden');
             showBulkError('');
             showBulkModal('Mover ' + n + ' ' + (n === 1 ? 'lançamento' : 'lançamentos'));
@@ -1800,7 +1837,7 @@
         bulkPreview.addEventListener('click', async function (e) {
             if (e.target.closest('[data-bulk-cancel]')) {
                 bulkPreview.innerHTML = '';
-                if (bulkPreview.dataset.mode === 'delete') { closeBulkModal(); } else if (bulkPreview.dataset.mode === 'move' && bulkMoveForm) { bulkMoveForm.classList.remove('hidden'); } else { bulkForm.classList.remove('hidden'); }
+                if (bulkPreview.dataset.mode === 'delete') { closeBulkModal(); } else if (bulkPreview.dataset.mode === 'move' && bulkMoveForm) { bulkMoveForm.classList.remove('hidden'); } else if (bulkPreview.dataset.mode === 'account') { bulkAccountForm.classList.remove('hidden'); } else { bulkForm.classList.remove('hidden'); }
                 return;
             }
             const apply = e.target.closest('[data-bulk-apply]');
