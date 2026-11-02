@@ -37,6 +37,7 @@ type Transaction struct {
 	Installment       *InstallmentInfo `json:"-"` // dados de exibição da parcela; não é gravado
 	EffectivePriority string           `json:"-"` // classificação efetiva (própria ou da categoria); não é gravada
 	TransferNote      string           `json:"-"` // selo de transferência (exibição); não é gravado
+	AccountName       string           `json:"-"` // nome da conta (exibição); não é gravado
 }
 
 // InstallmentInfo reúne os dados de exibição de um lançamento parcelado.
@@ -100,6 +101,9 @@ type PageData struct {
 	BookError  string      // erro exibido dentro do pop-up de livros
 	ShowBooks  bool        // abre o pop-up de livros ao carregar
 	BookColors []BookColor // paleta para os formulários do cadastro de livros
+
+	Accounts     []Account           // contas ativas do livro aberto (listas de escolha ao lançar)
+	BookAccounts map[int64][]Account // contas de cada livro, ativas e arquivadas (cadastro de livros)
 }
 
 // FilterView são os filtros da lista, prontos para o formulário e para os campos ocultos.

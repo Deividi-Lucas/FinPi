@@ -332,6 +332,22 @@ func (h *Handler) renderPage(w http.ResponseWriter, r *http.Request, o pageOpts)
 		serverError(w, "Erro ao carregar as transferências", err)
 		return
 	}
+	bookAccounts, err := db.ListAccounts()
+	if err != nil {
+		serverError(w, "Erro ao carregar as contas", err)
+		return
+	}
+	allAccounts, err := h.db.ListAccountsAll()
+	if err != nil {
+		serverError(w, "Erro ao carregar as contas", err)
+		return
+	}
+	names := accountNameMap(bookAccounts)
+	for i := range shown {
+		if shown[i].AccountID != 0 {
+			shown[i].AccountName = names[shown[i].AccountID]
+		}
+	}
 
 	var importResult *models.ImportResult
 	if v := r.URL.Query().Get("importados"); v != "" {
@@ -406,6 +422,9 @@ func (h *Handler) renderPage(w http.ResponseWriter, r *http.Request, o pageOpts)
 		BookError:  o.BookError,
 		ShowBooks:  o.ShowBooks,
 		BookColors: models.BookColors,
+
+		Accounts:     activeAccounts(bookAccounts),
+		BookAccounts: accountsByBook(allAccounts),
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -437,12 +456,23 @@ func (h *Handler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	acc, _, err := transactionAccount(r.PostForm)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	t.AccountID = acc
+
 	if err := h.resolveCategory(db, r.PostForm, &t); err != nil {
 		categoryFormError(w, err)
 		return
 	}
 
 	if err := db.CreateTransaction(&t); err != nil {
+		if msg, ok := accountError(err); ok {
+			http.Error(w, msg, http.StatusBadRequest)
+			return
+		}
 		serverError(w, "Erro ao gravar transação", err)
 		return
 	}
@@ -481,12 +511,36 @@ func (h *Handler) UpdateTransaction(w http.ResponseWriter, r *http.Request) {
 	}
 	t.ID = id
 
+	// Sem o campo conta no envio, a conta atual do lançamento é mantida (nunca zera por omissão).
+	acc, present, err := transactionAccount(r.PostForm)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if !present {
+		cur, err := db.GetTransactionsByIDs([]int64{id})
+		if err != nil {
+			serverError(w, "Erro ao carregar o lançamento", err)
+			return
+		}
+		if len(cur) == 0 {
+			http.Error(w, "Lançamento não encontrado", http.StatusNotFound)
+			return
+		}
+		acc = cur[0].AccountID
+	}
+	t.AccountID = acc
+
 	if err := h.resolveCategory(db, r.PostForm, &t); err != nil {
 		categoryFormError(w, err)
 		return
 	}
 
 	if err := db.UpdateTransaction(&t); err != nil {
+		if msg, ok := accountError(err); ok {
+			http.Error(w, msg, http.StatusBadRequest)
+			return
+		}
 		dbError(w, "Erro ao atualizar transação", err)
 		return
 	}
