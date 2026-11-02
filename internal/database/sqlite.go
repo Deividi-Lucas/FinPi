@@ -161,7 +161,10 @@ func migrate(conn *sql.DB) error {
 	if _, err := conn.Exec(`CREATE INDEX IF NOT EXISTS idx_transactions_book_date ON transactions(book_id, date)`); err != nil {
 		return err
 	}
-	return seedCategories(conn)
+	if err := seedCategories(conn); err != nil {
+		return err
+	}
+	return migrateNubankRDBInternal(conn)
 }
 
 // DefaultBookID é o livro "Pessoal", criado na migração; recebe tudo o que existia antes dos livros.
