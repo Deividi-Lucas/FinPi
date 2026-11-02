@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    {{template "headCommon"}}
+    <title>FinPi - Visão geral</title>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans antialiased selection:bg-emerald-500 selection:text-white">
+    {{template "liveUpdates"}}
+    <div class="max-w-6xl mx-auto px-4 py-8">
+
+        <header class="flex flex-col sm:flex-row items-center justify-between pb-6 border-b border-slate-800 gap-4">
+            <div class="flex items-center gap-3">
+                <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-xl">🪙</div>
+                <div>
+                    <h1 class="text-2xl font-bold tracking-tight text-white">Visão geral</h1>
+                    <p class="text-xs text-slate-400">Todos os livros, sem contar duas vezes as transferências entre eles</p>
+                </div>
+            </div>
+            <div class="flex flex-wrap items-center justify-center gap-2">
+                <a href="/" class="inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-sm font-medium px-3 py-2 rounded-xl border border-slate-700 transition">Voltar ao mês</a>
+                <a href="/relatorio" class="inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-sm font-medium px-3 py-2 rounded-xl border border-slate-700 transition">Relatório</a>
+            </div>
+        </header>
+
+        {{if .Truncated}}
+        <div class="mt-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-sm">Há mais lançamentos do que o limite lido para sugerir pares; as sugestões consideram os mais recentes.</div>
+        {{end}}
+
+        {{template "liveBanner"}}
+
+        <!-- Período -->
+        <section class="mt-6 flex flex-wrap items-center gap-3">
+            <div class="flex items-center gap-1">
+                <a href="{{.Period.MonthURL}}" class="px-3 py-2 rounded-xl border text-sm {{if .Period.Year}}bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-200{{else}}bg-emerald-600 border-emerald-500 text-white font-semibold{{end}}">Mês</a>
+                <a href="{{.Period.YearURL}}" class="px-3 py-2 rounded-xl border text-sm {{if .Period.Year}}bg-emerald-600 border-emerald-500 text-white font-semibold{{else}}bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-200{{end}}">Ano</a>
+            </div>
+            <div class="flex items-center gap-2">
+                <a href="{{.Period.PrevURL}}" class="px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm" title="Período anterior" aria-label="Período anterior">&lsaquo;</a>
+                <span class="px-4 py-2 rounded-xl bg-slate-800/80 border border-slate-700 text-sm font-semibold text-white">{{.Period.Label}}</span>
+                <a href="{{.Period.NextURL}}" class="px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm" title="Próximo período" aria-label="Próximo período">&rsaquo;</a>
+            </div>
+            <div class="flex flex-wrap items-center gap-4 sm:ml-auto text-sm">
+                {{if .Pending}}<a href="/visao-geral?{{.State}}&revisao=1&aba=sugeridos" class="text-amber-300 hover:text-amber-200">{{.Pending}} {{plural .Pending "par sugerido" "pares sugeridos"}} para confirmar</a>{{end}}
+                <a href="/visao-geral?{{.State}}&revisao=1&aba=ligados" class="text-xs text-slate-400 hover:text-slate-200">Transferências entre livros</a>
+            </div>
+        </section>
+
+        <!-- Cartões -->
+        <section class="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div class="p-5 rounded-2xl bg-slate-800/60 border border-slate-700/60">
+                <p class="text-xs uppercase tracking-wide text-slate-400">Receitas</p>
+                <p class="mt-1 text-2xl font-bold text-emerald-400">{{formatCurrency .Overview.Total.TotalIncome}}</p>
+            </div>
+            <div class="p-5 rounded-2xl bg-slate-800/60 border border-slate-700/60">
+                <p class="text-xs uppercase tracking-wide text-slate-400">Despesas</p>
+                <p class="mt-1 text-2xl font-bold text-rose-400">{{formatCurrency .Overview.Total.TotalExpense}}</p>
+            </div>
+            <div class="p-5 rounded-2xl bg-slate-800/60 border border-slate-700/60">
+                <p class="text-xs uppercase tracking-wide text-slate-400">Saldo</p>
+                <p class="mt-1 text-2xl font-bold {{if lt .Overview.Total.Balance 0}}text-rose-400{{else}}text-emerald-400{{end}}">{{formatCurrency .Overview.Total.Balance}}</p>
+            </div>
+        </section>
+
+        <!-- Por livro -->
+        <section class="mt-6 rounded-2xl bg-slate-800/60 border border-slate-700/60 overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left text-xs uppercase tracking-wide text-slate-400 border-b border-slate-700/60">
+                        <th class="px-4 py-3 font-medium">Livro</th>
+                        <th class="px-4 py-3 font-medium text-right">Receitas</th>
+                        <th class="px-4 py-3 font-medium text-right">Despesas</th>
+                        <th class="px-4 py-3 font-medium text-right">Saldo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .Overview.Rows}}
+                    <tr class="border-b border-slate-800">
+                        <td class="px-4 py-3"><span class="inline-block h-2.5 w-2.5 rounded-full mr-2" style="background-color: {{.Book.Hex}}"></span>{{.Book.Name}}</td>
+                        <td class="px-4 py-3 text-right text-emerald-400">{{formatCurrency .Summary.TotalIncome}}</td>
+                        <td class="px-4 py-3 text-right text-rose-400">{{formatCurrency .Summary.TotalExpense}}</td>
+                        <td class="px-4 py-3 text-right {{if lt .Summary.Balance 0}}text-rose-400{{else}}text-slate-200{{end}}">{{formatCurrency .Summary.Balance}}</td>
+                    </tr>
+                    {{end}}
+                    {{if or .Overview.LinkedSides .Overview.LinkedIn .Overview.LinkedOut}}
+                    <tr class="border-b border-slate-800 text-slate-300">
+                        <td class="px-4 py-3">Transferências entre livros <span class="text-xs text-slate-500">({{.Overview.LinkedSides}} {{plural .Overview.LinkedSides "lado ligado" "lados ligados"}} no período)</span></td>
+                        <td class="px-4 py-3 text-right">&minus; {{formatCurrency .Overview.LinkedIn}}</td>
+                        <td class="px-4 py-3 text-right">&minus; {{formatCurrency .Overview.LinkedOut}}</td>
+                        <td class="px-4 py-3 text-right"></td>
+                    </tr>
+                    {{end}}
+                    {{if or .Overview.SoloSides .Overview.SoloIn .Overview.SoloOut}}
+                    <tr class="border-b border-slate-800 text-slate-300">
+                        <td class="px-4 py-3">Fora do FinPi <span class="text-xs text-slate-500">({{.Overview.SoloSides}} {{plural .Overview.SoloSides "lançamento marcado" "lançamentos marcados"}} no período)</span></td>
+                        <td class="px-4 py-3 text-right">&minus; {{formatCurrency .Overview.SoloIn}}</td>
+                        <td class="px-4 py-3 text-right">&minus; {{formatCurrency .Overview.SoloOut}}</td>
+                        <td class="px-4 py-3 text-right"></td>
+                    </tr>
+                    {{end}}
+                    <tr class="font-bold text-white">
+                        <td class="px-4 py-3">Total</td>
+                        <td class="px-4 py-3 text-right">{{formatCurrency .Overview.Total.TotalIncome}}</td>
+                        <td class="px-4 py-3 text-right">{{formatCurrency .Overview.Total.TotalExpense}}</td>
+                        <td class="px-4 py-3 text-right">{{formatCurrency .Overview.Total.Balance}}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        {{if or .Overview.InternalIn .Overview.InternalOut}}
+        <p class="mt-4 text-xs text-slate-400">Movimentações internas (fora dos totais): entradas {{formatCurrency .Overview.InternalIn}} &middot; saídas {{formatCurrency .Overview.InternalOut}}</p>
+        {{end}}
+
+        <footer class="mt-12 pt-6 border-t border-slate-800 text-center text-xs text-slate-500">
+            <p>🪙 FinPi &bull; Binário único em Go &bull; Armazenamento SQLite WAL &bull; Otimizado para Raspberry Pi 3</p>
+            <p class="mt-1 text-slate-600">Versão {{.Version}}</p>
+        </footer>
+    </div>
+
+    {{define "overviewPeriodFields"}}{{if .Year}}<input type="hidden" name="ano" value="{{.YearNum}}">{{else}}<input type="hidden" name="month" value="{{.Month}}">{{end}}{{end}}
+    {{define "overviewTxSide"}}
+                            <div class="flex items-center gap-2 text-xs text-slate-400">
+                                <span class="inline-block h-2.5 w-2.5 rounded-full" style="background-color: {{.Book.Hex}}"></span>
+                                <span>{{.Book.Name}}</span>
+                                <span>&middot;</span>
+                                <span>{{formatDate .Date}}</span>
+                            </div>
+                            <p class="mt-1 text-sm text-slate-100 break-words">{{.Description}}</p>
+                            <p class="mt-1 text-sm font-semibold {{if eq .Type "income"}}text-emerald-400{{else}}text-rose-400{{end}}">{{formatCurrency .AmountCents}}</p>
+    {{end}}
+
+    <!-- Pop-up: revisão das transferências entre livros -->
+    <div id="review-modal" class="fixed inset-0 z-50 {{if .Review.Open}}flex{{else}}hidden{{end}} items-center justify-center bg-black/60 backdrop-blur-sm p-4" onclick="closeReviewModal()">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl p-6 relative" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
+                <h3 class="text-lg font-semibold text-white">Transferências entre livros</h3>
+                <button type="button" onclick="closeReviewModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer" title="Fechar" aria-label="Fechar">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            {{if .Error}}
+            <div class="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm">{{.Error}}</div>
+            {{end}}
+
+            <!-- Abas -->
+            <nav class="flex flex-wrap gap-1 mb-5 text-sm">
+                <a href="/visao-geral?{{.State}}&amp;revisao=1&amp;aba=sugeridos" class="px-3 py-1.5 rounded-lg border {{if eq .Review.Tab "sugeridos"}}bg-emerald-600 border-emerald-500 text-white font-semibold{{else}}bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-300{{end}}">Sugeridos ({{len .Review.Suggestions}})</a>
+                <a href="/visao-geral?{{.State}}&amp;revisao=1&amp;aba=ligados" class="px-3 py-1.5 rounded-lg border {{if eq .Review.Tab "ligados"}}bg-emerald-600 border-emerald-500 text-white font-semibold{{else}}bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-300{{end}}">Ligados ({{len .Review.Linked}})</a>
+                <a href="/visao-geral?{{.State}}&amp;revisao=1&amp;aba=fora" class="px-3 py-1.5 rounded-lg border {{if eq .Review.Tab "fora"}}bg-emerald-600 border-emerald-500 text-white font-semibold{{else}}bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-300{{end}}">Fora do FinPi ({{len .Review.Solo}})</a>
+                <a href="/visao-geral?{{.State}}&amp;revisao=1&amp;aba=manual" class="px-3 py-1.5 rounded-lg border {{if eq .Review.Tab "manual"}}bg-emerald-600 border-emerald-500 text-white font-semibold{{else}}bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-300{{end}}">Ligar à mão</a>
+            </nav>
+
+            {{if eq .Review.Tab "sugeridos"}}
+            <p class="mb-4 text-xs text-slate-400">Saídas e entradas de livros diferentes, de mesmo valor e com até 3 dias de diferença. Ligue as que forem a mesma transferência para não contar duas vezes.</p>
+            {{if not .Review.Suggestions}}
+            <p class="text-sm text-slate-400">Nenhum par sugerido.</p>
+            {{end}}
+            <ul class="space-y-3">
+                {{range $p := .Review.Suggestions}}
+                <li class="review-pair rounded-xl border border-slate-700/60 bg-slate-800/40 p-4" data-pair="{{$p.Out.ID}}-{{$p.In.ID}}">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <p class="text-xs uppercase tracking-wide text-rose-300 mb-1">Saída</p>
+                            {{template "overviewTxSide" $p.Out}}
+                        </div>
+                        <div>
+                            <p class="text-xs uppercase tracking-wide text-emerald-300 mb-1">Entrada</p>
+                            {{template "overviewTxSide" $p.In}}
+                        </div>
+                    </div>
+                    {{if gt $p.DaysApart 0}}<p class="mt-2 text-xs text-amber-300">{{$p.DaysApart}} {{plural $p.DaysApart "dia" "dias"}} de diferença</p>{{end}}
+                    <div class="mt-3 flex flex-wrap items-center gap-2">
+                        <form method="POST" action="/transferencias/ligar" class="inline">
+                            <input type="hidden" name="saida" value="{{$p.Out.ID}}">
+                            <input type="hidden" name="entrada" value="{{$p.In.ID}}">
+                            <input type="hidden" name="aba" value="sugeridos">
+                            {{template "overviewPeriodFields" $.Period}}
+                            <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition cursor-pointer">Ligar</button>
+                        </form>
+                        <button type="button" onclick="discardPair(this)" class="px-3 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-slate-800 border border-slate-700 transition cursor-pointer">Descartar</button>
+                    </div>
+                    {{if or $p.AltOut $p.AltIn}}
+                    <details class="mt-3">
+                        <summary class="text-xs text-slate-400 hover:text-slate-200 cursor-pointer">Outras opções</summary>
+                        <ul class="mt-2 space-y-2">
+                            {{range $p.AltIn}}
+                            <li class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800 p-2">
+                                <div class="min-w-0"><p class="text-xs text-emerald-300">Outra entrada</p>{{template "overviewTxSide" .}}</div>
+                                <form method="POST" action="/transferencias/ligar" class="inline">
+                                    <input type="hidden" name="saida" value="{{$p.Out.ID}}">
+                                    <input type="hidden" name="entrada" value="{{.ID}}">
+                                    <input type="hidden" name="aba" value="sugeridos">
+                                    {{template "overviewPeriodFields" $.Period}}
+                                    <button type="submit" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition cursor-pointer">Ligar com esta</button>
+                                </form>
+                            </li>
+                            {{end}}
+                            {{range $p.AltOut}}
+                            <li class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800 p-2">
+                                <div class="min-w-0"><p class="text-xs text-rose-300">Outra saída</p>{{template "overviewTxSide" .}}</div>
+                                <form method="POST" action="/transferencias/ligar" class="inline">
+                                    <input type="hidden" name="saida" value="{{.ID}}">
+                                    <input type="hidden" name="entrada" value="{{$p.In.ID}}">
+                                    <input type="hidden" name="aba" value="sugeridos">
+                                    {{template "overviewPeriodFields" $.Period}}
+                                    <button type="submit" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition cursor-pointer">Ligar com esta</button>
+                                </form>
+                            </li>
+                            {{end}}
+                        </ul>
+                    </details>
+                    {{end}}
+                </li>
+                {{end}}
+            </ul>
+            <p id="review-discarded-note" class="hidden mt-3 text-xs text-slate-500">Há pares descartados nesta sessão do navegador. <button type="button" onclick="restoreDiscarded()" class="underline hover:text-slate-300 cursor-pointer">Mostrar de novo</button></p>
+            {{end}}
+
+            {{if eq .Review.Tab "ligados"}}
+            <p class="mb-4 text-xs text-slate-400">Pares ligados: não entram nos totais da visão geral.</p>
+            {{if not .Review.Linked}}
+            <p class="text-sm text-slate-400">Nenhuma transferência ligada.</p>
+            {{end}}
+            <ul class="space-y-3">
+                {{range .Review.Linked}}
+                <li class="rounded-xl border border-slate-700/60 bg-slate-800/40 p-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <p class="text-xs uppercase tracking-wide text-rose-300 mb-1">Saída</p>
+                            {{template "overviewTxSide" .Out}}
+                        </div>
+                        <div>
+                            <p class="text-xs uppercase tracking-wide text-emerald-300 mb-1">Entrada</p>
+                            {{template "overviewTxSide" .In}}
+                        </div>
+                    </div>
+                    <form method="POST" action="/transferencias/desligar" class="mt-3" onsubmit="return confirm('Desfazer esta ligação? Os dois lançamentos voltam a contar nos totais.');">
+                        <input type="hidden" name="id" value="{{.ID}}">
+                        <input type="hidden" name="aba" value="ligados">
+                        {{template "overviewPeriodFields" $.Period}}
+                        <button type="submit" class="px-3 py-1.5 rounded-lg text-xs text-rose-300 hover:bg-rose-500/10 border border-rose-500/30 transition cursor-pointer">Desfazer ligação</button>
+                    </form>
+                </li>
+                {{end}}
+            </ul>
+            {{end}}
+
+            {{if eq .Review.Tab "fora"}}
+            <p class="mb-4 text-xs text-slate-400">Lançamentos cujo outro lado está fora do FinPi (ex.: uma conta que você não controla aqui). Não entram nos totais.</p>
+            {{if not .Review.Solo}}
+            <p class="text-sm text-slate-400">Nenhum lançamento marcado.</p>
+            {{end}}
+            <ul class="divide-y divide-slate-800/60">
+                {{range .Review.Solo}}
+                <li class="py-3 flex flex-wrap items-center justify-between gap-3">
+                    <div class="min-w-0">{{template "overviewTxSide" .}}</div>
+                    <form method="POST" action="/transferencias/voltar" class="inline">
+                        <input type="hidden" name="ids" value="{{.ID}}">
+                        <input type="hidden" name="aba" value="fora">
+                        {{template "overviewPeriodFields" $.Period}}
+                        <button type="submit" class="px-3 py-1.5 rounded-lg text-xs text-slate-200 hover:bg-slate-800 border border-slate-700 transition cursor-pointer">Voltar a contar</button>
+                    </form>
+                </li>
+                {{end}}
+            </ul>
+            {{end}}
+
+            {{if eq .Review.Tab "manual"}}
+            <p class="mb-4 text-xs text-slate-400">Marque uma saída e uma entrada de livros diferentes e mesmo valor para ligar, ou marque lançamentos cujo outro lado está fora do FinPi.</p>
+            <form method="GET" action="/visao-geral" class="mb-4 flex flex-wrap items-end gap-2">
+                <input type="hidden" name="revisao" value="1">
+                <input type="hidden" name="aba" value="manual">
+                {{template "overviewPeriodFields" .Period}}
+                <label class="flex flex-col text-xs text-slate-400">Descrição
+                    <input type="text" name="q" value="{{.Review.Q}}" maxlength="100" placeholder="ex.: pix" class="mt-1 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500">
+                </label>
+                <label class="flex flex-col text-xs text-slate-400">Valor
+                    <input type="text" name="valor" value="{{.Review.Valor}}" maxlength="20" inputmode="decimal" placeholder="ex.: 45,00" class="mt-1 w-28 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500">
+                </label>
+                <label class="flex flex-col text-xs text-slate-400">Mês
+                    <input type="month" name="mes" value="{{.Review.Mes}}" class="mt-1 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-emerald-500">
+                </label>
+                <button type="submit" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-medium px-3 py-2 rounded-lg transition cursor-pointer">Filtrar</button>
+                {{if or .Review.Q .Review.Valor .Review.Mes}}<a href="/visao-geral?{{.State}}&amp;revisao=1&amp;aba=manual" class="text-xs text-slate-400 hover:text-slate-200 px-2 py-2">Limpar</a>{{end}}
+            </form>
+
+            {{if not .Review.Manual}}
+            <p class="text-sm text-slate-400">Nenhum lançamento livre encontrado.</p>
+            {{else}}
+            <div class="overflow-x-auto rounded-xl border border-slate-700/60">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-xs uppercase tracking-wide text-slate-400 border-b border-slate-700/60">
+                            <th class="px-3 py-2 w-8"><span class="sr-only">Selecionar</span></th>
+                            <th class="px-3 py-2 font-medium">Livro</th>
+                            <th class="px-3 py-2 font-medium">Data</th>
+                            <th class="px-3 py-2 font-medium">Descrição</th>
+                            <th class="px-3 py-2 font-medium text-right">Valor</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .Review.Manual}}
+                        <tr class="border-b border-slate-800">
+                            <td class="px-3 py-2"><input type="checkbox" class="manual-check cursor-pointer" aria-label="Selecionar {{.Description}}" data-manual-id="{{.ID}}" data-type="{{.Type}}" data-book="{{.BookID}}" data-cents="{{.AmountCents}}" onchange="updateManualBar()"></td>
+                            <td class="px-3 py-2 whitespace-nowrap"><span class="inline-block h-2.5 w-2.5 rounded-full mr-2" style="background-color: {{.Book.Hex}}"></span>{{.Book.Name}}</td>
+                            <td class="px-3 py-2 whitespace-nowrap">{{formatDate .Date}}</td>
+                            <td class="px-3 py-2 break-words">{{.Description}}</td>
+                            <td class="px-3 py-2 text-right whitespace-nowrap {{if eq .Type "income"}}text-emerald-400{{else}}text-rose-400{{end}}">{{if eq .Type "income"}}+{{else}}&minus;{{end}} {{formatCurrency .AmountCents}}</td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+            <p class="mt-2 text-xs text-slate-500">Mostrando até 50 lançamentos livres, dos mais recentes para os mais antigos. Use os filtros para achar outros.</p>
+
+            <div class="mt-4 flex flex-wrap items-center gap-2">
+                <span id="manual-count" class="text-xs text-slate-400 mr-auto">Nenhum marcado</span>
+                <form id="manual-link-form" method="POST" action="/transferencias/ligar" class="inline">
+                    <input type="hidden" name="saida" value="">
+                    <input type="hidden" name="entrada" value="">
+                    <input type="hidden" name="aba" value="manual">
+                    {{template "overviewPeriodFields" .Period}}
+                    <button type="submit" id="manual-link-btn" disabled title="Marque uma saída e uma entrada de livros diferentes e mesmo valor" class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-medium px-3 py-1.5 rounded-lg transition cursor-pointer">Ligar</button>
+                </form>
+                <form id="manual-solo-form" method="POST" action="/transferencias/fora" class="inline">
+                    <span id="manual-solo-ids"></span>
+                    <input type="hidden" name="aba" value="manual">
+                    {{template "overviewPeriodFields" .Period}}
+                    <button type="submit" id="manual-solo-btn" disabled class="px-3 py-1.5 rounded-lg text-xs text-slate-200 hover:bg-slate-800 border border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer">Outro lado fora do FinPi</button>
+                </form>
+            </div>
+            {{end}}
+            {{end}}
+        </div>
+    </div>
+
+    <script>
+        function closeReviewModal() {
+            const modal = document.getElementById('review-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            // Tira a revisão da URL para que um recarregamento não reabra o pop-up.
+            const url = new URL(location.href);
+            ['revisao', 'aba', 'q', 'valor', 'mes'].forEach(function (k) { url.searchParams.delete(k); });
+            history.replaceState(null, '', url);
+        }
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                const modal = document.getElementById('review-modal');
+                if (modal && !modal.classList.contains('hidden')) closeReviewModal();
+            }
+        });
+
+        // "Descartar" só esconde o par neste navegador (sessionStorage); nada é gravado no servidor.
+        const DISCARD_KEY = 'finpi:discarded-pairs';
+        function readDiscarded() {
+            try {
+                const list = JSON.parse(sessionStorage.getItem(DISCARD_KEY) || '[]');
+                return Array.isArray(list) ? list : [];
+            } catch (e) { return []; }
+        }
+        function writeDiscarded(list) {
+            try { sessionStorage.setItem(DISCARD_KEY, JSON.stringify(list)); } catch (e) {}
+        }
+        function applyDiscarded() {
+            const list = readDiscarded();
+            let hidden = 0;
+            document.querySelectorAll('.review-pair').forEach(function (card) {
+                const gone = list.indexOf(card.dataset.pair) !== -1;
+                card.classList.toggle('hidden', gone);
+                if (gone) hidden++;
+            });
+            const note = document.getElementById('review-discarded-note');
+            if (note) note.classList.toggle('hidden', hidden === 0);
+        }
+        function discardPair(btn) {
+            const card = btn.closest('.review-pair');
+            if (!card) return;
+            const list = readDiscarded();
+            if (list.indexOf(card.dataset.pair) === -1) list.push(card.dataset.pair);
+            writeDiscarded(list);
+            applyDiscarded();
+        }
+        function restoreDiscarded() {
+            writeDiscarded([]);
+            applyDiscarded();
+        }
+        applyDiscarded();
+
+        // Aba "Ligar à mão": habilita os botões conforme o que está marcado.
+        function updateManualBar() {
+            const checked = Array.from(document.querySelectorAll('.manual-check:checked'));
+            const count = document.getElementById('manual-count');
+            if (!count) return;
+            count.textContent = checked.length === 0 ? 'Nenhum marcado' : (checked.length === 1 ? '1 marcado' : checked.length + ' marcados');
+
+            const linkForm = document.getElementById('manual-link-form');
+            const linkBtn = document.getElementById('manual-link-btn');
+            let canLink = false;
+            if (checked.length === 2) {
+                const out = checked.find(function (c) { return c.dataset.type === 'expense'; });
+                const inc = checked.find(function (c) { return c.dataset.type === 'income'; });
+                if (out && inc && out.dataset.book !== inc.dataset.book && out.dataset.cents === inc.dataset.cents) {
+                    canLink = true;
+                    linkForm.elements['saida'].value = out.dataset.manualId;
+                    linkForm.elements['entrada'].value = inc.dataset.manualId;
+                }
+            }
+            if (!canLink) {
+                linkForm.elements['saida'].value = '';
+                linkForm.elements['entrada'].value = '';
+            }
+            linkBtn.disabled = !canLink;
+
+            const holder = document.getElementById('manual-solo-ids');
+            holder.innerHTML = '';
+            checked.forEach(function (c) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'ids';
+                input.value = c.dataset.manualId;
+                holder.appendChild(input);
+            });
+            document.getElementById('manual-solo-btn').disabled = checked.length === 0;
+        }
+        updateManualBar();
+
+        // Tempo real: com o pop-up de revisão aberto, mostra o aviso em vez de recarregar.
+        startLiveUpdates(function () {
+            const m = document.getElementById('review-modal');
+            return !!(m && !m.classList.contains('hidden'));
+        });
+    </script>
+</body>
+</html>

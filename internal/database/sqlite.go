@@ -139,6 +139,11 @@ func migrate(conn *sql.DB) error {
 	if _, err := conn.Exec(createBooksSQL); err != nil {
 		return fmt.Errorf("erro ao criar a tabela de livros: %w", err)
 	}
+	for _, stmt := range []string{createTransferLinksSQL, createTransferSoloSQL} {
+		if _, err := conn.Exec(stmt); err != nil {
+			return fmt.Errorf("erro ao criar as tabelas de transferências: %w", err)
+		}
+	}
 	if _, err := conn.Exec(`INSERT OR IGNORE INTO books (id, name, name_key, color) VALUES (1, 'Pessoal', 'pessoal', 'emerald')`); err != nil {
 		return fmt.Errorf("erro ao criar o livro Pessoal: %w", err)
 	}
@@ -161,6 +166,20 @@ func migrate(conn *sql.DB) error {
 
 // DefaultBookID é o livro "Pessoal", criado na migração; recebe tudo o que existia antes dos livros.
 const DefaultBookID = 1
+
+const createTransferLinksSQL = `
+	CREATE TABLE IF NOT EXISTS transfer_links (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		out_tx_id INTEGER NOT NULL UNIQUE,
+		in_tx_id INTEGER NOT NULL UNIQUE,
+		created_at TEXT NOT NULL
+	)`
+
+const createTransferSoloSQL = `
+	CREATE TABLE IF NOT EXISTS transfer_solo (
+		tx_id INTEGER PRIMARY KEY,
+		created_at TEXT NOT NULL
+	)`
 
 const createBooksSQL = `
 	CREATE TABLE IF NOT EXISTS books (
@@ -414,11 +433,22 @@ func (d *DB) UpdateTransaction(t *models.Transaction) error {
 
 // DeleteTransaction exclui um lançamento pelo ID.
 func (d *DB) DeleteTransaction(id int64) error {
-	res, err := d.conn.Exec(`DELETE FROM transactions WHERE id = ? AND book_id = ?`, id, d.book)
+	tx, err := d.conn.Begin()
 	if err != nil {
 		return err
 	}
-	return requireAffected(res)
+	defer tx.Rollback()
+	res, err := tx.Exec(`DELETE FROM transactions WHERE id = ? AND book_id = ?`, id, d.book)
+	if err != nil {
+		return err
+	}
+	if err := requireAffected(res); err != nil {
+		return err
+	}
+	if err := deleteTransferRefs(tx, id); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func requireAffected(res sql.Result) error {

@@ -41,11 +41,14 @@ finpi/
 │   │   ├── categories.go       # Categorias (por livro): criar, renomear, ocultar e excluir
 │   │   ├── books.go            # API de livros: criar, copiar categorias, editar e arquivar
 │   │   ├── move.go             # Mover lançamentos entre livros (prévia, categoria no destino, desfazer)
+│   │   ├── transfer.go         # Ligações de transferência entre livros e lançamentos "fora do FinPi"
 │   │   └── sqlite_test.go      # Testes do banco (centavos, migração, exclusão)
 │   ├── handlers/
 │   │   ├── handlers.go         # Rotas HTTP e formatação BRL
 │   │   ├── categories.go       # Rotas do menu de categorias
 │   │   ├── books.go            # Rotas dos livros (/livros, /livros/editar, /livros/arquivar)
+│   │   ├── overview.go         # Visão geral (/visao-geral): totais entre livros sem as transferências ligadas
+│   │   ├── transfers.go        # Revisão das transferências (/transferencias/ligar, desligar, fora, voltar)
 │   │   ├── book_scope.go       # Resolve o livro do pedido (?livro=) e escopa os handlers
 │   │   ├── events.go           # Endpoint /events (SSE) para atualização em tempo real
 │   │   ├── broker.go           # Distribui avisos de mudança às telas conectadas
@@ -74,12 +77,16 @@ finpi/
 │   │   ├── flow.go             # Fatias do fluxo de caixa (dia, semana, mês) e saldo acumulado
 │   │   ├── recurring.go        # Gastos recorrentes por categoria e por descrição
 │   │   └── chart.go            # Geometria do gráfico (SVG gerado no servidor)
+│   ├── transfer/
+│   │   ├── suggest.go          # Regra pura: valida pares e sugere transferências entre livros
+│   │   └── overview.go         # Regra pura: monta os totais da Visão geral entre livros
 │   ├── textutil/
 │   │   └── fold.go             # Normalização de texto (sem acentos nem maiúsculas)
 │   └── models/
 │       └── models.go           # Modelos de dados e structs de tela
 ├── templates/
-│   └── index.html              # Interface web moderna com Tailwind CSS (embutida)
+│   ├── index.html              # Interface web moderna com Tailwind CSS (embutida)
+│   └── overview.html           # Página Visão geral e pop-up de revisão das transferências
 ├── build-arm64.ps1             # Script para compilação cruzada no Windows
 ├── deploy.ps1                  # Deploy em 1 clique para o Raspberry Pi
 ├── finpi.service               # Unidade systemd para produção contínua
@@ -208,6 +215,31 @@ entram (as parcelas previstas ficam de fora).
   identificador de origem é **global**: o mesmo extrato não entra duas vezes, nem em outro livro.
 - **Migração:** os dados existentes viram o livro **Pessoal** automaticamente na primeira abertura; a tabela de categorias é
   reconstruída numa transação, e o atualizador faz **backup do banco** antes de trocar o binário.
+
+---
+
+## 🔁 Visão geral e transferências entre livros
+
+**O problema:** um Pix do Pessoal para a PJ aparece como **despesa** num livro e como **receita** no outro. Somando os
+livros, o mesmo dinheiro conta duas vezes.
+
+- **Visão geral** (`/visao-geral`): botão na tela principal e na tela do Relatório. Escolha um **mês** ou um **ano** (setas ‹ ›).
+  Os totais somam todos os livros ativos **sem os pares ligados** e sem a **Movimentação interna**. A tabela por livro
+  tem as linhas **Transferências entre livros** e **Fora do FinPi**, e a linha **Total** bate com os cartões da própria Visão geral (cada livro mantém os seus cartões).
+- **Revisão:** o pop-up tem abas. **Sugeridos** são pares de valor igual, com até 3 dias de diferença e em livros
+  diferentes; nada é ligado sem a sua confirmação (**Ligar**, ou **Descartar** para esconder a sugestão neste
+  navegador). **Ligados** lista os pares e permite **Desfazer** (`/transferencias/ligar`, `/transferencias/desligar`).
+  **Fora do FinPi** guarda lançamentos cujo outro lado está numa conta que não está no FinPi
+  (`/transferencias/fora`) e permite **Voltar a contar** (`/transferencias/voltar`). **Ligar à mão** liga dois
+  lançamentos marcados que as sugestões não pegaram.
+- **Quando a ligação some:** excluir um dos lançamentos apaga a ligação; editar o valor ou o tipo, ou mover um
+  lançamento para o mesmo livro do par, a invalida e o par volta como pendência.
+- **Cada livro continua somando a transferência normalmente:** cartões, dashboard e relatório do livro não mudam; só a
+  Visão geral desconta os pares ligados.
+- **Livro arquivado:** as ligações dele ficam fora da Visão geral e o lado ativo volta a contar normalmente.
+- **Selos nas listas:** o histórico mostra **↔ livro do outro lado** nos lançamentos ligados e **fora do FinPi** nos
+  marcados.
+- **Limitação:** só liga lançamentos com **valor igual**.
 
 ---
 

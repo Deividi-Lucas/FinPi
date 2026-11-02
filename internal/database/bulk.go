@@ -262,6 +262,9 @@ func (d *DB) ApplyDeletes(summary string, ids []int64) (applied, skipped int, er
 		if _, err := tx.Exec(`DELETE FROM transactions WHERE id = ?`, id); err != nil {
 			return 0, 0, err
 		}
+		if err := deleteTransferRefs(tx, id); err != nil {
+			return 0, 0, err
+		}
 		items = append(items, batchItem{before: before})
 	}
 	if len(items) == 0 {

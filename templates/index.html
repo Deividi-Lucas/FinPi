@@ -33,6 +33,9 @@
             <a href="/relatorio?livro={{.BookID}}" class="inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-sm font-medium px-3 py-2 rounded-xl border border-slate-700 transition">
                 Relatório
             </a>
+            <a href="/visao-geral" class="inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-sm font-medium px-3 py-2 rounded-xl border border-slate-700 transition">
+                Visão geral
+            </a>
             <button
                 type="button"
                 onclick="openCategoriesModal()"
@@ -321,6 +324,7 @@
                                 <span class="block text-xs font-normal text-slate-500 mt-0.5">restam {{.Remaining}} {{if eq .Remaining 1}}parcela{{else}}parcelas{{end}} &bull; {{formatCurrency .RemainingCents}}</span>
                                 {{end}}
                                 {{end}}
+                                {{with .TransferNote}}<span class="ml-2 px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-slate-700/60 text-slate-300 border border-slate-600">{{.}}</span>{{end}}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <span class="px-2.5 py-1 rounded-md text-xs bg-slate-800 text-slate-300 border border-slate-700">

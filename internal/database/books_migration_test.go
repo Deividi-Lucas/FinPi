@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"path/filepath"
 	"testing"
+
+	"finpi/internal/models"
 )
 
 // writeOldDB cria um banco no formato anterior aos livros (categorias com name_key UNIQUE).
@@ -102,5 +104,43 @@ func TestMigrate_IsIdempotent(t *testing.T) {
 			t.Errorf("rodada %d: %d categorias, quer 2", i, n)
 		}
 		db.Close()
+	}
+}
+
+func TestMigrate_TransferTablesAreIdempotentAndKeepLinks(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "old.db")
+	writeOldDB(t, path)
+
+	db, err := InitDB(path)
+	if err != nil {
+		t.Fatalf("InitDB: %v", err)
+	}
+	b, err := db.CreateBook("PJ", "sky", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pj := db.ForBook(b.ID)
+	out := mustCreate(t, db, models.Transaction{Description: "Pix para PJ", AmountCents: 5000, Type: "expense", Category: "Outros", Date: "2026-10-05"})
+	in := mustCreate(t, pj, models.Transaction{Description: "Pix do Pessoal", AmountCents: 5000, Type: "income", Category: "Outros", Date: "2026-10-05"})
+	if err := db.LinkTransfer(out.ID, in.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	db, err = InitDB(path)
+	if err != nil {
+		t.Fatalf("segundo InitDB: %v", err)
+	}
+	defer db.Close()
+	for _, tbl := range []string{"transfer_links", "transfer_solo"} {
+		if n := count(t, db, `SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = ?`, tbl); n != 1 {
+			t.Errorf("tabela %s ausente", tbl)
+		}
+	}
+	links, err := db.ListTransferLinks()
+	if err != nil || len(links) != 1 || !links[0].Valid || links[0].Out.ID != out.ID || links[0].In.ID != in.ID {
+		t.Fatalf("a ligação deveria sobreviver à segunda abertura: %+v, %v", links, err)
 	}
 }
