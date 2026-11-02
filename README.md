@@ -137,6 +137,10 @@ maiúsculas e acentos ("saude" e "Saúde" são a mesma categoria).
 
 ## 📊 Dashboard do mês
 
+O mês da tela principal muda pelas setas **‹ ›** ao lado do campo de mês (mês anterior e próximo, virando o ano em
+dezembro/janeiro) ou escolhendo um mês no próprio campo. As setas mantêm o livro, as previstas e os filtros, e ficam
+escondidas com **Todos os meses** ligado.
+
 Abaixo dos cartões de resumo, a seção **Dashboard do mês** mostra a quantidade de transações, o **maior** e o
 **menor** gasto e a divisão das despesas em **Essencial** (não se vive sem), **Supérfluo** (se vive sem) e **Sem
 classificação**. Segue o mês selecionado; parcelas previstas não entram na conta.
