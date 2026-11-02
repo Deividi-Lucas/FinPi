@@ -29,7 +29,7 @@ type reportQuery struct {
 	Custom    bool
 	Group     string // "dia", "semana", "mes" ou "" (automático)
 	Projected bool
-	Filter    filter.Filter // texto, categorias, tipo e valor (todos os números do relatório respeitam o filtro)
+	Filter    filter.Filter // texto, categorias, contas, tipo e valor (todos os números do relatório respeitam o filtro)
 	Book      int64         // livro (só quando veio explícito na URL)
 	AllBooks  bool          // "Todos os livros" (livro=todos)
 }
@@ -256,6 +256,25 @@ func (h *Handler) Report(w http.ResponseWriter, r *http.Request) {
 			candidates = [][]models.Transaction{cands}
 		}
 	}
+	// Menu Conta: as contas do livro ou, em Todos os livros, as de todos os livros ativos com o nome do livro.
+	allAccounts, err := h.db.ListAccountsAll()
+	if err != nil {
+		serverError(w, "Erro ao carregar as contas", err)
+		return
+	}
+	usedAccounts, err := h.db.UsedAccountIDs()
+	if err != nil {
+		serverError(w, "Erro ao carregar as contas", err)
+		return
+	}
+	var accounts []models.AccountOption
+	if q.AllBooks {
+		list, names := allBooksAccounts(allAccounts, activeBooks(books))
+		accounts = accountOptions(q.Filter, list, usedAccounts, names)
+	} else {
+		accounts = accountOptions(q.Filter, accountsByBook(allAccounts)[book.ID], usedAccounts, nil)
+	}
+
 	txs = filterTransactions(q.Filter, txs)
 	var internalIn, internalOut int64
 	txs, internalIn, internalOut = dashboard.SplitInternal(txs) // movimentação interna fica fora do fluxo
@@ -286,7 +305,7 @@ func (h *Handler) Report(w http.ResponseWriter, r *http.Request) {
 		Income:     report.Incomes(txs, len(months)),
 		ChartLabel: "Entradas, saídas e saldo acumulado por " + map[report.Granularity]string{report.Day: "dia", report.Week: "semana", report.Month: "mês"}[granularity],
 
-		Filter:        filterView(q.Filter, nil, categories),
+		Filter:        filterView(q.Filter, nil, categories, accounts),
 		AllCategories: categories,
 		ClearURL:      q.URL(func(x *reportQuery) { x.Filter = filter.Filter{} }),
 
@@ -327,7 +346,7 @@ func filterTransactions(f filter.Filter, list []models.Transaction) []models.Tra
 	}
 	var out []models.Transaction
 	for _, t := range list {
-		if f.Match(t.Category, t.Description, t.Type, t.AmountCents) {
+		if matchTx(f, t) {
 			out = append(out, t)
 		}
 	}

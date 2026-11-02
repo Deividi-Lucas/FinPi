@@ -266,7 +266,7 @@ func (h *Handler) BulkPreview(w http.ResponseWriter, r *http.Request) {
 
 	view := bulkView{
 		Action: req.Action, Missing: len(req.IDs) - len(list), SelectedMonth: bulkMonth(r),
-		IncludeProjected: wantsProjected(r), Filter: filterView(formFilters(r), nil, nil), BookID: book.ID,
+		IncludeProjected: wantsProjected(r), Filter: filterView(formFilters(r), nil, nil, nil), BookID: book.ID,
 	}
 	for _, name := range bulkParamNames {
 		if v := r.PostForm.Get(name); v != "" {

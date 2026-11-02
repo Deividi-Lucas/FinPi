@@ -135,6 +135,30 @@ func TestListAccountsAll(t *testing.T) {
 	}
 }
 
+func TestUsedAccountIDs(t *testing.T) {
+	db := openTestDB(t)
+	other, _ := db.CreateBook("PJ", "sky", 0)
+	a, _ := db.CreateAccount("A", "")
+	db.CreateAccount("Sem uso", "")
+	b, _ := db.ForBook(other.ID).CreateAccount("B", "")
+	for _, tx := range []models.Transaction{
+		{Description: "x", AmountCents: 1, Type: "expense", Category: "Outros", Date: "2026-10-01", AccountID: a.ID},
+		{Description: "y", AmountCents: 1, Type: "expense", Category: "Outros", Date: "2026-10-01"},
+	} {
+		if err := db.CreateTransaction(&tx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	tx := models.Transaction{Description: "z", AmountCents: 1, Type: "expense", Category: "Outros", Date: "2026-10-01", AccountID: b.ID}
+	if err := db.ForBook(other.ID).CreateTransaction(&tx); err != nil {
+		t.Fatal(err)
+	}
+	used, err := db.UsedAccountIDs()
+	if err != nil || len(used) != 2 || !used[a.ID] || !used[b.ID] {
+		t.Fatalf("em uso = %v %v; quer as contas A e B (de todos os livros, sem o 0)", used, err)
+	}
+}
+
 func TestBankHelpers(t *testing.T) {
 	cases := map[string]string{
 		"mp:1": models.BankMercadoPago, "nu:1": models.BankNubank, "sic:1": models.BankSicredi,

@@ -117,6 +117,18 @@ type FilterView struct {
 	Warning    string          // avisos de valores inválidos
 	Categories []string        // categorias marcadas, como vieram
 	Selected   map[string]bool // categoria (nome exibido) → marcada
+
+	Accounts        []int64         // contas marcadas (0 = "Sem conta"), para os campos ocultos
+	AccountSelected map[int64]bool  // conta → marcada (inclui o 0)
+	AccountOptions  []AccountOption // opções do menu Conta (sem o "Sem conta", que é fixo)
+}
+
+// AccountOption é uma conta no menu Conta da barra de filtros.
+type AccountOption struct {
+	ID       int64
+	Name     string
+	BookName string // nome do livro ao lado (só em Todos os livros)
+	Archived bool
 }
 
 // ImportResult é o resultado de uma importação, exibido num aviso após o redirecionamento.
@@ -155,6 +167,7 @@ type ProjectedInstallment struct {
 	Total       int
 	Date        string // AAAA-MM-DD
 	AmountCents int64
+	AccountID   int64 // conta da parcela mais recente da série (0 = sem conta; usada pelos filtros)
 }
 
 // Category é uma categoria de lançamentos.

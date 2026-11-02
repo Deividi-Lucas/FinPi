@@ -82,6 +82,24 @@ func (d *DB) ListAccountsAll() ([]models.Account, error) {
 	return queryAccounts(d.conn, `SELECT `+accountColumns+` FROM accounts ORDER BY book_id, archived, id`)
 }
 
+// UsedAccountIDs devolve as contas (de todos os livros) que têm ao menos um lançamento.
+func (d *DB) UsedAccountIDs() (map[int64]bool, error) {
+	rows, err := d.conn.Query(`SELECT DISTINCT account_id FROM transactions WHERE account_id <> 0`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	used := map[int64]bool{}
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		used[id] = true
+	}
+	return used, rows.Err()
+}
+
 // GetAccount devolve uma conta do livro, ou ErrAccountNotFound.
 func (d *DB) GetAccount(id int64) (models.Account, error) {
 	a, err := scanAccount(d.conn.QueryRow(`SELECT `+accountColumns+` FROM accounts WHERE id = ? AND book_id = ?`, id, d.book))

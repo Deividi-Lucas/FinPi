@@ -185,7 +185,7 @@ const maxHistoryRows = 500 // limite de lançamentos mostrados na lista
 // a lista devolvida mostra no máximo maxHistoryRows (os mais recentes, pois vêm em ordem decrescente).
 func applyFilter(f filter.Filter, list []models.Transaction) (shown []models.Transaction, count int, income, expense int64) {
 	for _, t := range list {
-		if !f.Match(t.Category, t.Description, t.Type, t.AmountCents) {
+		if !matchTx(f, t) {
 			continue
 		}
 		count++
@@ -202,18 +202,34 @@ func applyFilter(f filter.Filter, list []models.Transaction) (shown []models.Tra
 	return shown, count, income, expense
 }
 
-// filterView monta os dados do formulário de filtros.
-func filterView(f filter.Filter, warnings []string, categories []models.Category) models.FilterView {
+// matchTx é o único ponto que decide se um lançamento passa pelos filtros (texto, categorias, tipo, valor e conta);
+// o histórico, o relatório e as somas de excluídos de Todos os livros usam todos esta função.
+func matchTx(f filter.Filter, t models.Transaction) bool {
+	return f.MatchAccount(t.AccountID) && f.Match(t.Category, t.Description, t.Type, t.AmountCents)
+}
+
+// matchProjected é o matchTx das parcelas previstas (a conta é a do lançamento da série).
+func matchProjected(f filter.Filter, p models.ProjectedInstallment) bool {
+	return f.MatchAccount(p.AccountID) && f.Match(p.Category, p.Name, p.Type, p.AmountCents)
+}
+
+// filterView monta os dados do formulário de filtros; accounts são as opções do menu Conta.
+func filterView(f filter.Filter, warnings []string, categories []models.Category, accounts []models.AccountOption) models.FilterView {
 	selected := map[string]bool{}
 	for _, c := range categories {
 		if f.Selected(c.Name) {
 			selected[c.Name] = true
 		}
 	}
+	accSelected := map[int64]bool{}
+	for _, id := range f.Accounts {
+		accSelected[id] = true
+	}
 	return models.FilterView{
 		Text: f.Text, Type: f.TypeParam(), Min: f.MinText(), Max: f.MaxText(), AllMonths: f.AllMonths,
 		Active: f.Active(), Query: f.Query(), Warning: strings.Join(warnings, " "),
 		Categories: f.Categories, Selected: selected,
+		Accounts: f.Accounts, AccountSelected: accSelected, AccountOptions: accounts,
 	}
 }
 
@@ -342,6 +358,11 @@ func (h *Handler) renderPage(w http.ResponseWriter, r *http.Request, o pageOpts)
 		serverError(w, "Erro ao carregar as contas", err)
 		return
 	}
+	usedAccounts, err := h.db.UsedAccountIDs()
+	if err != nil {
+		serverError(w, "Erro ao carregar as contas", err)
+		return
+	}
 	names := accountNameMap(bookAccounts)
 	for i := range shown {
 		if shown[i].AccountID != 0 {
@@ -402,7 +423,7 @@ func (h *Handler) renderPage(w http.ResponseWriter, r *http.Request, o pageOpts)
 		HistoryIncome:    histIncome,
 		HistoryExpense:   histExpense,
 		HistoryTruncated: count > len(shown),
-		Filter:           filterView(f, filterWarnings, categories),
+		Filter:           filterView(f, filterWarnings, categories, accountOptions(f, bookAccounts, usedAccounts, nil)),
 
 		Projected:        projected,
 		ProjectedIncome:  projectedIncome,

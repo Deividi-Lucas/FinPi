@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"finpi/internal/database"
+	"finpi/internal/filter"
 	"finpi/internal/models"
 )
 
@@ -117,6 +118,32 @@ func accountNameMap(accounts []models.Account) map[int64]string {
 		names[a.ID] = a.Name
 	}
 	return names
+}
+
+// accountOptions monta o menu Conta da barra de filtros, na ordem de accounts: as ativas, as arquivadas em uso
+// (used) e as que já estão marcadas no filtro. bookNames (só em Todos os livros) põe o nome do livro ao lado.
+func accountOptions(f filter.Filter, accounts []models.Account, used map[int64]bool, bookNames map[int64]string) []models.AccountOption {
+	var out []models.AccountOption
+	for _, a := range accounts {
+		if a.Archived && !used[a.ID] && !f.HasAccount(a.ID) {
+			continue
+		}
+		out = append(out, models.AccountOption{ID: a.ID, Name: a.Name, BookName: bookNames[a.BookID], Archived: a.Archived})
+	}
+	return out
+}
+
+// allBooksAccounts devolve as contas dos livros ativos, na ordem dos livros, e o nome de cada livro (menu Conta de
+// Todos os livros).
+func allBooksAccounts(all []models.Account, active []models.Book) ([]models.Account, map[int64]string) {
+	byBook := accountsByBook(all)
+	names := map[int64]string{}
+	var out []models.Account
+	for _, b := range active {
+		names[b.ID] = b.Name
+		out = append(out, byBook[b.ID]...)
+	}
+	return out, names
 }
 
 // activeAccounts filtra as contas não arquivadas (as que aparecem nas listas de escolha).
