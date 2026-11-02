@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"html/template"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 
 	"finpi/internal/database"
 	"finpi/internal/models"
+	"finpi/internal/textutil"
 	"finpi/internal/transfer"
 )
 
@@ -72,7 +74,7 @@ func (p overviewPeriod) stateQuery() string {
 type overviewPage struct {
 	Version string
 	Period  overviewPeriod
-	State   string // period.stateQuery()
+	State   template.URL // period.stateQuery(); template.URL para o "=" não ser escapado no href
 	Error   string
 
 	Overview  transfer.Overview
@@ -82,10 +84,36 @@ type overviewPage struct {
 	Review reviewData
 }
 
-// reviewData é o conteúdo do pop-up de revisão (preenchido na Task 5; vazio na Task 4).
+const maxManualRows = 50 // linhas da aba "Ligar à mão"
+
+// reviewTx é um lançamento mostrado na revisão, com o livro dele.
+type reviewTx struct {
+	transfer.Tx
+	Book models.Book
+}
+
+// reviewPair é um par sugerido para a tela.
+type reviewPair struct {
+	Out, In       reviewTx
+	DaysApart     int
+	AltOut, AltIn []reviewTx
+}
+
+// reviewLink é uma ligação válida, com os dois lados.
+type reviewLink struct {
+	ID      int64
+	Out, In reviewTx
+}
+
+// reviewData é o conteúdo do pop-up de revisão das transferências.
 type reviewData struct {
-	Open bool
-	Tab  string
+	Open          bool
+	Tab           string
+	Suggestions   []reviewPair
+	Linked        []reviewLink
+	Solo          []reviewTx
+	Manual        []reviewTx
+	Q, Valor, Mes string
 }
 
 // freeTransactions devolve os lançamentos de livros ativos que ainda não estão ligados (ligação válida) nem marcados.
@@ -170,11 +198,11 @@ func (h *Handler) renderOverview(w http.ResponseWriter, r *http.Request, status 
 	}
 
 	page := overviewPage{
-		Version: h.version, Period: period, State: period.stateQuery(), Error: errMsg,
+		Version: h.version, Period: period, State: template.URL(period.stateQuery()), Error: errMsg,
 		Overview: transfer.BuildOverview(inputs, linked, soloSet),
 		Pending:  len(transfer.Suggest(free)), Truncated: truncated,
 	}
-	h.fillReview(&page, r, values, all, links, solo, free) // Task 5; na Task 4 é um no-op
+	h.fillReview(&page, r, values, all, links, solo, free)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
@@ -183,7 +211,86 @@ func (h *Handler) renderOverview(w http.ResponseWriter, r *http.Request, status 
 	}
 }
 
-// fillReview prepara o pop-up de revisão. Na Task 4 não faz nada.
+// fillReview prepara o pop-up de revisão: abre com revisao=1 ou quando há uma mensagem de erro para mostrar.
 func (h *Handler) fillReview(page *overviewPage, r *http.Request, values url.Values,
 	all []models.Transaction, links []database.TransferLink, solo []models.Transaction, free []transfer.Tx) {
+	if values.Get("revisao") != "1" && page.Error == "" {
+		return
+	}
+	rv := &page.Review
+	rv.Open = true
+	rv.Tab = values.Get("aba")
+	switch rv.Tab {
+	case "sugeridos", "ligados", "fora", "manual":
+	default:
+		rv.Tab = "sugeridos"
+	}
+
+	byBook := map[int64]models.Book{}
+	if books, err := h.db.ListBooks(); err == nil {
+		for _, b := range books {
+			byBook[b.ID] = b
+		}
+	}
+	conv := func(t transfer.Tx) reviewTx { return reviewTx{Tx: t, Book: byBook[t.BookID]} }
+	convAll := func(list []transfer.Tx) []reviewTx {
+		var out []reviewTx
+		for _, t := range list {
+			out = append(out, conv(t))
+		}
+		return out
+	}
+
+	for _, p := range transfer.Suggest(free) {
+		rv.Suggestions = append(rv.Suggestions, reviewPair{
+			Out: conv(p.Out), In: conv(p.In), DaysApart: p.DaysApart,
+			AltOut: convAll(p.AltOut), AltIn: convAll(p.AltIn),
+		})
+	}
+	for _, l := range links {
+		if l.Valid {
+			rv.Linked = append(rv.Linked, reviewLink{ID: l.ID,
+				Out: conv(database.ToTransferTx(l.Out)), In: conv(database.ToTransferTx(l.In))})
+		}
+	}
+	for _, s := range solo {
+		rv.Solo = append(rv.Solo, conv(database.ToTransferTx(s)))
+	}
+
+	// Aba "Ligar à mão": lançamentos livres (já do mais recente para o mais antigo), com os filtros.
+	rv.Q = strings.TrimSpace(values.Get("q"))
+	rv.Valor = strings.TrimSpace(values.Get("valor"))
+	rv.Mes = strings.TrimSpace(values.Get("mes"))
+	q := textutil.Fold(rv.Q)
+	cents, valorErr := parseLooseCents(rv.Valor)
+	useValor := rv.Valor != "" && valorErr == nil
+	_, mesErr := time.Parse("2006-01", rv.Mes)
+	useMes := rv.Mes != "" && mesErr == nil
+	for _, t := range free {
+		if q != "" && !strings.Contains(textutil.Fold(t.Description), q) {
+			continue
+		}
+		if useValor && t.AmountCents != cents {
+			continue
+		}
+		if useMes && !strings.HasPrefix(t.Date, rv.Mes+"-") {
+			continue
+		}
+		rv.Manual = append(rv.Manual, conv(t))
+		if len(rv.Manual) >= maxManualRows {
+			break
+		}
+	}
+}
+
+// parseLooseCents aceita "45,00", "45.00", "1.234,56" e "R$ 45" e devolve centavos.
+func parseLooseCents(s string) (int64, error) {
+	s = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(s), "R$"))
+	s = strings.ReplaceAll(s, " ", "")
+	if strings.Contains(s, ",") {
+		s = strings.ReplaceAll(s, ".", "") // com vírgula, os pontos são de milhar
+	} else if strings.Count(s, ".") > 1 {
+		s = strings.ReplaceAll(s, ".", "") // "1.234.567" sem decimais
+	}
+	return parseAmountCents(s)
 }
