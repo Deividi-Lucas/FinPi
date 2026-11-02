@@ -1522,6 +1522,14 @@
 
         // Trocar a categoria de uma linha leva junto as demais com a mesma descrição (ex.: vários "Rendimentos").
         importPreview.addEventListener('change', function (e) {
+            if (e.target.matches('[data-import-account]')) {
+                const nameInput = importPreview.querySelector('[data-import-account-name]');
+                if (nameInput) {
+                    nameInput.classList.toggle('hidden', e.target.value !== 'nova');
+                    if (e.target.value === 'nova') nameInput.focus();
+                }
+                return;
+            }
             const row = e.target.closest('[data-import-row]');
             if (!row) return;
             if (e.target.matches('select[data-cat]')) {
@@ -1543,6 +1551,11 @@
             const params = new URLSearchParams();
             params.set('n', String(rows.length));
             importPreview.querySelectorAll('input[type="hidden"]').forEach(function (input) { params.set(input.name, input.value); });
+            const accountSelect = importPreview.querySelector('[data-import-account]');
+            if (accountSelect) {
+                params.set('conta', accountSelect.value);
+                if (accountSelect.value === 'nova') params.set('conta_nova', importPreview.querySelector('[data-import-account-name]').value);
+            }
             rows.forEach(function (row, i) {
                 const box = row.querySelector('input[data-sel]');
                 params.set('sel_' + i, box.checked && !box.disabled ? '1' : '');
