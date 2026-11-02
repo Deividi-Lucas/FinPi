@@ -1,4 +1,4 @@
-// Package filter lê os filtros da URL (texto, categorias, tipo e faixa de valor) e decide se um lançamento
+// Package filter lê os filtros da URL (texto, categorias, contas, tipo e faixa de valor) e decide se um lançamento
 // passa por eles. São funções puras, usadas pela página principal e pelo relatório.
 package filter
 
@@ -13,6 +13,7 @@ import (
 
 const (
 	MaxCategories = 50  // categorias aceitas num filtro
+	MaxAccounts   = 50  // contas aceitas num filtro
 	MaxTextLen    = 100 // caracteres da busca por texto
 	maxCents      = 10_000_000_000_000
 )
@@ -26,14 +27,16 @@ type Filter struct {
 	MaxCents   int64
 	HasMin     bool
 	HasMax     bool
-	AllMonths  bool // só a página principal usa: procurar em todos os meses
+	AllMonths  bool    // só a página principal usa: procurar em todos os meses
+	Accounts   []int64 // contas marcadas (0 = "Sem conta"), na ordem da URL (sem repetidas)
 
 	terms   []string        // palavras da busca, normalizadas (textutil.Fold)
 	catKeys map[string]bool // categorias normalizadas
+	accKeys map[int64]bool  // contas marcadas
 }
 
-// Parse lê os filtros dos parâmetros q, cat (repetido), tipo (receita|despesa), min, max e todos (1).
-// Valores inválidos são ignorados e devolvem um aviso em português.
+// Parse lê os filtros dos parâmetros q, cat (repetido), conta (repetido; 0 = sem conta), tipo (receita|despesa),
+// min, max e todos (1). Valores inválidos são ignorados e devolvem um aviso em português.
 func Parse(v url.Values) (Filter, []string) {
 	var f Filter
 	var warnings []string
@@ -53,6 +56,28 @@ func Parse(v url.Values) (Filter, []string) {
 		}
 		f.catKeys[key] = true
 		f.Categories = append(f.Categories, c)
+	}
+
+	f.accKeys = map[int64]bool{}
+	invalidAccount := false
+	for _, raw := range v["conta"] {
+		raw = strings.TrimSpace(raw)
+		if raw == "" {
+			continue
+		}
+		id, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || id < 0 {
+			invalidAccount = true
+			continue
+		}
+		if f.accKeys[id] || len(f.Accounts) >= MaxAccounts {
+			continue
+		}
+		f.accKeys[id] = true
+		f.Accounts = append(f.Accounts, id)
+	}
+	if invalidAccount {
+		warnings = append(warnings, "Conta inválida ignorada.")
 	}
 
 	switch strings.TrimSpace(v.Get("tipo")) {
@@ -118,13 +143,16 @@ func parseMoney(s string) (int64, error) {
 	return 0, fmt.Errorf("valor inválido")
 }
 
-// Active conta quantos filtros estão ligados (texto, categorias, tipo e valor contam um cada).
+// Active conta quantos filtros estão ligados (texto, categorias, contas, tipo e valor contam um cada).
 func (f Filter) Active() int {
 	n := 0
 	if len(f.terms) > 0 {
 		n++
 	}
 	if len(f.Categories) > 0 {
+		n++
+	}
+	if len(f.Accounts) > 0 {
 		n++
 	}
 	if f.Type != "" {
@@ -139,6 +167,17 @@ func (f Filter) Active() int {
 // Selected diz se a categoria está marcada (compara pelo nome normalizado).
 func (f Filter) Selected(category string) bool {
 	return f.catKeys[textutil.Fold(category)]
+}
+
+// HasAccount diz se a conta (0 = "Sem conta") está marcada no filtro.
+func (f Filter) HasAccount(id int64) bool {
+	return f.accKeys[id]
+}
+
+// MatchAccount diz se um lançamento da conta id (0 = sem conta) passa pelo filtro de contas; sem contas marcadas,
+// tudo passa. As contas marcadas se combinam com "ou".
+func (f Filter) MatchAccount(id int64) bool {
+	return len(f.Accounts) == 0 || f.accKeys[id]
 }
 
 // Match diz se um lançamento (categoria, descrição, tipo "income"/"expense" e valor em centavos) passa pelos filtros.
@@ -196,6 +235,9 @@ func (f Filter) Values() url.Values {
 	}
 	for _, c := range f.Categories {
 		v.Add("cat", c)
+	}
+	for _, id := range f.Accounts {
+		v.Add("conta", strconv.FormatInt(id, 10))
 	}
 	if t := f.TypeParam(); t != "" {
 		v.Set("tipo", t)

@@ -3,6 +3,7 @@ package filter
 import (
 	"net/url"
 	"reflect"
+	"strconv"
 	"testing"
 )
 
@@ -191,5 +192,75 @@ func TestSelected(t *testing.T) {
 	f, _ := parse(t, "cat=saude&cat=LAZER")
 	if !f.Selected("Saúde") || !f.Selected("Lazer") || f.Selected("Moradia") {
 		t.Error("Selected compara pelo nome normalizado")
+	}
+}
+
+func TestParse_AccountsRepeatedWithNoAccount(t *testing.T) {
+	f, warnings := parse(t, "conta=3&conta=0&conta=3&conta=+7+")
+	if len(warnings) != 0 {
+		t.Errorf("avisos inesperados: %v", warnings)
+	}
+	if !reflect.DeepEqual(f.Accounts, []int64{3, 0, 7}) {
+		t.Errorf("Accounts = %v, quer [3 0 7] (sem repetidas)", f.Accounts)
+	}
+	if !f.HasAccount(3) || !f.HasAccount(0) || !f.HasAccount(7) || f.HasAccount(4) {
+		t.Error("HasAccount diz quais contas estão marcadas")
+	}
+	if f.Active() != 1 {
+		t.Errorf("o filtro de conta conta como um só: ativo=%d", f.Active())
+	}
+}
+
+func TestParse_InvalidAccountWarnsOnceAndIsIgnored(t *testing.T) {
+	f, warnings := parse(t, "conta=abc&conta=-2&conta=5&conta=1.5&conta=")
+	if !reflect.DeepEqual(f.Accounts, []int64{5}) {
+		t.Errorf("Accounts = %v, quer [5]", f.Accounts)
+	}
+	if !reflect.DeepEqual(warnings, []string{"Conta inválida ignorada."}) {
+		t.Errorf("avisos = %v, quer um só aviso de conta inválida", warnings)
+	}
+	g, warnings := parse(t, "conta=x")
+	if len(g.Accounts) != 0 || g.Active() != 0 || len(warnings) != 1 {
+		t.Errorf("só inválidas: contas=%v ativo=%d avisos=%v", g.Accounts, g.Active(), warnings)
+	}
+}
+
+func TestParse_AccountsAreBounded(t *testing.T) {
+	v := url.Values{}
+	for i := 1; i <= MaxAccounts+10; i++ {
+		v.Add("conta", strconv.Itoa(i))
+	}
+	f, _ := Parse(v)
+	if len(f.Accounts) != MaxAccounts {
+		t.Errorf("contas = %d, máximo %d", len(f.Accounts), MaxAccounts)
+	}
+}
+
+func TestMatchAccount(t *testing.T) {
+	none, _ := parse(t, "")
+	if !none.MatchAccount(0) || !none.MatchAccount(9) {
+		t.Error("sem filtro de conta tudo passa")
+	}
+	f, _ := parse(t, "conta=2")
+	if !f.MatchAccount(2) || f.MatchAccount(3) || f.MatchAccount(0) {
+		t.Error("conta=2 deixa passar só a conta 2")
+	}
+	g, _ := parse(t, "conta=0&conta=4")
+	if !g.MatchAccount(0) || !g.MatchAccount(4) || g.MatchAccount(2) {
+		t.Error("conta=0 é Sem conta; contas marcadas se combinam com ou")
+	}
+}
+
+func TestQuery_AccountsRoundTrip(t *testing.T) {
+	f, _ := parse(t, "conta=4&conta=0&cat=Lazer")
+	if got, want := f.Query(), "cat=Lazer&conta=4&conta=0"; got != want {
+		t.Errorf("Query = %q, quer %q", got, want)
+	}
+	g, warnings := parse(t, f.Query())
+	if len(warnings) != 0 || !reflect.DeepEqual(g.Accounts, f.Accounts) || g.Query() != f.Query() {
+		t.Errorf("ida e volta: %v %q", g.Accounts, g.Query())
+	}
+	if !reflect.DeepEqual(f.Values()["conta"], []string{"4", "0"}) {
+		t.Errorf("Values conta = %v", f.Values()["conta"])
 	}
 }
