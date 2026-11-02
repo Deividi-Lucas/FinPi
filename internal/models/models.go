@@ -59,6 +59,8 @@ type Summary struct {
 type PageData struct {
 	SelectedMonth string // ex: "2026-10"
 	DisplayMonth  string // ex: "Outubro de 2026"
+	PrevMonthURL  string // seta do mês anterior ("" sem seta: mês inválido, limite da faixa ou "Todos os meses")
+	NextMonthURL  string // seta do próximo mês
 	Summary       Summary
 	Transactions  []Transaction
 	TodayDate     string // Data atual para preencher o formulário por padrão

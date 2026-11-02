@@ -45,17 +45,22 @@
             </button>
 
             <!-- Filtro de Mês -->
-            <form method="GET" action="/" class="flex items-center gap-2 bg-slate-800/80 p-1.5 rounded-xl border border-slate-700">
+            <form method="GET" action="/" class="flex flex-wrap items-center justify-center gap-2 bg-slate-800/80 p-1.5 rounded-xl border border-slate-700">
                 <input type="hidden" name="livro" value="{{.BookID}}">
-                <label for="month" class="text-xs font-medium text-slate-300 pl-2">Mês:</label>
+                <div class="flex items-center gap-2">
+                {{if or .PrevMonthURL .NextMonthURL}}{{if .PrevMonthURL}}<a href="{{.PrevMonthURL}}" class="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm" title="Mês anterior" aria-label="Mês anterior">&lsaquo;</a>{{else}}<span class="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-800 text-slate-600 text-sm cursor-not-allowed" aria-hidden="true">&lsaquo;</span>{{end}}{{end}}
+                <label for="month" class="hidden sm:inline text-xs font-medium text-slate-300 pl-2">Mês:</label>
                 <input 
                     type="month" 
                     id="month" 
+                    aria-label="Mês"
                     name="month" 
                     value="{{.SelectedMonth}}" 
                     onchange="this.form.submit()"
                     class="bg-slate-900 text-slate-200 text-sm font-medium rounded-lg px-3 py-1.5 border border-slate-700 focus:outline-none focus:border-emerald-500 cursor-pointer"
                 >
+                {{if or .PrevMonthURL .NextMonthURL}}{{if .NextMonthURL}}<a href="{{.NextMonthURL}}" class="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm" title="Próximo mês" aria-label="Próximo mês">&rsaquo;</a>{{else}}<span class="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-800 text-slate-600 text-sm cursor-not-allowed" aria-hidden="true">&rsaquo;</span>{{end}}{{end}}
+                </div>
                 <label class="flex items-center gap-1.5 text-xs font-medium text-slate-300 pl-2 pr-2 cursor-pointer">
                     <input
                         type="checkbox"

@@ -415,9 +415,16 @@ func (h *Handler) renderPage(w http.ResponseWriter, r *http.Request, o pageOpts)
 		undo = &models.UndoView{Action: b.Action, Summary: b.Summary, Count: b.Count, At: b.CreatedAt.Local().Format("02/01/2006 15:04")}
 	}
 
+	var prevMonthURL, nextMonthURL string
+	if !f.AllMonths {
+		prevMonthURL, nextMonthURL = monthNavURLs(selectedMonth, book.ID, includeProjected, f)
+	}
+
 	data := models.PageData{
 		SelectedMonth: selectedMonth,
 		DisplayMonth:  formatDisplayMonth(selectedMonth),
+		PrevMonthURL:  prevMonthURL,
+		NextMonthURL:  nextMonthURL,
 		Summary:       summary,
 		Transactions:  transactions,
 		TodayDate:     now.Format("2006-01-02"),
