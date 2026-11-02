@@ -157,29 +157,11 @@ func (h *Handler) renderOverview(w http.ResponseWriter, r *http.Request, status 
 		serverError(w, "Erro ao carregar os livros", err)
 		return
 	}
-	links, err := h.db.ListTransferLinks()
+	// ligação com um livro arquivado não desconta o lado ativo: ele volta a contar normalmente
+	linked, soloSet, links, solo, err := h.transferSets(activeBooks(books))
 	if err != nil {
 		serverError(w, "Erro ao carregar as ligações", err)
 		return
-	}
-	solo, err := h.db.ListSolo()
-	if err != nil {
-		serverError(w, "Erro ao carregar as marcas", err)
-		return
-	}
-	active := map[int64]bool{}
-	for _, b := range activeBooks(books) {
-		active[b.ID] = true
-	}
-	linked, soloSet := map[int64]bool{}, map[int64]bool{}
-	for _, l := range links {
-		// ligação com um livro arquivado não desconta o lado ativo: ele volta a contar normalmente
-		if l.Valid && active[l.Out.BookID] && active[l.In.BookID] {
-			linked[l.Out.ID], linked[l.In.ID] = true, true
-		}
-	}
-	for _, s := range solo {
-		soloSet[s.ID] = true
 	}
 
 	var inputs []transfer.BookInput
