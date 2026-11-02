@@ -11,7 +11,6 @@ import (
 
 	"finpi/internal/dashboard"
 	"finpi/internal/filter"
-	"finpi/internal/installments"
 	"finpi/internal/models"
 	"finpi/internal/report"
 )
@@ -32,6 +31,7 @@ type reportQuery struct {
 	Projected bool
 	Filter    filter.Filter // texto, categorias, tipo e valor (todos os números do relatório respeitam o filtro)
 	Book      int64         // livro (só quando veio explícito na URL)
+	AllBooks  bool          // "Todos os livros" (livro=todos)
 }
 
 // URL monta o link do relatório com este estado, depois de aplicar mod (se houver).
@@ -52,7 +52,9 @@ func (q reportQuery) URL(mod func(*reportQuery)) string {
 	if q.Projected {
 		v.Set("previstas", "1")
 	}
-	if q.Book > 0 {
+	if q.AllBooks {
+		v.Set("livro", allBooksParam)
+	} else if q.Book > 0 {
 		v.Set("livro", strconv.FormatInt(q.Book, 10))
 	}
 	for k, vs := range q.Filter.Values() {
@@ -177,6 +179,8 @@ type reportPage struct {
 	Options          []granOption
 
 	InternalIn, InternalOut int64 // movimentação interna do período (fora dos totais), em centavos
+	Excluded                excludedSums // só em "Todos os livros": transferências ligadas e marcadas fora do FinPi
+	HasExcluded             bool
 
 	Cards      reportCards
 	Empty      bool
@@ -192,6 +196,8 @@ type reportPage struct {
 
 	Book     models.Book // livro do relatório
 	BookID   int64
+	BookParam string       // valor de livro= nos formulários e links: o ID do livro ou "todos"
+	AllBooks bool          // relatório de todos os livros somados
 	Books    []models.Book // livros ativos (seletor)
 	BookPath string        // página atual, para o seletor de livro
 }
@@ -209,41 +215,53 @@ func (h *Handler) Report(w http.ResponseWriter, r *http.Request) {
 		serverError(w, "Erro ao carregar os livros", err)
 		return
 	}
-	if r.URL.Query().Get("livro") != "" && !invalid {
+	bookParam := strconv.FormatInt(book.ID, 10)
+	switch {
+	case strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("livro")), allBooksParam):
+		q.AllBooks, book, bookParam = true, allBooksPseudoBook, allBooksParam
+	case r.URL.Query().Get("livro") != "" && !invalid:
 		q.Book = book.ID // só entra nos endereços quando veio explícito e válido
 	}
 
-	txs, err := db.GetTransactionsBetween(q.From, q.To)
-	if err != nil {
-		serverError(w, "Erro ao carregar lançamentos do período", err)
-		return
+	var (
+		txs        []models.Transaction
+		categories []models.Category
+		excluded   excludedSums
+		candidates [][]models.Transaction
+	)
+	if q.AllBooks {
+		data, err := h.loadAllBooks(books, q.From, q.To, q.Filter, q.Projected)
+		if err != nil {
+			serverError(w, "Erro ao carregar lançamentos do período", err)
+			return
+		}
+		txs, categories, excluded, candidates = data.Txs, data.Categories, data.Excluded, data.Candidates
+	} else {
+		txs, err = db.GetTransactionsBetween(q.From, q.To)
+		if err != nil {
+			serverError(w, "Erro ao carregar lançamentos do período", err)
+			return
+		}
+		categories, err = db.ListCategories()
+		if err != nil {
+			serverError(w, "Erro ao carregar categorias", err)
+			return
+		}
+		if q.Projected {
+			cands, err := db.GetInstallmentCandidates()
+			if err != nil {
+				serverError(w, "Erro ao carregar parcelas", err)
+				return
+			}
+			candidates = [][]models.Transaction{cands}
+		}
 	}
 	txs = filterTransactions(q.Filter, txs)
 	var internalIn, internalOut int64
 	txs, internalIn, internalOut = dashboard.SplitInternal(txs) // movimentação interna fica fora do fluxo
 
-	categories, err := db.ListCategories()
-	if err != nil {
-		serverError(w, "Erro ao carregar categorias", err)
-		return
-	}
-
 	months := monthsBetween(q.From, q.To)
-	var projected []models.ProjectedInstallment
-	if q.Projected {
-		candidates, err := db.GetInstallmentCandidates()
-		if err != nil {
-			serverError(w, "Erro ao carregar parcelas", err)
-			return
-		}
-		for _, m := range months {
-			for _, p := range installments.Project(candidates, m) {
-				if p.Date >= q.From && p.Date <= q.To && !models.IsInternal(p.Category) && q.Filter.Match(p.Category, p.Name, p.Type, p.AmountCents) {
-					projected = append(projected, p)
-				}
-			}
-		}
-	}
+	projected := projectInstallments(candidates, months, q.From, q.To, q.Filter)
 
 	granularity := report.AutoGranularity(q.From, q.To)
 	explicit := false
@@ -260,6 +278,7 @@ func (h *Handler) Report(w http.ResponseWriter, r *http.Request) {
 		Group:            string(granularity), GroupExplicit: explicit,
 		AutoURL:    q.URL(func(x *reportQuery) { x.Group = "" }),
 		InternalIn: internalIn, InternalOut: internalOut,
+		Excluded: excluded, HasExcluded: excluded != (excludedSums{}),
 		Empty:      len(txs) == 0 && len(projected) == 0,
 		Buckets:    buckets,
 		Cards:      buildCards(buckets, len(months), q.Projected && len(projected) > 0),
@@ -271,7 +290,7 @@ func (h *Handler) Report(w http.ResponseWriter, r *http.Request) {
 		AllCategories: categories,
 		ClearURL:      q.URL(func(x *reportQuery) { x.Filter = filter.Filter{} }),
 
-		Book: book, BookID: book.ID, Books: activeBooks(books), BookPath: "/relatorio",
+		Book: book, BookID: book.ID, BookParam: bookParam, AllBooks: q.AllBooks, Books: activeBooks(books), BookPath: "/relatorio",
 	}
 	for _, o := range []struct {
 		g     report.Granularity

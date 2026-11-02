@@ -17,8 +17,8 @@
                 </div>
             </div>
             <div class="flex flex-wrap items-center justify-center gap-2">
-            {{template "bookBar" .}}
-            <a href="/?livro={{.BookID}}" class="inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-sm font-medium px-3 py-2 rounded-xl border border-slate-700 transition">Voltar ao mês</a>
+            {{template "bookBarAll" .}}
+            <a href="/{{if not .AllBooks}}?livro={{.BookID}}{{end}}" class="inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-sm font-medium px-3 py-2 rounded-xl border border-slate-700 transition">Voltar ao mês</a>
             <a href="/visao-geral" class="inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-sm font-medium px-3 py-2 rounded-xl border border-slate-700 transition">Visão geral</a>
             </div>
         </header>
@@ -45,7 +45,7 @@
             </div>
 
             <form id="period-form" method="GET" action="/relatorio" class="flex flex-wrap items-center gap-2">
-                <input type="hidden" name="livro" value="{{.BookID}}">
+                <input type="hidden" name="livro" value="{{.BookParam}}">
                 <label class="text-xs text-slate-300">De
                     <input type="date" name="de" value="{{.From}}" required class="ml-1 bg-slate-900 text-slate-200 text-sm rounded-lg px-2 py-1.5 border border-slate-700 focus:outline-none focus:border-emerald-500">
                 </label>
@@ -67,7 +67,7 @@
         <!-- Filtros: todos os números do relatório (cartões, fluxo de caixa, recorrentes e receitas) respeitam o filtro -->
         <section id="filters" class="mt-4 p-4 rounded-2xl bg-slate-800/40 border border-slate-800">
             <form id="filters-form" method="GET" action="/relatorio" class="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
-                <input type="hidden" name="livro" value="{{.BookID}}">
+                <input type="hidden" name="livro" value="{{.BookParam}}">
                 {{if .Custom}}<input type="hidden" name="de" value="{{.From}}"><input type="hidden" name="ate" value="{{.To}}">{{else}}<input type="hidden" name="ano" value="{{.Year}}">{{end}}
                 {{if .GroupExplicit}}<input type="hidden" name="agrupar" value="{{.Group}}">{{end}}
                 {{if .IncludeProjected}}<input type="hidden" name="previstas" value="1">{{end}}
@@ -84,7 +84,7 @@
 
         {{if .Empty}}
         <p class="mt-8 p-6 rounded-2xl bg-slate-800/40 border border-slate-800 text-sm text-slate-500 text-center">{{if .Filter.Active}}Nenhum lançamento corresponde aos filtros neste período.{{else}}Sem lançamentos neste período.{{end}}</p>
-        {{if or .InternalIn .InternalOut}}<p class="mt-3 text-xs text-slate-400">Movimentações internas (fora dos totais): entradas {{formatCurrency .InternalIn}} &middot; saídas {{formatCurrency .InternalOut}}</p>{{end}}
+        {{if or .InternalIn .InternalOut}}<p class="mt-3 text-xs text-slate-400">Movimentações internas (fora dos totais): entradas {{formatCurrency .InternalIn}} &middot; saídas {{formatCurrency .InternalOut}}</p>{{end}}{{template "reportExcluded" .}}
         {{else}}
 
         <!-- Cartões -->
@@ -113,7 +113,7 @@
             </div>
             {{end}}
         </section>
-        {{if or .InternalIn .InternalOut}}<p class="mt-3 text-xs text-slate-400">Movimentações internas (fora dos totais): entradas {{formatCurrency .InternalIn}} &middot; saídas {{formatCurrency .InternalOut}}</p>{{end}}
+        {{if or .InternalIn .InternalOut}}<p class="mt-3 text-xs text-slate-400">Movimentações internas (fora dos totais): entradas {{formatCurrency .InternalIn}} &middot; saídas {{formatCurrency .InternalOut}}</p>{{end}}{{template "reportExcluded" .}}
 
         <!-- Fluxo de caixa -->
         <section class="mt-8 p-5 rounded-2xl bg-slate-800/40 border border-slate-800">
@@ -422,3 +422,6 @@
     <button type="button" data-imore="{{.Tab}}" class="mt-3 text-xs text-emerald-400 hover:text-emerald-300 cursor-pointer">Ver todas ({{len .Rows}})</button>
 </div>
 {{end}}
+
+{{/* reportExcluded: transferências entre livros e lançamentos marcados que ficaram fora do fluxo de Todos os livros. */}}
+{{define "reportExcluded"}}{{if .HasExcluded}}{{if or .Excluded.LinkedIn .Excluded.LinkedOut}}<p class="mt-1 text-xs text-slate-400">Transferências entre livros (fora do fluxo): entradas {{formatCurrency .Excluded.LinkedIn}} &middot; saídas {{formatCurrency .Excluded.LinkedOut}}</p>{{end}}{{if or .Excluded.SoloIn .Excluded.SoloOut}}<p class="mt-1 text-xs text-slate-400">Fora do FinPi (fora do fluxo): entradas {{formatCurrency .Excluded.SoloIn}} &middot; saídas {{formatCurrency .Excluded.SoloOut}}</p>{{end}}{{end}}{{end}}

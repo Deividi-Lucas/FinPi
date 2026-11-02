@@ -239,6 +239,11 @@ livros, o mesmo dinheiro conta duas vezes.
 - **Livro arquivado:** as ligações dele ficam fora da Visão geral e o lado ativo volta a contar normalmente.
 - **Selos nas listas:** o histórico mostra **↔ livro do outro lado** nos lançamentos ligados e **fora do FinPi** nos
   marcados.
+- **Relatório de todos os livros:** no seletor de livro do **Relatório** há a opção **Todos os livros** (`/relatorio?livro=todos`).
+  Fluxo de caixa, recorrentes e receitas por fonte somam os livros ativos **sem os pares ligados**, sem os marcados
+  "fora do FinPi" e sem a Movimentação interna; duas linhas abaixo dos cartões mostram o que foi tirado. O filtro de
+  categorias junta as dos livros pelo nome (marcar "Outros" pega o "Outros" de cada livro) e as parcelas previstas vêm
+  de todos os livros. Com um livro escolhido, o relatório é o de sempre.
 - **Limitação:** só liga lançamentos com **valor igual**.
 
 ---
