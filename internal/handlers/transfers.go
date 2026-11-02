@@ -133,9 +133,11 @@ func (h *Handler) MarkSoloHandler(w http.ResponseWriter, r *http.Request) {
 		h.transferError(w, r, err)
 		return
 	}
-	if marked > 0 {
-		h.events.Publish()
+	if marked == 0 { // todos já estavam ligados/marcados ou não existem
+		h.transferError(w, r, transfer.ErrTaken)
+		return
 	}
+	h.events.Publish()
 	redirectOverview(w, r)
 }
 

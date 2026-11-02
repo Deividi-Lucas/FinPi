@@ -167,9 +167,14 @@ func (h *Handler) renderOverview(w http.ResponseWriter, r *http.Request, status 
 		serverError(w, "Erro ao carregar as marcas", err)
 		return
 	}
+	active := map[int64]bool{}
+	for _, b := range activeBooks(books) {
+		active[b.ID] = true
+	}
 	linked, soloSet := map[int64]bool{}, map[int64]bool{}
 	for _, l := range links {
-		if l.Valid {
+		// ligação com um livro arquivado não desconta o lado ativo: ele volta a contar normalmente
+		if l.Valid && active[l.Out.BookID] && active[l.In.BookID] {
 			linked[l.Out.ID], linked[l.In.ID] = true, true
 		}
 	}
@@ -194,15 +199,19 @@ func (h *Handler) renderOverview(w http.ResponseWriter, r *http.Request, status 
 	}
 	var free []transfer.Tx
 	for _, t := range freeTransactions(all, links, solo) {
+		if models.IsInternal(t.Category) { // já fica fora dos totais
+			continue
+		}
 		free = append(free, database.ToTransferTx(t))
 	}
+	pairs := transfer.Suggest(free)
 
 	page := overviewPage{
 		Version: h.version, Period: period, State: template.URL(period.stateQuery()), Error: errMsg,
 		Overview: transfer.BuildOverview(inputs, linked, soloSet),
-		Pending:  len(transfer.Suggest(free)), Truncated: truncated,
+		Pending:  len(pairs), Truncated: truncated,
 	}
-	h.fillReview(&page, r, values, all, links, solo, free)
+	h.fillReview(&page, r, values, links, solo, free, pairs)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
@@ -213,7 +222,7 @@ func (h *Handler) renderOverview(w http.ResponseWriter, r *http.Request, status 
 
 // fillReview prepara o pop-up de revisão: abre com revisao=1 ou quando há uma mensagem de erro para mostrar.
 func (h *Handler) fillReview(page *overviewPage, r *http.Request, values url.Values,
-	all []models.Transaction, links []database.TransferLink, solo []models.Transaction, free []transfer.Tx) {
+	links []database.TransferLink, solo []models.Transaction, free []transfer.Tx, pairs []transfer.Pair) {
 	if values.Get("revisao") != "1" && page.Error == "" {
 		return
 	}
@@ -241,7 +250,7 @@ func (h *Handler) fillReview(page *overviewPage, r *http.Request, values url.Val
 		return out
 	}
 
-	for _, p := range transfer.Suggest(free) {
+	for _, p := range pairs {
 		rv.Suggestions = append(rv.Suggestions, reviewPair{
 			Out: conv(p.Out), In: conv(p.In), DaysApart: p.DaysApart,
 			AltOut: convAll(p.AltOut), AltIn: convAll(p.AltIn),
