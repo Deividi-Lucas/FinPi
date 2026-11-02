@@ -40,6 +40,7 @@ finpi/
 │   │   ├── sqlite.go           # Otimizações de WAL, pragmas, migração (inclui o livro Pessoal), escopo por livro (`ForBook`) e queries SQLite
 │   │   ├── categories.go       # Categorias (por livro): criar, renomear, ocultar e excluir
 │   │   ├── books.go            # API de livros: criar, copiar categorias, editar e arquivar
+│   │   ├── accounts.go         # Contas por livro: CRUD, migração por banco e conta nos lançamentos
 │   │   ├── move.go             # Mover lançamentos entre livros (prévia, categoria no destino, desfazer)
 │   │   ├── transfer.go         # Ligações de transferência entre livros e lançamentos "fora do FinPi"
 │   │   └── sqlite_test.go      # Testes do banco (centavos, migração, exclusão)
@@ -47,6 +48,7 @@ finpi/
 │   │   ├── handlers.go         # Rotas HTTP e formatação BRL
 │   │   ├── categories.go       # Rotas do menu de categorias
 │   │   ├── books.go            # Rotas dos livros (/livros, /livros/editar, /livros/arquivar)
+│   │   ├── accounts.go         # Rotas das contas (/contas, /contas/editar, /contas/arquivar)
 │   │   ├── overview.go         # Visão geral (/visao-geral): totais entre livros sem as transferências ligadas
 │   │   ├── transfers.go        # Revisão das transferências (/transferencias/ligar, desligar, fora, voltar)
 │   │   ├── book_scope.go       # Resolve o livro do pedido (?livro=) e escopa os handlers
@@ -215,6 +217,32 @@ entram (as parcelas previstas ficam de fora).
   identificador de origem é **global**: o mesmo extrato não entra duas vezes, nem em outro livro.
 - **Migração:** os dados existentes viram o livro **Pessoal** automaticamente na primeira abertura; a tabela de categorias é
   reconstruída numa transação, e o atualizador faz **backup do banco** antes de trocar o binário.
+
+---
+
+## 🏛️ Contas
+
+Dentro de cada livro você pode separar o que foi feito em cada **conta bancária** (Nubank, Sicredi, Mercado Pago…).
+A conta é só um **rótulo e um filtro**: os totais do livro, a Visão geral e a checagem de duplicados não mudam.
+
+- **Migração automática:** na primeira atualização, cada livro ganha uma conta por banco encontrado nos lançamentos
+  importados ("Mercado Pago", "Nubank", "Sicredi", "Banco do Brasil") e os importados entram nela. Os lançamentos
+  manuais ficam em **Sem conta**.
+- **Gerenciar** (`/contas`, `/contas/editar`, `/contas/arquivar`): na tela de **Livros**, cada livro lista as suas contas
+  e permite criar, renomear e arquivar (nunca apaga; o lançamento antigo mantém o selo). O nome é único dentro do livro.
+- **Importar extrato:** a prévia mostra **Conta**, já escolhida pelo banco do arquivo (criada na confirmação se ainda não
+  existir). Dá para trocar por outra conta do livro ou criar uma **Nova conta…** (por exemplo, uma segunda conta do mesmo
+  banco). Reimportar o mesmo extrato em outra conta do mesmo livro continua sendo detectado como "Já importado".
+- **No lançamento:** o campo **Conta** (opcional) está no novo lançamento e na edição; editar sem mexer na conta
+  preserva a conta. Na **edição múltipla**, **Definir conta…** atribui a conta (ou "Sem conta") a vários de uma vez,
+  com desfazer.
+- **Filtro e selo:** o filtro **Conta** (multisseleção, com "Sem conta") vale para o histórico e para todos os números do
+  relatório (`conta=ID` na URL). Em **Todos os livros** ele lista as contas de todos os livros, com o nome do livro. O
+  histórico mostra a conta como selo ao lado da categoria.
+- **Mover entre livros:** o lançamento importado vai para a conta do **mesmo banco** no livro de destino (criada se faltar);
+  o manual continua sem conta. O **desfazer** restaura a conta de origem.
+- **Limitações:** a Visão geral não tem filtro por conta, e a ligação de transferências ainda só pega livros diferentes
+  (uma transferência entre duas contas do mesmo livro precisa ser marcada como Movimentação interna).
 
 ---
 
