@@ -78,7 +78,8 @@ finpi/
 │   │   ├── recurring.go        # Gastos recorrentes por categoria e por descrição
 │   │   └── chart.go            # Geometria do gráfico (SVG gerado no servidor)
 │   ├── transfer/
-│   │   └── transfer.go         # Regra pura: valida pares e sugere transferências entre livros
+│   │   ├── suggest.go          # Regra pura: valida pares e sugere transferências entre livros
+│   │   └── overview.go         # Regra pura: monta os totais da Visão geral entre livros
 │   ├── textutil/
 │   │   └── fold.go             # Normalização de texto (sem acentos nem maiúsculas)
 │   └── models/
@@ -222,9 +223,9 @@ entram (as parcelas previstas ficam de fora).
 **O problema:** um Pix do Pessoal para a PJ aparece como **despesa** num livro e como **receita** no outro. Somando os
 livros, o mesmo dinheiro conta duas vezes.
 
-- **Visão geral** (`/visao-geral`): botão no cabeçalho e na tela de livros. Escolha um **mês** ou um **ano** (setas ‹ ›).
+- **Visão geral** (`/visao-geral`): botão na tela principal e na tela do Relatório. Escolha um **mês** ou um **ano** (setas ‹ ›).
   Os totais somam todos os livros ativos **sem os pares ligados** e sem a **Movimentação interna**. A tabela por livro
-  tem as linhas **Transferências entre livros** e **Fora do FinPi**, e o total bate com os cartões de cada livro.
+  tem as linhas **Transferências entre livros** e **Fora do FinPi**, e a linha **Total** bate com os cartões da própria Visão geral (cada livro mantém os seus cartões).
 - **Revisão:** o pop-up tem abas. **Sugeridos** são pares de valor igual, com até 3 dias de diferença e em livros
   diferentes; nada é ligado sem a sua confirmação (**Ligar**, ou **Descartar** para esconder a sugestão neste
   navegador). **Ligados** lista os pares e permite **Desfazer** (`/transferencias/ligar`, `/transferencias/desligar`).
@@ -235,6 +236,7 @@ livros, o mesmo dinheiro conta duas vezes.
   lançamento para o mesmo livro do par, a invalida e o par volta como pendência.
 - **Cada livro continua somando a transferência normalmente:** cartões, dashboard e relatório do livro não mudam; só a
   Visão geral desconta os pares ligados.
+- **Livro arquivado:** as ligações dele ficam fora da Visão geral e o lado ativo volta a contar normalmente.
 - **Selos nas listas:** o histórico mostra **↔ livro do outro lado** nos lançamentos ligados e **fora do FinPi** nos
   marcados.
 - **Limitação:** só liga lançamentos com **valor igual**.
