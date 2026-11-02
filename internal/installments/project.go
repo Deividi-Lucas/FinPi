@@ -46,6 +46,7 @@ func Project(candidates []models.Transaction, month string) []models.ProjectedIn
 				Total:       l.info.Total,
 				Date:        date,
 				AmountCents: l.tx.AmountCents,
+				AccountID:   l.tx.AccountID,
 			})
 		}
 	}

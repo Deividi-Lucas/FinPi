@@ -2,6 +2,7 @@ package models
 
 import (
 	"strconv"
+	"strings"
 	"time"
 
 	"finpi/internal/textutil"
@@ -29,12 +30,14 @@ type Transaction struct {
 	Priority   string `json:"priority"` // "", "essential" ou "superfluous"; vazio segue a categoria
 	ExternalID string `json:"-"`        // identificador de origem (importação); usado só na gravação em lote
 	BookID     int64  `json:"-"`        // livro do lançamento; preenchido onde o livro importa (lotes e movimentação)
+	AccountID  int64  `json:"-"`        // conta do lançamento (0 = sem conta); precisa ser do mesmo livro
 
 	OriginalDescription string `json:"-"` // texto original do banco (importação); vazio nos lançamentos manuais
 
 	Installment       *InstallmentInfo `json:"-"` // dados de exibição da parcela; não é gravado
 	EffectivePriority string           `json:"-"` // classificação efetiva (própria ou da categoria); não é gravada
 	TransferNote      string           `json:"-"` // selo de transferência (exibição); não é gravado
+	AccountName       string           `json:"-"` // nome da conta (exibição); não é gravado
 }
 
 // InstallmentInfo reúne os dados de exibição de um lançamento parcelado.
@@ -98,6 +101,9 @@ type PageData struct {
 	BookError  string      // erro exibido dentro do pop-up de livros
 	ShowBooks  bool        // abre o pop-up de livros ao carregar
 	BookColors []BookColor // paleta para os formulários do cadastro de livros
+
+	Accounts     []Account           // contas ativas do livro aberto (listas de escolha ao lançar)
+	BookAccounts map[int64][]Account // contas de cada livro, ativas e arquivadas (cadastro de livros)
 }
 
 // FilterView são os filtros da lista, prontos para o formulário e para os campos ocultos.
@@ -111,6 +117,19 @@ type FilterView struct {
 	Warning    string          // avisos de valores inválidos
 	Categories []string        // categorias marcadas, como vieram
 	Selected   map[string]bool // categoria (nome exibido) → marcada
+
+	Accounts        []int64         // contas marcadas (0 = "Sem conta"), para os campos ocultos
+	AccountSelected map[int64]bool  // conta → marcada (inclui o 0)
+	AccountOptions  []AccountOption // opções do menu Conta (sem o "Sem conta", que é fixo)
+	AccountShown    int             // marcadas que aparecem no menu (opções e "Sem conta"): o "(N)" exibido
+}
+
+// AccountOption é uma conta no menu Conta da barra de filtros.
+type AccountOption struct {
+	ID       int64
+	Name     string
+	BookName string // nome do livro ao lado (só em Todos os livros)
+	Archived bool
 }
 
 // ImportResult é o resultado de uma importação, exibido num aviso após o redirecionamento.
@@ -149,6 +168,7 @@ type ProjectedInstallment struct {
 	Total       int
 	Date        string // AAAA-MM-DD
 	AmountCents int64
+	AccountID   int64 // conta da parcela mais recente da série (0 = sem conta; usada pelos filtros)
 }
 
 // Category é uma categoria de lançamentos.
@@ -210,6 +230,51 @@ type Book struct {
 	Name     string
 	Color    string // chave de BookColors
 	Archived bool
+}
+
+// Bancos conhecidos, ligados às contas pelo prefixo do external_id dos lançamentos importados.
+const (
+	BankMercadoPago = "mercadopago"
+	BankNubank      = "nubank"
+	BankSicredi     = "sicredi"
+	BankBB          = "bb"
+)
+
+// BankName é o nome de exibição do banco ("" para desconhecido).
+func BankName(bank string) string {
+	switch bank {
+	case BankMercadoPago:
+		return "Mercado Pago"
+	case BankNubank:
+		return "Nubank"
+	case BankSicredi:
+		return "Sicredi"
+	case BankBB:
+		return "Banco do Brasil"
+	}
+	return ""
+}
+
+// BankFromExternalID devolve o banco de um external_id importado (mp:, nu:, sic:, bb:), ou "".
+func BankFromExternalID(id string) string {
+	switch {
+	case strings.HasPrefix(id, "mp:"):
+		return BankMercadoPago
+	case strings.HasPrefix(id, "nu:"):
+		return BankNubank
+	case strings.HasPrefix(id, "sic:"):
+		return BankSicredi
+	case strings.HasPrefix(id, "bb:"):
+		return BankBB
+	}
+	return ""
+}
+
+// Account é uma conta (Nubank, Sicredi…) dentro de um livro; só rotula e filtra lançamentos.
+type Account struct {
+	ID, BookID int64
+	Name, Bank string
+	Archived   bool
 }
 
 // BookColor é uma cor disponível para um livro.

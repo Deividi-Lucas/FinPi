@@ -80,6 +80,9 @@ func main() {
 	mux.HandleFunc("/livros", h.CreateBook)
 	mux.HandleFunc("/livros/editar", h.UpdateBook)
 	mux.HandleFunc("/livros/arquivar", h.ArchiveBook)
+	mux.HandleFunc("/contas", h.CreateAccount)
+	mux.HandleFunc("/contas/editar", h.UpdateAccount)
+	mux.HandleFunc("/contas/arquivar", h.ArchiveAccount)
 	mux.HandleFunc("/events", h.Events) // atualização em tempo real (SSE)
 
 	addr := fmt.Sprintf("%s:%s", *host, *port)

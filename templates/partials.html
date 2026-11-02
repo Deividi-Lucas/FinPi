@@ -91,7 +91,7 @@
     </script>
 {{end}}
 
-{{/* filterFields: campos comuns da barra de filtros (busca, categorias, tipo e valor). O ponto precisa ter .Filter e .AllCategories. */}}
+{{/* filterFields: campos comuns da barra de filtros (busca, categorias, conta, tipo e valor). O ponto precisa ter .Filter e .AllCategories. */}}
 {{define "filterFields"}}
                 <label class="flex-1 min-w-[12rem] text-xs text-slate-300">Buscar na descrição
                     <input type="search" name="q" value="{{.Filter.Text}}" maxlength="100" placeholder="Ex.: pix fulano" class="mt-1 w-full bg-slate-900 text-slate-200 text-sm rounded-lg px-3 py-2 border border-slate-700 focus:outline-none focus:border-emerald-500">
@@ -105,6 +105,18 @@
                         {{end}}
                     </div>
                 </details>
+
+                {{if or .Filter.AccountOptions .Filter.Accounts}}
+                <details class="relative text-xs text-slate-300" data-account-filter>
+                    <summary class="list-none px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-sm text-slate-200 cursor-pointer select-none">Conta{{if .Filter.AccountShown}} ({{.Filter.AccountShown}}){{end}} &#9662;</summary>
+                    <div class="absolute z-20 mt-1 max-h-64 w-64 overflow-y-auto p-2 rounded-xl bg-slate-900 border border-slate-700 shadow-xl">
+                        {{range .Filter.AccountOptions}}
+                        <label class="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-800 cursor-pointer"><input type="checkbox" name="conta" value="{{.ID}}" {{if index $.Filter.AccountSelected .ID}}checked{{end}} class="accent-emerald-500"> {{.Name}}{{if .BookName}} <span class="text-slate-500" data-account-book>{{.BookName}}</span>{{end}}{{if .Archived}} <span class="text-slate-500">(arquivada)</span>{{end}}</label>
+                        {{end}}
+                        <label class="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-800 cursor-pointer"><input type="checkbox" name="conta" value="0" {{if index $.Filter.AccountSelected 0}}checked{{end}} class="accent-emerald-500"> Sem conta</label>
+                    </div>
+                </details>
+                {{end}}
 
                 <div class="text-xs text-slate-300">Tipo
                     <div class="mt-1 flex items-center gap-3 px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-sm text-slate-200">

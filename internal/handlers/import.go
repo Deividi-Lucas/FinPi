@@ -11,6 +11,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"finpi/internal/database"
 	"finpi/internal/models"
 	"finpi/internal/statement"
 	"finpi/internal/textutil"
@@ -37,6 +38,33 @@ type importView struct {
 	Bank             string          // rótulo do banco do extrato
 	Format           string          // formato do arquivo, em maiúsculas
 	NewOptions       map[string]bool // opções que ainda não existem no livro (criadas na confirmação)
+	BankKey          string          // models.Bank* do extrato
+	BankAccount      models.Account  // conta ativa do livro para esse banco (se BankAccountOK)
+	BankAccountOK    bool
+	Accounts         []models.Account // demais contas ativas do livro
+}
+
+// bankKey converte o banco do extrato no valor de models.Bank*.
+func bankKey(b statement.Bank) string {
+	switch b {
+	case statement.BankNubank:
+		return models.BankNubank
+	case statement.BankSicredi:
+		return models.BankSicredi
+	case statement.BankBancoDoBrasil:
+		return models.BankBB
+	}
+	return models.BankMercadoPago
+}
+
+// accountError devolve a mensagem de um erro de conta que é culpa do pedido (ok=false: erro interno).
+func accountError(err error) (string, bool) {
+	for _, e := range []error{database.ErrAccountNotFound, database.ErrAccountName, database.ErrAccountDuplicate, database.ErrAccountArchived} {
+		if errors.Is(err, e) {
+			return e.Error(), true
+		}
+	}
+	return "", false
 }
 
 func importError(w http.ResponseWriter, err error) {
@@ -154,8 +182,27 @@ func (h *Handler) ImportPreview(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	bank := bankKey(st.Bank)
+	bankAcc, bankOK, err := db.AccountForBank(bank)
+	if err != nil {
+		serverError(w, "Erro ao carregar as contas", err)
+		return
+	}
+	allAccounts, err := db.ListAccounts()
+	if err != nil {
+		serverError(w, "Erro ao carregar as contas", err)
+		return
+	}
+	var others []models.Account
+	for _, a := range allAccounts {
+		if !a.Archived && !(bankOK && a.ID == bankAcc.ID) {
+			others = append(others, a)
+		}
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	view := importView{
+		BankKey: bank, BankAccount: bankAcc, BankAccountOK: bankOK, Accounts: others,
 		FileName: header.Filename, Preview: preview, Options: options,
 		SelectedMonth: requestMonth(r), IncludeProjected: wantsProjected(r), Book: book, BookID: book.ID,
 		Bank: st.Bank.Label(), Format: strings.ToUpper(st.Format), NewOptions: newOptions,
@@ -300,8 +347,41 @@ func (h *Handler) ImportConfirm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	inserted, skipped, err := db.ImportTransactions(rows)
+	var inserted, skipped int
+	conta := strings.TrimSpace(r.PostForm.Get("conta"))
+	if conta == "" { // sem escolha (clientes antigos): sem conta
+		inserted, skipped, err = db.ImportTransactions(rows)
+	} else {
+		acc := database.ImportAccount{}
+		switch conta {
+		case "novo-banco":
+			// O banco vem do identificador das linhas, nunca do navegador.
+			acc.Bank = models.BankFromExternalID(rows[0].ExternalID)
+			if acc.Bank == "" {
+				http.Error(w, database.ErrAccountNotFound.Error(), http.StatusBadRequest)
+				return
+			}
+		case "nova":
+			acc.NewName = strings.TrimSpace(r.PostForm.Get("conta_nova"))
+			if acc.NewName == "" {
+				http.Error(w, database.ErrAccountName.Error(), http.StatusBadRequest)
+				return
+			}
+		default:
+			id, perr := strconv.ParseInt(conta, 10, 64)
+			if perr != nil || id <= 0 {
+				http.Error(w, database.ErrAccountNotFound.Error(), http.StatusBadRequest)
+				return
+			}
+			acc.ID = id
+		}
+		inserted, skipped, err = db.ImportTransactionsToAccount(rows, acc)
+	}
 	if err != nil {
+		if msg, ok := accountError(err); ok {
+			http.Error(w, msg, http.StatusBadRequest)
+			return
+		}
 		serverError(w, "Erro ao gravar a importação", err)
 		return
 	}

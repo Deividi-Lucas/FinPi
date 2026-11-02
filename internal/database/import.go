@@ -1,6 +1,7 @@
 package database
 
 import (
+	"database/sql"
 	"errors"
 
 	"finpi/internal/models"
@@ -73,6 +74,12 @@ func (d *DB) LatestCategoryByDescription() (map[string]string, error) {
 // ImportTransactions grava as linhas, no livro do DB, numa única transação. Linhas cujo external_id já existe são
 // ignoradas (skipped). Qualquer outro erro desfaz tudo.
 func (d *DB) ImportTransactions(rows []models.Transaction) (inserted, skipped int, err error) {
+	return d.importRows(rows, nil)
+}
+
+// importRows é ImportTransactions com um passo opcional, dentro da mesma transação, que resolve (e talvez cria) a
+// conta que receberá todas as linhas.
+func (d *DB) importRows(rows []models.Transaction, resolve func(tx *sql.Tx) (int64, error)) (inserted, skipped int, err error) {
 	for _, t := range rows {
 		if t.ExternalID == "" {
 			return 0, 0, errors.New("external_id é obrigatório na importação")
@@ -85,9 +92,19 @@ func (d *DB) ImportTransactions(rows []models.Transaction) (inserted, skipped in
 	}
 	defer tx.Rollback()
 
+	if resolve != nil {
+		accountID, err := resolve(tx)
+		if err != nil {
+			return 0, 0, err
+		}
+		for i := range rows {
+			rows[i].AccountID = accountID
+		}
+	}
+
 	stmt, err := tx.Prepare(`
-		INSERT INTO transactions (description, amount_cents, type, category, date, priority, external_id, book_id, original_description)
-		VALUES (?, ?, ?, ?, ?, '', ?, ?, ?)
+		INSERT INTO transactions (description, amount_cents, type, category, date, priority, external_id, book_id, original_description, account_id)
+		VALUES (?, ?, ?, ?, ?, '', ?, ?, ?, ?)
 		ON CONFLICT(external_id) WHERE external_id <> '' DO NOTHING`)
 	if err != nil {
 		return 0, 0, err
@@ -95,7 +112,10 @@ func (d *DB) ImportTransactions(rows []models.Transaction) (inserted, skipped in
 	defer stmt.Close()
 
 	for _, t := range rows {
-		res, err := stmt.Exec(t.Description, t.AmountCents, t.Type, t.Category, t.Date, t.ExternalID, d.book, t.OriginalDescription)
+		if err := checkAccount(tx, d.book, t.AccountID, 0); err != nil {
+			return 0, 0, err
+		}
+		res, err := stmt.Exec(t.Description, t.AmountCents, t.Type, t.Category, t.Date, t.ExternalID, d.book, t.OriginalDescription, t.AccountID)
 		if err != nil {
 			return 0, 0, err
 		}

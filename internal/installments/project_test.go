@@ -137,3 +137,14 @@ func TestProject_CarriesTheCategoryOfTheLatestInstallment(t *testing.T) {
 		t.Errorf("categoria = %q, quer a da parcela mais recente (Casa)", p.Category)
 	}
 }
+
+func TestProject_CarriesTheAccountOfTheLatestInstallment(t *testing.T) {
+	first := tx(1, "Geladeira 2/10", "expense", "2026-09-15", 25000)
+	first.AccountID = 4
+	latest := tx(2, "Geladeira 3/10", "expense", "2026-10-15", 25000)
+	latest.AccountID = 7
+
+	if p := only(t, Project([]models.Transaction{first, latest}, "2026-11")); p.AccountID != 7 {
+		t.Errorf("conta = %d, quer a da parcela mais recente (7)", p.AccountID)
+	}
+}

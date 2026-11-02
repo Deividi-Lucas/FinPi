@@ -16,6 +16,16 @@
         <p class="mt-2 text-xs text-slate-500">Nada foi gravado ainda. Revise, ajuste as categorias e confirme.</p>
     </div>
 
+    <div class="flex flex-wrap items-center gap-2 text-sm text-slate-300">
+        <label for="import-account" class="text-xs text-slate-400">Conta:</label>
+        <select id="import-account" name="conta" data-import-account class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-sm text-slate-100 cursor-pointer">
+            {{if .BankAccountOK}}<option value="{{.BankAccount.ID}}" selected>{{.BankAccount.Name}}</option>{{else}}<option value="novo-banco" selected>{{.Bank}} (será criada)</option>{{end}}
+            {{range .Accounts}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+            <option value="nova">Nova conta…</option>
+        </select>
+        <input type="text" name="conta_nova" data-import-account-name maxlength="40" placeholder="Nome da nova conta" class="hidden bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-sm text-slate-100">
+    </div>
+
     <div class="overflow-x-auto rounded-xl border border-slate-800">
         <table class="w-full text-left text-xs text-slate-300">
             <thead class="bg-slate-900/60 uppercase tracking-wider text-slate-400 border-b border-slate-800">

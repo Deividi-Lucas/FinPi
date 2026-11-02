@@ -185,7 +185,7 @@ const maxHistoryRows = 500 // limite de lançamentos mostrados na lista
 // a lista devolvida mostra no máximo maxHistoryRows (os mais recentes, pois vêm em ordem decrescente).
 func applyFilter(f filter.Filter, list []models.Transaction) (shown []models.Transaction, count int, income, expense int64) {
 	for _, t := range list {
-		if !f.Match(t.Category, t.Description, t.Type, t.AmountCents) {
+		if !matchTx(f, t) {
 			continue
 		}
 		count++
@@ -202,18 +202,45 @@ func applyFilter(f filter.Filter, list []models.Transaction) (shown []models.Tra
 	return shown, count, income, expense
 }
 
-// filterView monta os dados do formulário de filtros.
-func filterView(f filter.Filter, warnings []string, categories []models.Category) models.FilterView {
+// matchTx é o único ponto que decide se um lançamento passa pelos filtros (texto, categorias, tipo, valor e conta);
+// o histórico, o relatório e as somas de excluídos de Todos os livros usam todos esta função.
+func matchTx(f filter.Filter, t models.Transaction) bool {
+	return f.MatchAccount(t.AccountID) && f.Match(t.Category, t.Description, t.Type, t.AmountCents)
+}
+
+// matchProjected é o matchTx das parcelas previstas (a conta é a do lançamento da série).
+func matchProjected(f filter.Filter, p models.ProjectedInstallment) bool {
+	return f.MatchAccount(p.AccountID) && f.Match(p.Category, p.Name, p.Type, p.AmountCents)
+}
+
+// filterView monta os dados do formulário de filtros; accounts são as opções do menu Conta.
+func filterView(f filter.Filter, warnings []string, categories []models.Category, accounts []models.AccountOption) models.FilterView {
 	selected := map[string]bool{}
 	for _, c := range categories {
 		if f.Selected(c.Name) {
 			selected[c.Name] = true
 		}
 	}
+	accSelected := map[int64]bool{}
+	for _, id := range f.Accounts {
+		accSelected[id] = true
+	}
+	// O "(N)" do menu conta só o que aparece marcado nele; uma conta que não é opção (ex.: de outro livro) continua
+	// no filtro e nos campos ocultos, mas não entra na contagem exibida.
+	shown := 0
+	if accSelected[0] {
+		shown++
+	}
+	for _, o := range accounts {
+		if accSelected[o.ID] {
+			shown++
+		}
+	}
 	return models.FilterView{
 		Text: f.Text, Type: f.TypeParam(), Min: f.MinText(), Max: f.MaxText(), AllMonths: f.AllMonths,
 		Active: f.Active(), Query: f.Query(), Warning: strings.Join(warnings, " "),
 		Categories: f.Categories, Selected: selected,
+		Accounts: f.Accounts, AccountSelected: accSelected, AccountOptions: accounts, AccountShown: shown,
 	}
 }
 
@@ -332,6 +359,27 @@ func (h *Handler) renderPage(w http.ResponseWriter, r *http.Request, o pageOpts)
 		serverError(w, "Erro ao carregar as transferências", err)
 		return
 	}
+	bookAccounts, err := db.ListAccounts()
+	if err != nil {
+		serverError(w, "Erro ao carregar as contas", err)
+		return
+	}
+	allAccounts, err := h.db.ListAccountsAll()
+	if err != nil {
+		serverError(w, "Erro ao carregar as contas", err)
+		return
+	}
+	usedAccounts, err := h.db.UsedAccountIDs()
+	if err != nil {
+		serverError(w, "Erro ao carregar as contas", err)
+		return
+	}
+	names := accountNameMap(bookAccounts)
+	for i := range shown {
+		if shown[i].AccountID != 0 {
+			shown[i].AccountName = names[shown[i].AccountID]
+		}
+	}
 
 	var importResult *models.ImportResult
 	if v := r.URL.Query().Get("importados"); v != "" {
@@ -386,7 +434,7 @@ func (h *Handler) renderPage(w http.ResponseWriter, r *http.Request, o pageOpts)
 		HistoryIncome:    histIncome,
 		HistoryExpense:   histExpense,
 		HistoryTruncated: count > len(shown),
-		Filter:           filterView(f, filterWarnings, categories),
+		Filter:           filterView(f, filterWarnings, categories, accountOptions(f, bookAccounts, usedAccounts, nil)),
 
 		Projected:        projected,
 		ProjectedIncome:  projectedIncome,
@@ -406,6 +454,9 @@ func (h *Handler) renderPage(w http.ResponseWriter, r *http.Request, o pageOpts)
 		BookError:  o.BookError,
 		ShowBooks:  o.ShowBooks,
 		BookColors: models.BookColors,
+
+		Accounts:     activeAccounts(bookAccounts),
+		BookAccounts: accountsByBook(allAccounts),
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -437,12 +488,23 @@ func (h *Handler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	acc, _, err := transactionAccount(r.PostForm)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	t.AccountID = acc
+
 	if err := h.resolveCategory(db, r.PostForm, &t); err != nil {
 		categoryFormError(w, err)
 		return
 	}
 
 	if err := db.CreateTransaction(&t); err != nil {
+		if msg, ok := accountError(err); ok {
+			http.Error(w, msg, http.StatusBadRequest)
+			return
+		}
 		serverError(w, "Erro ao gravar transação", err)
 		return
 	}
@@ -481,12 +543,36 @@ func (h *Handler) UpdateTransaction(w http.ResponseWriter, r *http.Request) {
 	}
 	t.ID = id
 
+	// Sem o campo conta no envio, a conta atual do lançamento é mantida (nunca zera por omissão).
+	acc, present, err := transactionAccount(r.PostForm)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if !present {
+		cur, err := db.GetTransactionsByIDs([]int64{id})
+		if err != nil {
+			serverError(w, "Erro ao carregar o lançamento", err)
+			return
+		}
+		if len(cur) == 0 {
+			http.Error(w, "Lançamento não encontrado", http.StatusNotFound)
+			return
+		}
+		acc = cur[0].AccountID
+	}
+	t.AccountID = acc
+
 	if err := h.resolveCategory(db, r.PostForm, &t); err != nil {
 		categoryFormError(w, err)
 		return
 	}
 
 	if err := db.UpdateTransaction(&t); err != nil {
+		if msg, ok := accountError(err); ok {
+			http.Error(w, msg, http.StatusBadRequest)
+			return
+		}
 		dbError(w, "Erro ao atualizar transação", err)
 		return
 	}

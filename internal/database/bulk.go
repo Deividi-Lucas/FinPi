@@ -54,10 +54,15 @@ type snapshot struct {
 	BookID      int64  `json:"book_id"`
 
 	OriginalDescription string `json:"original_description"`
+
+	// AccountID é nil em lotes gravados antes das contas (conta desconhecida: o desfazer não mexe nela).
+	AccountID *int64 `json:"account_id,omitempty"`
 }
 
 func snapshotOf(t models.Transaction) snapshot {
+	acc := t.AccountID
 	return snapshot{
+		AccountID: &acc,
 		ID: t.ID, Description: t.Description, AmountCents: t.AmountCents, Type: t.Type, Category: t.Category,
 		Date: t.Date, Priority: t.Priority, ExternalID: t.ExternalID, CreatedAt: t.CreatedAt.UTC().Format(time.RFC3339Nano), BookID: t.BookID,
 		OriginalDescription: t.OriginalDescription,
@@ -67,10 +72,11 @@ func snapshotOf(t models.Transaction) snapshot {
 // sameState compara todos os campos, menos a data de criação.
 func (s snapshot) sameState(o snapshot) bool {
 	return s.ID == o.ID && s.Description == o.Description && s.AmountCents == o.AmountCents && s.Type == o.Type &&
-		s.Category == o.Category && s.Date == o.Date && s.Priority == o.Priority && s.ExternalID == o.ExternalID && s.BookID == o.BookID
+		s.Category == o.Category && s.Date == o.Date && s.Priority == o.Priority && s.ExternalID == o.ExternalID && s.BookID == o.BookID &&
+		(s.AccountID == nil || o.AccountID == nil || *s.AccountID == *o.AccountID)
 }
 
-const loadColumns = `id, description, amount_cents, type, category, date, priority, external_id, created_at, book_id, original_description`
+const loadColumns = `id, description, amount_cents, type, category, date, priority, external_id, created_at, book_id, original_description, account_id`
 
 // loadTransactions lê os lançamentos que existem entre os ids (com o identificador de origem).
 // Com book > 0 só alcança os daquele livro; com book == 0, os de qualquer livro.
@@ -96,7 +102,7 @@ func loadTransactions(q queryer, ids []int64, book int64) (map[int64]models.Tran
 	defer rows.Close()
 	for rows.Next() {
 		var t models.Transaction
-		if err := rows.Scan(&t.ID, &t.Description, &t.AmountCents, &t.Type, &t.Category, &t.Date, &t.Priority, &t.ExternalID, &t.CreatedAt, &t.BookID, &t.OriginalDescription); err != nil {
+		if err := rows.Scan(&t.ID, &t.Description, &t.AmountCents, &t.Type, &t.Category, &t.Date, &t.Priority, &t.ExternalID, &t.CreatedAt, &t.BookID, &t.OriginalDescription, &t.AccountID); err != nil {
 			return nil, err
 		}
 		out[t.ID] = t
@@ -216,12 +222,15 @@ func (d *DB) ApplyEdits(summary string, ids []int64, edit func(models.Transactio
 		if !models.ValidPriority(after.Priority) {
 			return 0, 0, ErrInvalidPriority
 		}
-		if before.Description == after.Description && before.Category == after.Category && before.Date == after.Date && before.Priority == after.Priority {
+		if before.Description == after.Description && before.Category == after.Category && before.Date == after.Date && before.Priority == after.Priority && before.AccountID == after.AccountID {
 			skipped++
 			continue
 		}
-		if _, err := tx.Exec(`UPDATE transactions SET description = ?, category = ?, date = ?, priority = ? WHERE id = ?`,
-			after.Description, after.Category, after.Date, after.Priority, id); err != nil {
+		if err := checkAccount(tx, d.book, after.AccountID, before.AccountID); err != nil {
+			return 0, 0, err
+		}
+		if _, err := tx.Exec(`UPDATE transactions SET description = ?, category = ?, date = ?, priority = ?, account_id = ? WHERE id = ?`,
+			after.Description, after.Category, after.Date, after.Priority, after.AccountID, id); err != nil {
 			return 0, 0, err
 		}
 		a := after
@@ -319,6 +328,16 @@ func ensureCategoryInBook(tx *sql.Tx, bookID int64, category string) error {
 	return err
 }
 
+// legacyAccountTx escolhe a conta de um lançamento restaurado a partir de um lote sem account_id: a conta ativa
+// do banco de origem (external_id) no livro, criada se faltar; sem banco, 0.
+func legacyAccountTx(tx *sql.Tx, book int64, externalID string) (int64, error) {
+	bank := models.BankFromExternalID(externalID)
+	if bank == "" {
+		return 0, nil
+	}
+	return bankAccountTx(tx, book, bank)
+}
+
 // UndoLatestBatch desfaz o lote mais recente ainda não desfeito, numa transação. Só restaura o que continua
 // exatamente como o lote deixou (edição) ou o que ainda não existe (exclusão); o resto é pulado.
 func (d *DB) UndoLatestBatch() (restored, skipped int, err error) {
@@ -398,6 +417,21 @@ func (d *DB) UndoLatestBatch() (restored, skipped int, err error) {
 				it.before.Description, it.before.Category, it.before.Date, it.before.Priority, it.before.BookID, it.before.ID); err != nil {
 				return 0, 0, err
 			}
+			switch {
+			case it.before.AccountID != nil:
+				if _, err := tx.Exec(`UPDATE transactions SET account_id = ? WHERE id = ?`, *it.before.AccountID, it.before.ID); err != nil {
+					return 0, 0, err
+				}
+			case it.before.BookID != now.BookID:
+				// lote antigo de movimentação, sem o campo: a conta atual é do outro livro; usa a do banco no livro de volta
+				account, err := legacyAccountTx(tx, it.before.BookID, now.ExternalID)
+				if err != nil {
+					return 0, 0, err
+				}
+				if _, err := tx.Exec(`UPDATE transactions SET account_id = ? WHERE id = ?`, account, it.before.ID); err != nil {
+					return 0, 0, err
+				}
+			} // lote antigo no mesmo livro: mantém a conta atual
 			restored++
 			continue
 		}
@@ -424,9 +458,15 @@ func (d *DB) UndoLatestBatch() (restored, skipped int, err error) {
 		if err := ensureCategoryInBook(tx, it.before.BookID, it.before.Category); err != nil {
 			return 0, 0, err
 		}
-		if _, err := tx.Exec(`INSERT INTO transactions (`+loadColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		var account int64
+		if it.before.AccountID != nil {
+			account = *it.before.AccountID
+		} else if account, err = legacyAccountTx(tx, it.before.BookID, it.before.ExternalID); err != nil { // lote antigo
+			return 0, 0, err
+		}
+		if _, err := tx.Exec(`INSERT INTO transactions (`+loadColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			it.before.ID, it.before.Description, it.before.AmountCents, it.before.Type, it.before.Category,
-			it.before.Date, it.before.Priority, it.before.ExternalID, created, it.before.BookID, it.before.OriginalDescription); err != nil {
+			it.before.Date, it.before.Priority, it.before.ExternalID, created, it.before.BookID, it.before.OriginalDescription, account); err != nil {
 			return 0, 0, err
 		}
 		restored++

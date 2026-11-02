@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"finpi/internal/models"
 	"finpi/internal/textutil"
 )
 
@@ -52,6 +53,7 @@ func (d *DB) MoveToBook(ids []int64, dest int64) (applied, skipped int, err erro
 		return 0, 0, err
 	}
 	var items []batchItem
+	bankAccounts := map[string]int64{}
 	for _, id := range ids {
 		before, ok := current[id]
 		if !ok {
@@ -77,11 +79,21 @@ func (d *DB) MoveToBook(ids []int64, dest int64) (applied, skipped int, err erro
 			known[textutil.Fold(clean)] = clean
 			name = clean
 		}
-		if _, err := tx.Exec(`UPDATE transactions SET book_id = ?, category = ? WHERE id = ? AND book_id = ?`, dest, name, id, d.book); err != nil {
+		// conta: o importado vai para a conta do mesmo banco no destino (criada se preciso); o resto fica sem conta
+		var account int64
+		if bank := models.BankFromExternalID(before.ExternalID); bank != "" {
+			if account, ok = bankAccounts[bank]; !ok {
+				if account, err = bankAccountTx(tx, dest, bank); err != nil {
+					return 0, 0, err
+				}
+				bankAccounts[bank] = account
+			}
+		}
+		if _, err := tx.Exec(`UPDATE transactions SET book_id = ?, category = ?, account_id = ? WHERE id = ? AND book_id = ?`, dest, name, account, id, d.book); err != nil {
 			return 0, 0, err
 		}
 		after := before
-		after.BookID, after.Category = dest, name
+		after.BookID, after.Category, after.AccountID = dest, name, account
 		items = append(items, batchItem{before: before, after: &after})
 	}
 	if len(items) == 0 {

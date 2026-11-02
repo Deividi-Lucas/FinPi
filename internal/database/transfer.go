@@ -14,11 +14,11 @@ func ToTransferTx(t models.Transaction) transfer.Tx {
 	return transfer.Tx{ID: t.ID, BookID: t.BookID, Type: t.Type, AmountCents: t.AmountCents, Date: t.Date, Description: t.Description}
 }
 
-const crossColumns = `t.id, t.description, t.amount_cents, t.type, t.category, t.date, t.book_id`
+const crossColumns = `t.id, t.description, t.amount_cents, t.type, t.category, t.date, t.book_id, t.account_id`
 
 func scanCross(sc interface{ Scan(...any) error }) (models.Transaction, error) {
 	var t models.Transaction
-	err := sc.Scan(&t.ID, &t.Description, &t.AmountCents, &t.Type, &t.Category, &t.Date, &t.BookID)
+	err := sc.Scan(&t.ID, &t.Description, &t.AmountCents, &t.Type, &t.Category, &t.Date, &t.BookID, &t.AccountID)
 	return t, err
 }
 
