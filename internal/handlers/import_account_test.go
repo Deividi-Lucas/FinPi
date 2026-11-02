@@ -54,7 +54,7 @@ func TestImportPreview_SuggestsExistingBankAccount(t *testing.T) {
 	if !strings.Contains(body, `<option value="`+itoa(other.ID)+`">Reserva</option>`) || !strings.Contains(body, "Nova conta…") {
 		t.Error("faltam as demais contas ou a opção Nova conta…")
 	}
-	if strings.Contains(body, "(será criada)</option>") && strings.Contains(body, "Nubank (será criada)") {
+	if strings.Contains(body, "Nubank (será criada)") {
 		t.Error("não deveria oferecer criar a conta do banco")
 	}
 }

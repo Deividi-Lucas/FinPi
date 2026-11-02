@@ -121,6 +121,7 @@ type FilterView struct {
 	Accounts        []int64         // contas marcadas (0 = "Sem conta"), para os campos ocultos
 	AccountSelected map[int64]bool  // conta → marcada (inclui o 0)
 	AccountOptions  []AccountOption // opções do menu Conta (sem o "Sem conta", que é fixo)
+	AccountShown    int             // marcadas que aparecem no menu (opções e "Sem conta"): o "(N)" exibido
 }
 
 // AccountOption é uma conta no menu Conta da barra de filtros.

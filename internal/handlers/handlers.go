@@ -225,11 +225,22 @@ func filterView(f filter.Filter, warnings []string, categories []models.Category
 	for _, id := range f.Accounts {
 		accSelected[id] = true
 	}
+	// O "(N)" do menu conta só o que aparece marcado nele; uma conta que não é opção (ex.: de outro livro) continua
+	// no filtro e nos campos ocultos, mas não entra na contagem exibida.
+	shown := 0
+	if accSelected[0] {
+		shown++
+	}
+	for _, o := range accounts {
+		if accSelected[o.ID] {
+			shown++
+		}
+	}
 	return models.FilterView{
 		Text: f.Text, Type: f.TypeParam(), Min: f.MinText(), Max: f.MaxText(), AllMonths: f.AllMonths,
 		Active: f.Active(), Query: f.Query(), Warning: strings.Join(warnings, " "),
 		Categories: f.Categories, Selected: selected,
-		Accounts: f.Accounts, AccountSelected: accSelected, AccountOptions: accounts,
+		Accounts: f.Accounts, AccountSelected: accSelected, AccountOptions: accounts, AccountShown: shown,
 	}
 }
 

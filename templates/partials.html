@@ -108,7 +108,7 @@
 
                 {{if or .Filter.AccountOptions .Filter.Accounts}}
                 <details class="relative text-xs text-slate-300" data-account-filter>
-                    <summary class="list-none px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-sm text-slate-200 cursor-pointer select-none">Conta{{if .Filter.Accounts}} ({{len .Filter.Accounts}}){{end}} &#9662;</summary>
+                    <summary class="list-none px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-sm text-slate-200 cursor-pointer select-none">Conta{{if .Filter.AccountShown}} ({{.Filter.AccountShown}}){{end}} &#9662;</summary>
                     <div class="absolute z-20 mt-1 max-h-64 w-64 overflow-y-auto p-2 rounded-xl bg-slate-900 border border-slate-700 shadow-xl">
                         {{range .Filter.AccountOptions}}
                         <label class="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-800 cursor-pointer"><input type="checkbox" name="conta" value="{{.ID}}" {{if index $.Filter.AccountSelected .ID}}checked{{end}} class="accent-emerald-500"> {{.Name}}{{if .BookName}} <span class="text-slate-500" data-account-book>{{.BookName}}</span>{{end}}{{if .Archived}} <span class="text-slate-500">(arquivada)</span>{{end}}</label>
