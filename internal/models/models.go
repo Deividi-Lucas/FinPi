@@ -2,6 +2,7 @@ package models
 
 import (
 	"strconv"
+	"strings"
 	"time"
 
 	"finpi/internal/textutil"
@@ -210,6 +211,51 @@ type Book struct {
 	Name     string
 	Color    string // chave de BookColors
 	Archived bool
+}
+
+// Bancos conhecidos, ligados às contas pelo prefixo do external_id dos lançamentos importados.
+const (
+	BankMercadoPago = "mercadopago"
+	BankNubank      = "nubank"
+	BankSicredi     = "sicredi"
+	BankBB          = "bb"
+)
+
+// BankName é o nome de exibição do banco ("" para desconhecido).
+func BankName(bank string) string {
+	switch bank {
+	case BankMercadoPago:
+		return "Mercado Pago"
+	case BankNubank:
+		return "Nubank"
+	case BankSicredi:
+		return "Sicredi"
+	case BankBB:
+		return "Banco do Brasil"
+	}
+	return ""
+}
+
+// BankFromExternalID devolve o banco de um external_id importado (mp:, nu:, sic:, bb:), ou "".
+func BankFromExternalID(id string) string {
+	switch {
+	case strings.HasPrefix(id, "mp:"):
+		return BankMercadoPago
+	case strings.HasPrefix(id, "nu:"):
+		return BankNubank
+	case strings.HasPrefix(id, "sic:"):
+		return BankSicredi
+	case strings.HasPrefix(id, "bb:"):
+		return BankBB
+	}
+	return ""
+}
+
+// Account é uma conta (Nubank, Sicredi…) dentro de um livro; só rotula e filtra lançamentos.
+type Account struct {
+	ID, BookID int64
+	Name, Bank string
+	Archived   bool
 }
 
 // BookColor é uma cor disponível para um livro.

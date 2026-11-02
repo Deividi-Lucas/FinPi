@@ -164,7 +164,13 @@ func migrate(conn *sql.DB) error {
 	if err := seedCategories(conn); err != nil {
 		return err
 	}
-	return migrateNubankRDBInternal(conn)
+	if err := migrateNubankRDBInternal(conn); err != nil {
+		return err
+	}
+	if err := migrateAccounts(conn); err != nil {
+		return fmt.Errorf("erro ao criar as contas: %w", err)
+	}
+	return nil
 }
 
 // DefaultBookID é o livro "Pessoal", criado na migração; recebe tudo o que existia antes dos livros.
