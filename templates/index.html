@@ -162,6 +162,7 @@
                 <p class="text-xs text-slate-500 mt-2">Diferença entre receitas e despesas{{if and .IncludeProjected .Projected}} (com previstas){{end}}</p>
             </div>
         </section>
+        {{if or .Invested .Redeemed}}<p class="mt-3 text-xs text-emerald-300/80">Investido no mês (fora dos totais): aplicado {{formatCurrency .Invested}} &middot; resgatado {{formatCurrency .Redeemed}}</p>{{end}}
         {{if or .InternalIn .InternalOut}}<p class="mt-3 text-xs text-slate-400">Movimentações internas (fora dos totais): entradas {{formatCurrency .InternalIn}} &middot; saídas {{formatCurrency .InternalOut}}</p>{{end}}
 
         <!-- Dashboard do mês -->
@@ -337,6 +338,7 @@
                                     {{.Category}}
                                 </span>
                                 {{if isInternal .Category}}<span class="ml-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-slate-700/60 text-slate-300 border border-slate-600">interna</span>{{end}}
+                                {{if isInvestment .Category}}<span class="ml-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-emerald-900/40 text-emerald-300 border border-emerald-700/50">investimento</span>{{end}}
                                 {{if .AccountID}}<span data-account-badge title="Conta" class="ml-1 px-2 py-0.5 rounded-md text-xs bg-amber-500/10 text-amber-300 border border-amber-500/20">{{.AccountName}}</span>{{end}}
                                 {{if eq .EffectivePriority "essential"}}<span data-priority-badge="essential" class="ml-1 px-2 py-0.5 rounded-md text-xs bg-sky-500/10 text-sky-300 border border-sky-500/20">Essencial</span>{{else if eq .EffectivePriority "superfluous"}}<span data-priority-badge="superfluous" class="ml-1 px-2 py-0.5 rounded-md text-xs bg-violet-500/10 text-violet-300 border border-violet-500/20">Supérfluo</span>{{end}}
                             </td>

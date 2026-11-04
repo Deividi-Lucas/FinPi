@@ -179,6 +179,7 @@ type reportPage struct {
 	Options          []granOption
 
 	InternalIn, InternalOut int64 // movimentação interna do período (fora dos totais), em centavos
+	Invested, Redeemed      int64 // investimento do período: aplicado e resgatado (fora dos totais), em centavos
 	Excluded                excludedSums // só em "Todos os livros": transferências ligadas e marcadas fora do FinPi
 	HasExcluded             bool
 
@@ -276,8 +277,8 @@ func (h *Handler) Report(w http.ResponseWriter, r *http.Request) {
 	}
 
 	txs = filterTransactions(q.Filter, txs)
-	var internalIn, internalOut int64
-	txs, internalIn, internalOut = dashboard.SplitInternal(txs) // movimentação interna fica fora do fluxo
+	var outside dashboard.Outside
+	txs, outside = dashboard.SplitOutside(txs) // movimentação interna e investimento ficam fora do fluxo
 
 	months := monthsBetween(q.From, q.To)
 	projected := projectInstallments(candidates, months, q.From, q.To, q.Filter)
@@ -296,7 +297,8 @@ func (h *Handler) Report(w http.ResponseWriter, r *http.Request) {
 		ToggleProjected:  q.URL(func(x *reportQuery) { x.Projected = !x.Projected }),
 		Group:            string(granularity), GroupExplicit: explicit,
 		AutoURL:    q.URL(func(x *reportQuery) { x.Group = "" }),
-		InternalIn: internalIn, InternalOut: internalOut,
+		InternalIn: outside.InternalIn, InternalOut: outside.InternalOut,
+		Invested: outside.Invested, Redeemed: outside.Redeemed,
 		Excluded: excluded, HasExcluded: excluded != (excludedSums{}),
 		Empty:      len(txs) == 0 && len(projected) == 0,
 		Buckets:    buckets,

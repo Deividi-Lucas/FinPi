@@ -64,7 +64,7 @@ func TestSummarizeMatchesSQLSummaryWithoutInternal(t *testing.T) {
 		t.Fatal(err)
 	}
 	list, _ := db.GetTransactions("2026-10")
-	regular, _, _ := dashboard.SplitInternal(list)
+	regular, _ := dashboard.SplitOutside(list)
 	if got := dashboard.Summarize(regular); got != want {
 		t.Errorf("Summarize = %+v, SQL = %+v", got, want)
 	}

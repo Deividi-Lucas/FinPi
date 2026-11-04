@@ -118,6 +118,25 @@ func isInternalMovement(description string) bool {
 	return strings.HasPrefix(folded, "resgate rdb") || strings.HasPrefix(folded, "aplicacao rdb")
 }
 
+// investmentTerms são palavras (ou frases) que, numa descrição, indicam dinheiro indo para um investimento.
+var investmentTerms = []string{
+	"tesouro direto", "tesouro selic", "tesouro ipca", "cdb", "lci", "lca", "rdc", "fundo de investimento",
+	"corretora", "xp investimentos", "rico investimentos", "clear corretora", "btg pactual", "nuinvest", "easynvest",
+	"inter invest", "aplicacao financeira", "aplicacao automatica", "aplic financ", "aporte",
+}
+
+// isInvestmentMovement diz se a descrição parece um aporte em investimento (Tesouro, CDB, corretora...).
+// Compara por palavras inteiras, para "cdb" não casar dentro de outra palavra.
+func isInvestmentMovement(description string) bool {
+	padded := " " + strings.Join(strings.Fields(textutil.Fold(description)), " ") + " "
+	for _, term := range investmentTerms {
+		if strings.Contains(padded, " "+term+" ") {
+			return true
+		}
+	}
+	return false
+}
+
 func defaultCategory(cats []string) string {
 	for _, c := range cats {
 		if textutil.Fold(c) == "outros" {
@@ -163,8 +182,11 @@ func BuildPreview(st Statement, in PreviewInput) Preview {
 			category = c
 		}
 
-		if (bank == BankNubank || bank == BankSicredi) && isInternalMovement(r.Description) {
+		switch {
+		case (bank == BankNubank || bank == BankSicredi) && isInternalMovement(r.Description):
 			category = models.InternalCategory
+		case isInvestmentMovement(r.Description):
+			category = models.InvestmentCategory
 		}
 
 		row := PreviewRow{

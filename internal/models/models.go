@@ -17,6 +17,20 @@ func IsInternal(category string) bool {
 	return textutil.Fold(category) == textutil.Fold(InternalCategory)
 }
 
+// InvestmentCategory é a categoria do dinheiro aplicado em investimentos (saída) e dos resgates (entrada):
+// como a Movimentação interna, fica fora das receitas e despesas dos totais, mas é somada à parte ("Investido").
+const InvestmentCategory = "Investimento"
+
+// IsInvestment diz se a categoria é a de investimento (ignora caixa e acentos).
+func IsInvestment(category string) bool {
+	return textutil.Fold(category) == textutil.Fold(InvestmentCategory)
+}
+
+// IsOutsideTotals diz se a categoria não entra nas receitas e despesas (movimentação interna ou investimento).
+func IsOutsideTotals(category string) bool {
+	return IsInternal(category) || IsInvestment(category)
+}
+
 // Transaction representa um lançamento financeiro no banco de dados.
 type Transaction struct {
 	ID          int64     `json:"id"`
@@ -81,6 +95,8 @@ type PageData struct {
 
 	InternalIn  int64 // entradas de Movimentação interna no mês (fora dos totais), em centavos
 	InternalOut int64 // saídas de Movimentação interna no mês (fora dos totais), em centavos
+	Invested    int64 // saídas de Investimento no mês (fora dos totais), em centavos
+	Redeemed    int64 // entradas de Investimento (resgates) no mês (fora dos totais), em centavos
 
 	ImportResult *ImportResult // aviso após importar um extrato (nil = sem aviso)
 	BulkResult   *BulkResult   // aviso após uma edição em lote (nil = sem aviso)

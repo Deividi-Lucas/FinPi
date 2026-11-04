@@ -181,7 +181,7 @@ func (h *Handler) renderOverview(w http.ResponseWriter, r *http.Request, status 
 	}
 	var free []transfer.Tx
 	for _, t := range freeTransactions(all, links, solo) {
-		if models.IsInternal(t.Category) { // já fica fora dos totais
+		if models.IsOutsideTotals(t.Category) { // já fica fora dos totais
 			continue
 		}
 		free = append(free, database.ToTransferTx(t))

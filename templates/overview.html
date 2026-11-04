@@ -107,6 +107,9 @@
             </table>
         </section>
 
+        {{if or .Overview.Invested .Overview.Redeemed}}
+        <p class="mt-4 text-xs text-emerald-300/80">Investimentos (fora dos totais): investido {{formatCurrency .Overview.Invested}} &middot; resgatado {{formatCurrency .Overview.Redeemed}}</p>
+        {{end}}
         {{if or .Overview.InternalIn .Overview.InternalOut}}
         <p class="mt-4 text-xs text-slate-400">Movimentações internas (fora dos totais): entradas {{formatCurrency .Overview.InternalIn}} &middot; saídas {{formatCurrency .Overview.InternalOut}}</p>
         {{end}}

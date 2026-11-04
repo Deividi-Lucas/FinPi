@@ -25,6 +25,7 @@ type Overview struct {
 	SoloIn, SoloOut         int64 // marcados "outro lado fora do FinPi" dentro do período
 	SoloSides               int
 	InternalIn, InternalOut int64 // Movimentação interna (já fora dos totais de cada livro)
+	Invested, Redeemed      int64 // Investimento: aplicado e resgatado (também fora dos totais)
 	Total                   models.Summary
 }
 
@@ -34,9 +35,11 @@ func BuildOverview(books []BookInput, linked, solo map[int64]bool) Overview {
 	var o Overview
 	var income, expense int64
 	for _, b := range books {
-		regular, internalIn, internalOut := dashboard.SplitInternal(b.Txs)
-		o.InternalIn += internalIn
-		o.InternalOut += internalOut
+		regular, out := dashboard.SplitOutside(b.Txs)
+		o.InternalIn += out.InternalIn
+		o.InternalOut += out.InternalOut
+		o.Invested += out.Invested
+		o.Redeemed += out.Redeemed
 		s := dashboard.Summarize(regular)
 		o.Rows = append(o.Rows, BookRow{Book: b.Book, Summary: s})
 		income += s.TotalIncome
