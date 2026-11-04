@@ -97,21 +97,35 @@ func Compute(txs []models.Transaction, cats []models.Category) models.MonthStats
 	return stats
 }
 
-// SplitInternal separa os lançamentos da categoria Movimentação interna: devolve os demais e as somas de
-// entradas e saídas internas (em centavos).
-func SplitInternal(txs []models.Transaction) (regular []models.Transaction, internalIn, internalOut int64) {
+// Outside são as somas (em centavos) do que fica fora dos totais: Movimentação interna e Investimento.
+type Outside struct {
+	InternalIn, InternalOut int64 // Movimentação interna
+	Invested, Redeemed      int64 // Investimento: saídas (aplicado) e entradas (resgatado)
+}
+
+// SplitOutside separa os lançamentos das categorias Movimentação interna e Investimento: devolve os demais
+// e as somas do que ficou de fora.
+func SplitOutside(txs []models.Transaction) (regular []models.Transaction, o Outside) {
 	for _, t := range txs {
-		if !models.IsInternal(t.Category) {
+		income := t.Type == "income"
+		switch {
+		case models.IsInternal(t.Category):
+			if income {
+				o.InternalIn += t.AmountCents
+			} else {
+				o.InternalOut += t.AmountCents
+			}
+		case models.IsInvestment(t.Category):
+			if income {
+				o.Redeemed += t.AmountCents
+			} else {
+				o.Invested += t.AmountCents
+			}
+		default:
 			regular = append(regular, t)
-			continue
-		}
-		if t.Type == "income" {
-			internalIn += t.AmountCents
-		} else {
-			internalOut += t.AmountCents
 		}
 	}
-	return regular, internalIn, internalOut
+	return regular, o
 }
 
 // Summarize soma receitas, despesas e saldo (em centavos) dos lançamentos.

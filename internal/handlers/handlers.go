@@ -38,6 +38,7 @@ func NewHandler(db *database.DB, templateFS fs.FS, version string) (*Handler, er
 	funcMap := template.FuncMap{
 		"formatCurrency": formatCurrencyBRL,
 		"isInternal":     models.IsInternal,
+		"isInvestment":   models.IsInvestment,
 		"centsInput":     formatCentsInput,
 		"formatDate":     formatDateBR,
 		"plural": func(n int, one, many string) string {
@@ -189,7 +190,7 @@ func applyFilter(f filter.Filter, list []models.Transaction) (shown []models.Tra
 			continue
 		}
 		count++
-		if models.IsInternal(t.Category) { // aparece na lista, mas não entra nas somas
+		if models.IsOutsideTotals(t.Category) { // aparece na lista, mas não entra nas somas
 		} else if t.Type == "income" {
 			income += t.AmountCents
 		} else {
@@ -331,7 +332,7 @@ func (h *Handler) renderPage(w http.ResponseWriter, r *http.Request, o pageOpts)
 	}
 	dashboard.Annotate(transactions, categories)
 	// Movimentação interna (resgates, transferências entre contas) fica fora dos totais e do dashboard.
-	regular, internalIn, internalOut := dashboard.SplitInternal(transactions)
+	regular, outside := dashboard.SplitOutside(transactions)
 	summary := dashboard.Summarize(regular)
 	if includeProjected {
 		summary = withProjected(summary, projectedIncome, projectedExpense)
@@ -430,8 +431,10 @@ func (h *Handler) renderPage(w http.ResponseWriter, r *http.Request, o pageOpts)
 		TodayDate:     now.Format("2006-01-02"),
 		Version:       h.version,
 		Stats:         stats,
-		InternalIn:    internalIn,
-		InternalOut:   internalOut,
+		InternalIn:    outside.InternalIn,
+		InternalOut:   outside.InternalOut,
+		Invested:      outside.Invested,
+		Redeemed:      outside.Redeemed,
 		ImportResult:  importResult,
 		BulkResult:    bulkResult,
 		Undo:          undo,
@@ -623,11 +626,11 @@ func (h *Handler) DeleteTransaction(w http.ResponseWriter, r *http.Request) {
 	redirectToMonth(w, r, month)
 }
 
-// withoutInternal descarta as parcelas previstas da categoria Movimentação interna.
+// withoutInternal descarta as parcelas previstas das categorias Movimentação interna e Investimento.
 func withoutInternal(p []models.ProjectedInstallment) []models.ProjectedInstallment {
 	var out []models.ProjectedInstallment
 	for _, x := range p {
-		if !models.IsInternal(x.Category) {
+		if !models.IsOutsideTotals(x.Category) {
 			out = append(out, x)
 		}
 	}

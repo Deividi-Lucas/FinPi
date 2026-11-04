@@ -245,3 +245,19 @@ func TestBuildPreview_SameNubankIDInOFXAndCSVIsAlreadyImported(t *testing.T) {
 		t.Errorf("deveria vir como já importado: %+v", p.Rows[0])
 	}
 }
+
+func TestIsInvestmentMovement(t *testing.T) {
+	for desc, want := range map[string]bool{
+		"Pix enviado - XP Investimentos":     true,
+		"Compra Tesouro Direto":              true,
+		"APLICAÇÃO CDB":                      true,
+		"Transferência para Clear Corretora": true,
+		"Aporte mensal":                      true,
+		"Mercado Sao Cdbairro":               false,
+		"Restaurante":                        false,
+	} {
+		if got := isInvestmentMovement(desc); got != want {
+			t.Errorf("isInvestmentMovement(%q) = %v, esperado %v", desc, got, want)
+		}
+	}
+}

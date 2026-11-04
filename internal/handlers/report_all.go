@@ -88,7 +88,7 @@ func (h *Handler) loadAllBooks(books []models.Book, from, to string, f filter.Fi
 		for _, t := range txs {
 			isLinked := linked[t.ID]
 			// a movimentação interna já sai dos totais por outro caminho: não conta duas vezes como transferência
-			if (isLinked || soloSet[t.ID]) && !models.IsInternal(t.Category) {
+			if (isLinked || soloSet[t.ID]) && !models.IsOutsideTotals(t.Category) {
 				if matchTx(f, t) {
 					data.Excluded.add(t, isLinked)
 				}
@@ -133,7 +133,7 @@ func projectInstallments(sets [][]models.Transaction, months []string, from, to 
 	for _, candidates := range sets {
 		for _, m := range months {
 			for _, p := range installments.Project(candidates, m) {
-				if p.Date >= from && p.Date <= to && !models.IsInternal(p.Category) && matchProjected(f, p) {
+				if p.Date >= from && p.Date <= to && !models.IsOutsideTotals(p.Category) && matchProjected(f, p) {
 					out = append(out, p)
 				}
 			}

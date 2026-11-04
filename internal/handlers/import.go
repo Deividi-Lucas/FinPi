@@ -125,9 +125,9 @@ func (h *Handler) ImportPreview(w http.ResponseWriter, r *http.Request) {
 	for _, c := range visibleCategories(categories) {
 		options = append(options, c.Name)
 	}
-	// "Outros" e "Movimentação interna" sempre aparecem: se o livro não as tem, a confirmação as cria.
+	// "Outros", "Movimentação interna" e "Investimento" sempre aparecem: se o livro não as tem, a confirmação as cria.
 	newOptions := map[string]bool{}
-	for _, name := range []string{"Outros", models.InternalCategory} {
+	for _, name := range []string{"Outros", models.InternalCategory, models.InvestmentCategory} {
 		if hasFold(options, name) {
 			continue
 		}
@@ -306,8 +306,12 @@ func (h *Handler) ImportConfirm(w http.ResponseWriter, r *http.Request) {
 	for _, c := range categories {
 		canonical[textutil.Fold(c.Name)] = c.Name
 	}
-	// Só estas duas podem nascer na confirmação (a prévia as oferece mesmo num livro sem categorias).
-	creatable := map[string]string{textutil.Fold("Outros"): "Outros", textutil.Fold(models.InternalCategory): models.InternalCategory}
+	// Só estas podem nascer na confirmação (a prévia as oferece mesmo num livro sem categorias).
+	creatable := map[string]string{
+		textutil.Fold("Outros"):                  "Outros",
+		textutil.Fold(models.InternalCategory):   models.InternalCategory,
+		textutil.Fold(models.InvestmentCategory): models.InvestmentCategory,
+	}
 	for i := 0; i < n; i++ {
 		if r.PostForm.Get("sel_"+strconv.Itoa(i)) != "1" {
 			continue
