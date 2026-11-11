@@ -12,6 +12,7 @@ import (
 	"unicode/utf8"
 
 	"finpi/internal/database"
+	"finpi/internal/installments"
 	"finpi/internal/models"
 	"finpi/internal/statement"
 	"finpi/internal/textutil"
@@ -170,24 +171,35 @@ func (h *Handler) ImportPreview(w http.ResponseWriter, r *http.Request) {
 	preview.Bank = st.Bank
 	preview.Format = st.Format
 
-	// A categoria sugerida pode estar oculta: precisa existir como opção da linha.
-	have := map[string]bool{}
-	for _, o := range options {
-		have[o] = true
-	}
-	for _, row := range preview.Rows {
-		if row.Category != "" && !have[row.Category] {
-			options = append(options, row.Category)
-			have[row.Category] = true
-		}
-	}
-
 	bank := bankKey(st.Bank)
 	bankAcc, bankOK, err := db.AccountForBank(bank)
 	if err != nil {
 		serverError(w, "Erro ao carregar as contas", err)
 		return
 	}
+	var importAccount int64
+	if bankOK {
+		importAccount = bankAcc.ID
+	}
+	if err := reconcileProjected(db, &preview, minDate, maxDate, importAccount); err != nil {
+		serverError(w, "Erro ao carregar parcelas", err)
+		return
+	}
+
+	// A categoria sugerida pode estar oculta: precisa existir como opção da linha.
+	have := map[string]bool{}
+	for _, o := range options {
+		have[o] = true
+	}
+	for _, row := range preview.Rows {
+		for _, c := range []string{row.Category, row.PlainCategory} {
+			if c != "" && !have[c] {
+				options = append(options, c)
+				have[c] = true
+			}
+		}
+	}
+
 	allAccounts, err := db.ListAccounts()
 	if err != nil {
 		serverError(w, "Erro ao carregar as contas", err)
@@ -210,6 +222,52 @@ func (h *Handler) ImportPreview(w http.ResponseWriter, r *http.Request) {
 	if err := h.tmpl.ExecuteTemplate(w, "importPreview", view); err != nil {
 		serverError(w, "Erro ao renderizar a revisão", err)
 	}
+}
+
+// reconcileProjected reconhece, nas linhas do extrato, as parcelas previstas que elas realizam: a linha
+// passa a vir com a descrição da série ("Geladeira 4/10") e a categoria dela, o que faz a prevista
+// sumir ao importar. A sugestão sem a parcela fica em PlainDescription/PlainCategory para desfazer.
+func reconcileProjected(db *database.DB, preview *statement.Preview, minDate, maxDate string, account int64) error {
+	if len(preview.Rows) == 0 {
+		return nil
+	}
+	first, err1 := time.Parse("2006-01-02", minDate)
+	last, err2 := time.Parse("2006-01-02", maxDate)
+	if err1 != nil || err2 != nil {
+		return nil
+	}
+	candidates, err := db.GetInstallmentCandidates()
+	if err != nil {
+		return err
+	}
+	// A janela de dias pode atravessar o mês: projeta também o mês anterior e o seguinte.
+	var projected []models.ProjectedInstallment
+	end := time.Date(last.Year(), last.Month()+1, 1, 0, 0, 0, 0, time.UTC)
+	for cur := time.Date(first.Year(), first.Month()-1, 1, 0, 0, 0, 0, time.UTC); !cur.After(end); cur = cur.AddDate(0, 1, 0) {
+		projected = append(projected, withoutInternal(installments.Project(candidates, cur.Format("2006-01")))...)
+	}
+	if len(projected) == 0 {
+		return nil
+	}
+
+	rows := make([]installments.Row, len(preview.Rows))
+	for i, r := range preview.Rows {
+		rows[i] = installments.Row{Date: r.Date, Type: r.Type, AmountCents: r.AmountCents, Skip: r.Locked}
+	}
+	for i, j := range installments.Match(projected, rows, account) {
+		if j < 0 {
+			continue
+		}
+		p := projected[j]
+		row := &preview.Rows[i]
+		row.PlainDescription, row.PlainCategory = row.Description, row.Category
+		row.Description = installments.Description(p)
+		if p.Category != "" {
+			row.Category = p.Category
+		}
+		row.Installment = fmt.Sprintf("%d/%d", p.Number, p.Total)
+	}
+	return nil
 }
 
 // hasFold diz se a lista tem o nome, ignorando maiúsculas e acentos.
