@@ -12,6 +12,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/joho/godotenv"
+
 	"finpi/internal/database"
 	"finpi/internal/handlers"
 )
@@ -26,6 +28,7 @@ var templateFS embed.FS
 
 func main() {
 	// Flags de configuração (com suporte a variáveis de ambiente)
+	godotenv.Load()
 	defaultPort := getEnv("PORT", "8080")
 	defaultDBPath := getEnv("DB_PATH", "finpi.db")
 	defaultHost := getEnv("HOST", "0.0.0.0")
