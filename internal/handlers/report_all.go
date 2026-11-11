@@ -85,6 +85,7 @@ func (h *Handler) loadAllBooks(books []models.Book, from, to string, f filter.Fi
 		if err != nil {
 			return data, err
 		}
+		kept := txs[:0] // filtra no lugar: o período pode ter dezenas de milhares de lançamentos
 		for _, t := range txs {
 			isLinked := linked[t.ID]
 			// a movimentação interna já sai dos totais por outro caminho: não conta duas vezes como transferência
@@ -94,7 +95,12 @@ func (h *Handler) loadAllBooks(books []models.Book, from, to string, f filter.Fi
 				}
 				continue
 			}
-			data.Txs = append(data.Txs, t)
+			kept = append(kept, t)
+		}
+		if data.Txs == nil {
+			data.Txs = kept
+		} else {
+			data.Txs = append(data.Txs, kept...)
 		}
 		cats, err := bdb.ListCategories()
 		if err != nil {
@@ -114,12 +120,15 @@ func (h *Handler) loadAllBooks(books []models.Book, from, to string, f filter.Fi
 			data.Candidates = append(data.Candidates, cands)
 		}
 	}
-	sort.SliceStable(data.Txs, func(i, j int) bool {
+	byDate := func(i, j int) bool {
 		if data.Txs[i].Date != data.Txs[j].Date {
 			return data.Txs[i].Date < data.Txs[j].Date
 		}
 		return data.Txs[i].ID < data.Txs[j].ID
-	})
+	}
+	if !sort.SliceIsSorted(data.Txs, byDate) { // com um livro só já vem na ordem do banco
+		sort.SliceStable(data.Txs, byDate)
+	}
 	sort.SliceStable(data.Categories, func(i, j int) bool {
 		return textutil.Fold(data.Categories[i].Name) < textutil.Fold(data.Categories[j].Name)
 	})

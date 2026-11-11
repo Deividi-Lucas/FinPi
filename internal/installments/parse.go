@@ -32,6 +32,11 @@ var markers = []*regexp.Regexp{
 // Parse lê a parcela de uma descrição. Devolve false se não houver marcador válido.
 func Parse(description string) (Info, bool) {
 	text := strings.TrimSpace(description)
+	// Todo marcador tem "/" ou "parcela": sem eles, nenhuma regex casa. Parse roda em cada lançamento listado,
+	// então o atalho evita as regex na grande maioria das descrições.
+	if !strings.Contains(text, "/") && !strings.Contains(strings.ToLower(text), "parcela") {
+		return Info{}, false
+	}
 	for _, re := range markers {
 		m := re.FindStringSubmatch(text)
 		if m == nil {

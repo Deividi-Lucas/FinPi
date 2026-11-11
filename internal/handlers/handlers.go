@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"finpi/internal/dashboard"
 	"finpi/internal/database"
 	"finpi/internal/filter"
 	"finpi/internal/installments"
@@ -308,12 +307,6 @@ func (h *Handler) renderPage(w http.ResponseWriter, r *http.Request, o pageOpts)
 		return
 	}
 
-	transactions, err := db.GetTransactions(selectedMonth)
-	if err != nil {
-		serverError(w, "Erro ao carregar lançamentos", err)
-		return
-	}
-
 	includeProjected := wantsProjected(r)
 
 	candidates, err := db.GetInstallmentCandidates()
@@ -323,39 +316,25 @@ func (h *Handler) renderPage(w http.ResponseWriter, r *http.Request, o pageOpts)
 	}
 	projected := withoutInternal(installments.Project(candidates, selectedMonth))
 	projectedIncome, projectedExpense := projectedTotals(projected)
-	installments.Annotate(transactions)
 
 	categories, err := db.ListCategories()
 	if err != nil {
 		serverError(w, "Erro ao carregar categorias", err)
 		return
 	}
-	dashboard.Annotate(transactions, categories)
-	// Movimentação interna (resgates, transferências entre contas) fica fora dos totais e do dashboard.
-	regular, outside := dashboard.SplitOutside(transactions)
-	summary := dashboard.Summarize(regular)
-	if includeProjected {
-		summary = withProjected(summary, projectedIncome, projectedExpense)
-	}
-	stats := dashboard.Compute(regular, categories)
 
 	// A lista do histórico segue os filtros; os cartões e o dashboard do mês continuam sendo do mês inteiro.
 	f, filterWarnings := requestFilter(r)
-	list := transactions
-	if f.AllMonths {
-		all, err := db.GetTransactionsBetween("0001-01-01", "9999-12-31")
-		if err != nil {
-			serverError(w, "Erro ao carregar lançamentos", err)
-			return
-		}
-		for i, j := 0, len(all)-1; i < j; i, j = i+1, j-1 { // do mais recente para o mais antigo
-			all[i], all[j] = all[j], all[i]
-		}
-		installments.Annotate(all)
-		dashboard.Annotate(all, categories)
-		list = all
+	month, err := loadMonth(db, selectedMonth, categories, f)
+	if err != nil {
+		serverError(w, "Erro ao carregar lançamentos", err)
+		return
 	}
-	shown, count, histIncome, histExpense := applyFilter(f, list)
+	summary, stats, outside := month.Summary, month.Stats, month.Outside
+	if includeProjected {
+		summary = withProjected(summary, projectedIncome, projectedExpense)
+	}
+	shown, count, histIncome, histExpense := month.Shown, month.Count, month.HistIncome, month.HistExpense
 	if err := h.markTransfers(shown); err != nil {
 		serverError(w, "Erro ao carregar as transferências", err)
 		return
@@ -427,7 +406,6 @@ func (h *Handler) renderPage(w http.ResponseWriter, r *http.Request, o pageOpts)
 		PrevMonthURL:  prevMonthURL,
 		NextMonthURL:  nextMonthURL,
 		Summary:       summary,
-		Transactions:  transactions,
 		TodayDate:     now.Format("2006-01-02"),
 		Version:       h.version,
 		Stats:         stats,

@@ -219,8 +219,8 @@
                 <button type="button" data-itab="categoria" class="px-3 py-1.5 rounded-lg border bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700 cursor-pointer">Categoria</button>
             </div>
 
-            {{template "incomePanel" (dict "ID" "income-panel-descricao" "Tab" "descricao" "Rows" .Income.BySource "ShowMonths" .Income.HasMonthly "MonthsTouched" .Income.MonthsTouched)}}
-            {{template "incomePanel" (dict "ID" "income-panel-categoria" "Tab" "categoria" "Rows" .Income.ByCategory "ShowMonths" .Income.HasMonthly "MonthsTouched" .Income.MonthsTouched)}}
+            {{template "incomePanel" (dict "ID" "income-panel-descricao" "Tab" "descricao" "Rows" .Income.BySource "Total" .Income.SourceTotal "Limit" $.RankedLimit "ShowMonths" .Income.HasMonthly "MonthsTouched" .Income.MonthsTouched)}}
+            {{template "incomePanel" (dict "ID" "income-panel-categoria" "Tab" "categoria" "Rows" .Income.ByCategory "Total" .Income.CategoryTotal "Limit" $.RankedLimit "ShowMonths" .Income.HasMonthly "MonthsTouched" .Income.MonthsTouched)}}
             {{end}}
         </section>
 
@@ -234,8 +234,8 @@
                 </div>
             </div>
 
-            {{template "recurringPanel" (dict "ID" "panel-categoria" "Tab" "categoria" "Rows" .Recurrence.ByCategory "Empty" "Sem despesas neste período.")}}
-            {{template "recurringPanel" (dict "ID" "panel-descricao" "Tab" "descricao" "Rows" .Recurrence.ByDescription "Empty" "Nenhum gasto se repetiu neste período.")}}
+            {{template "recurringPanel" (dict "ID" "panel-categoria" "Tab" "categoria" "Rows" .Recurrence.ByCategory "Total" .Recurrence.CategoryTotal "Limit" $.RankedLimit "Empty" "Sem despesas neste período.")}}
+            {{template "recurringPanel" (dict "ID" "panel-descricao" "Tab" "descricao" "Rows" .Recurrence.ByDescription "Total" .Recurrence.DescriptionTotal "Limit" $.RankedLimit "Empty" "Nenhum gasto se repetiu neste período.")}}
         </section>
         {{end}}
 
@@ -263,6 +263,8 @@
         // Tabelas ranqueadas (gastos recorrentes e fontes de receita): abas, ordenação e "Ver todas". O estado de cada
         // uma fica no sessionStorage para sobreviver ao recarregamento automático do tempo real.
         const VISIBLE_ROWS = 10;
+        // "Ver todas" mostra no máximo RANKED_LIMIT linhas: o servidor só manda as primeiras de cada ordenação.
+        const RANKED_LIMIT = {{.RankedLimit}};
 
         function reportStore() {
             try { return window.sessionStorage; } catch (e) { return null; }
@@ -313,7 +315,7 @@
                     });
                     rows.forEach(function (row, i) {
                         body.appendChild(row);
-                        row.classList.toggle('hidden', !state.all[tab] && i >= VISIBLE_ROWS);
+                        row.classList.toggle('hidden', i >= (state.all[tab] ? RANKED_LIMIT : VISIBLE_ROWS));
                     });
                     const more = panel.querySelector('[data-' + A.more + ']');
                     if (more) more.classList.toggle('hidden', state.all[tab] || rows.length <= VISIBLE_ROWS);
@@ -381,7 +383,7 @@
             </tbody>
         </table>
     </div>
-    <button type="button" data-more="{{.Tab}}" class="mt-3 text-xs text-emerald-400 hover:text-emerald-300 cursor-pointer">Ver todas ({{len .Rows}})</button>
+    <button type="button" data-more="{{.Tab}}" class="mt-3 text-xs text-emerald-400 hover:text-emerald-300 cursor-pointer">{{if gt .Total .Limit}}Ver as {{.Limit}} primeiras (de {{.Total}}){{else}}Ver todas ({{.Total}}){{end}}</button>
     {{else}}
     <p class="p-4 text-sm text-slate-500">{{.Empty}}</p>
     {{end}}
@@ -421,7 +423,7 @@
             </tbody>
         </table>
     </div>
-    <button type="button" data-imore="{{.Tab}}" class="mt-3 text-xs text-emerald-400 hover:text-emerald-300 cursor-pointer">Ver todas ({{len .Rows}})</button>
+    <button type="button" data-imore="{{.Tab}}" class="mt-3 text-xs text-emerald-400 hover:text-emerald-300 cursor-pointer">{{if gt .Total .Limit}}Ver as {{.Limit}} primeiras (de {{.Total}}){{else}}Ver todas ({{.Total}}){{end}}</button>
 </div>
 {{end}}
 

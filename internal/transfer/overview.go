@@ -31,6 +31,7 @@ type Overview struct {
 
 // BuildOverview soma os livros e subtrai os lados ligados (linked) e os marcados (solo), que são conjuntos de ID
 // de lançamento. Cada lado é tratado individualmente: se só um lado cai no período, só ele é subtraído.
+// A página usa BuildOverviewFromTotals (mesmo resultado, sem carregar o período); esta é a referência dos testes.
 func BuildOverview(books []BookInput, linked, solo map[int64]bool) Overview {
 	var o Overview
 	var income, expense int64

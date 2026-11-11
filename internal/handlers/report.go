@@ -162,14 +162,15 @@ type granOption struct {
 }
 
 type reportPage struct {
-	Version  string
-	Warning  string
-	Custom   bool
-	Year     int
-	PrevURL  string
-	NextURL  string
-	YearURL  string // volta ao ano completo (quando o período é personalizado)
-	From, To string
+	Version     string
+	RankedLimit int // máximo de linhas de cada tabela ranqueada mostradas em "Ver todas" (report.MaxRankedRows)
+	Warning     string
+	Custom      bool
+	Year        int
+	PrevURL     string
+	NextURL     string
+	YearURL     string // volta ao ano completo (quando o período é personalizado)
+	From, To    string
 
 	IncludeProjected bool
 	ToggleProjected  string // link que liga/desliga as previstas
@@ -178,8 +179,8 @@ type reportPage struct {
 	AutoURL          string
 	Options          []granOption
 
-	InternalIn, InternalOut int64 // movimentação interna do período (fora dos totais), em centavos
-	Invested, Redeemed      int64 // investimento do período: aplicado e resgatado (fora dos totais), em centavos
+	InternalIn, InternalOut int64        // movimentação interna do período (fora dos totais), em centavos
+	Invested, Redeemed      int64        // investimento do período: aplicado e resgatado (fora dos totais), em centavos
 	Excluded                excludedSums // só em "Todos os livros": transferências ligadas e marcadas fora do FinPi
 	HasExcluded             bool
 
@@ -195,12 +196,12 @@ type reportPage struct {
 	AllCategories []models.Category // lista de categorias da barra de filtros
 	ClearURL      string            // mesmo período, sem filtros
 
-	Book     models.Book // livro do relatório
-	BookID   int64
-	BookParam string       // valor de livro= nos formulários e links: o ID do livro ou "todos"
-	AllBooks bool          // relatório de todos os livros somados
-	Books    []models.Book // livros ativos (seletor)
-	BookPath string        // página atual, para o seletor de livro
+	Book      models.Book // livro do relatório
+	BookID    int64
+	BookParam string        // valor de livro= nos formulários e links: o ID do livro ou "todos"
+	AllBooks  bool          // relatório de todos os livros somados
+	Books     []models.Book // livros ativos (seletor)
+	BookPath  string        // página atual, para o seletor de livro
 }
 
 // Report renderiza a página do relatório por período (somente leitura).
@@ -278,7 +279,7 @@ func (h *Handler) Report(w http.ResponseWriter, r *http.Request) {
 
 	txs = filterTransactions(q.Filter, txs)
 	var outside dashboard.Outside
-	txs, outside = dashboard.SplitOutside(txs) // movimentação interna e investimento ficam fora do fluxo
+	txs, outside = dashboard.SplitOutsideInPlace(txs) // movimentação interna e investimento ficam fora do fluxo
 
 	months := monthsBetween(q.From, q.To)
 	projected := projectInstallments(candidates, months, q.From, q.To, q.Filter)
@@ -291,7 +292,7 @@ func (h *Handler) Report(w http.ResponseWriter, r *http.Request) {
 
 	buckets := report.BuildFlow(txs, projected, q.From, q.To, granularity)
 	page := reportPage{
-		Version: h.version, Warning: warning, Custom: q.Custom, Year: q.Year, From: q.From, To: q.To,
+		Version: h.version, RankedLimit: report.MaxRankedRows, Warning: warning, Custom: q.Custom, Year: q.Year, From: q.From, To: q.To,
 		YearURL:          q.URL(func(x *reportQuery) { x.Custom = false }), // em modo personalizado q.Year já é o ano atual
 		IncludeProjected: q.Projected,
 		ToggleProjected:  q.URL(func(x *reportQuery) { x.Projected = !x.Projected }),
@@ -303,8 +304,8 @@ func (h *Handler) Report(w http.ResponseWriter, r *http.Request) {
 		Empty:      len(txs) == 0 && len(projected) == 0,
 		Buckets:    buckets,
 		Cards:      buildCards(buckets, len(months), q.Projected && len(projected) > 0),
-		Recurrence: report.Recurring(txs),
-		Income:     report.Incomes(txs, len(months)),
+		Recurrence: report.Recurring(txs).Limited(report.MaxRankedRows),
+		Income:     report.Incomes(txs, len(months)).Limited(report.MaxRankedRows),
 		ChartLabel: "Entradas, saídas e saldo acumulado por " + map[report.Granularity]string{report.Day: "dia", report.Week: "semana", report.Month: "mês"}[granularity],
 
 		Filter:        filterView(q.Filter, nil, categories, accounts),

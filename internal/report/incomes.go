@@ -30,29 +30,20 @@ type IncomeReport struct {
 	MonthsTouched    int        // meses que o período toca
 	AvgMonthly       int64      // Total ÷ MonthsTouched, arredondada
 	HasMonthly       bool       // false em período de um só mês
+
+	// Linhas antes de Limited (0 se não foi chamada): o "Ver todas" informa quantas existem.
+	SourceTotal, CategoryTotal int
 }
 
 // Incomes agrupa as receitas por descrição e por categoria. months é o número de meses que o período toca.
 func Incomes(txs []models.Transaction, months int) IncomeReport {
-	var incomes []models.Transaction
-	var total int64
-	for _, t := range txs {
-		if t.Type == "income" {
-			incomes = append(incomes, t)
-			total += t.AmountCents
-		}
-	}
-	sort.SliceStable(incomes, func(i, j int) bool {
-		if incomes[i].Date != incomes[j].Date {
-			return incomes[i].Date < incomes[j].Date
-		}
-		return incomes[i].ID < incomes[j].ID
-	})
+	incomes, total := chronological(txs, "income")
 
 	sources := map[string]*group{}
 	cats := map[string]*group{}
 	active := map[string]bool{}
-	for _, t := range incomes {
+	for _, i := range incomes {
+		t := &txs[i]
 		name := collapse(t.Description)
 		if info, ok := installments.Parse(t.Description); ok {
 			name = collapse(info.Name)
@@ -60,7 +51,7 @@ func Incomes(txs []models.Transaction, months int) IncomeReport {
 		addTo(sources, textutil.Fold(name), name, t.AmountCents, t.Date)
 
 		cat := collapse(t.Category)
-		addTo(cats, textutil.Fold(cat), cat, t.AmountCents, t.Date)
+		addTo(cats, textutil.FoldCached(cat), cat, t.AmountCents, t.Date)
 
 		if len(t.Date) >= 7 {
 			active[t.Date[:7]] = true

@@ -39,7 +39,10 @@ func InitDB(dbPath string) (*DB, error) {
 		"PRAGMA synchronous = NORMAL;", // Seguro com WAL, evita fsync agressivo que desgasta o flash
 		"PRAGMA busy_timeout = 5000;",  // Aguarda até 5s em caso de bloqueio antes de falhar
 		"PRAGMA cache_size = -2000;",   // Limita o cache em memória a ~2MB (reduz uso de RAM)
-		"PRAGMA temp_store = MEMORY;",  // Tabelas temporárias leves em RAM em vez de disco
+		// Lê o arquivo por mmap (até 64MB): páginas vêm do cache do sistema operacional, compartilhado e descartável,
+		// em vez de copiadas por read() a cada consulta; não aumenta o heap do Go.
+		"PRAGMA mmap_size = 67108864;",
+		"PRAGMA temp_store = MEMORY;", // Tabelas temporárias leves em RAM em vez de disco
 	}
 
 	for _, pragma := range pragmas {
@@ -159,6 +162,16 @@ func migrate(conn *sql.DB) error {
 		return fmt.Errorf("erro ao separar as categorias por livro: %w", err)
 	}
 	if _, err := conn.Exec(`CREATE INDEX IF NOT EXISTS idx_transactions_book_date ON transactions(book_id, date)`); err != nil {
+		return err
+	}
+	// Cobre o agrupamento por categoria (contagem de uso no menu de categorias, aberto em toda página).
+	if _, err := conn.Exec(`CREATE INDEX IF NOT EXISTS idx_transactions_book_category ON transactions(book_id, category)`); err != nil {
+		return err
+	}
+	// Cobre as somas do mês (MonthGroups) e a busca da maior/menor despesa: lidas só do índice, sem abrir cada
+	// lançamento na tabela.
+	if _, err := conn.Exec(`CREATE INDEX IF NOT EXISTS idx_transactions_month_sums
+		ON transactions(book_id, date, type, category, priority, amount_cents)`); err != nil {
 		return err
 	}
 	if err := seedCategories(conn); err != nil {
@@ -304,7 +317,16 @@ var ErrInvalidPriority = errors.New("prioridade inválida: use essential, superf
 const transactionColumns = `id, description, amount_cents, type, category, date, priority, created_at, original_description, account_id`
 
 func scanTransactions(rows *sql.Rows) ([]models.Transaction, error) {
+	return scanTransactionsCap(rows, 0)
+}
+
+// scanTransactionsCap é o scanTransactions com a capacidade já reservada (n = número esperado de linhas; é só uma
+// dica). Em listas grandes evita as realocações do append, que copiavam a lista inteira várias vezes.
+func scanTransactionsCap(rows *sql.Rows, n int) ([]models.Transaction, error) {
 	var list []models.Transaction
+	if n > 0 {
+		list = make([]models.Transaction, 0, n)
+	}
 	for rows.Next() {
 		var t models.Transaction
 		if err := rows.Scan(&t.ID, &t.Description, &t.AmountCents, &t.Type, &t.Category, &t.Date, &t.Priority, &t.CreatedAt, &t.OriginalDescription, &t.AccountID); err != nil {
@@ -346,13 +368,18 @@ func (d *DB) GetTransactions(yearMonth string) ([]models.Transaction, error) {
 	var args []interface{}
 
 	if yearMonth != "" {
+		from, to, ok := monthRange(yearMonth)
+		if !ok {
+			return nil, nil // mês inválido não casa com nenhum lançamento
+		}
+		// Intervalo de datas em vez de strftime(date): usa o índice (book_id, date) e lê só o mês.
 		query = `
 			SELECT ` + transactionColumns + `
 			FROM transactions
-			WHERE book_id = ? AND strftime('%Y-%m', date) = ?
+			WHERE book_id = ? AND date >= ? AND date < ?
 			ORDER BY date DESC, id DESC
 		`
-		args = append(args, d.book, yearMonth)
+		args = append(args, d.book, from, to)
 	} else {
 		query = `
 			SELECT ` + transactionColumns + `
@@ -376,6 +403,12 @@ func (d *DB) GetTransactions(yearMonth string) ([]models.Transaction, error) {
 // GetTransactionsBetween recupera os lançamentos com data de from a to (inclusive, AAAA-MM-DD),
 // do mais antigo para o mais recente.
 func (d *DB) GetTransactionsBetween(from, to string) ([]models.Transaction, error) {
+	// A contagem sai só do índice (book_id, date) e permite reservar a lista de uma vez (relatório de um ano).
+	var n int
+	if err := d.conn.QueryRow(`SELECT COUNT(*) FROM transactions WHERE book_id = ? AND date >= ? AND date <= ?`,
+		d.book, from, to).Scan(&n); err != nil {
+		return nil, err
+	}
 	rows, err := d.conn.Query(`
 		SELECT `+transactionColumns+`
 		FROM transactions
@@ -387,7 +420,7 @@ func (d *DB) GetTransactionsBetween(from, to string) ([]models.Transaction, erro
 	}
 	defer rows.Close()
 
-	return scanTransactions(rows)
+	return scanTransactionsCap(rows, n)
 }
 
 // GetInstallmentCandidates devolve os lançamentos cuja descrição pode conter uma parcela
@@ -479,4 +512,13 @@ func requireAffected(res sql.Result) error {
 		return ErrNotFound
 	}
 	return nil
+}
+
+// monthRange devolve o primeiro dia do mês (AAAA-MM) e o do mês seguinte, para filtrar date >= from AND date < to.
+func monthRange(yearMonth string) (from, to string, ok bool) {
+	m, err := time.Parse("2006-01", yearMonth)
+	if err != nil {
+		return "", "", false
+	}
+	return m.Format("2006-01-02"), m.AddDate(0, 1, 0).Format("2006-01-02"), true
 }

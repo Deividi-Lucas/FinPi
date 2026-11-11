@@ -23,42 +23,55 @@ type Recurrence struct {
 	ByCategory    []RecurringRow
 	ByDescription []RecurringRow // só grupos com 2 ou mais lançamentos
 	ExpenseTotal  int64
+
+	// Linhas antes de Limited (0 se não foi chamada): o "Ver todas" informa quantas existem.
+	CategoryTotal, DescriptionTotal int
 }
 
+// group acumula um grupo. Grafias e meses de um grupo são poucos, então ficam em fatias (busca linear) em vez
+// de mapas: com milhares de descrições distintas, dois mapas por grupo pesavam mais que o resto do relatório.
 type group struct {
-	count    int
-	total    int64
-	spelling map[string]int
-	order    []string        // grafias na ordem em que apareceram (por data, depois ID)
-	months   map[string]bool // meses (AAAA-MM) com ao menos um lançamento
-	last     string          // data (AAAA-MM-DD) do último lançamento
+	count  int
+	total  int64
+	order  []string // grafias na ordem em que apareceram (por data, depois ID)
+	counts []int    // vezes de cada grafia (mesma posição de order)
+	months []string // meses (AAAA-MM) com ao menos um lançamento
+	last   string   // data (AAAA-MM-DD) do último lançamento
 }
 
 func (g *group) add(spelling string, cents int64, date string) {
-	if g.spelling == nil {
-		g.spelling = map[string]int{}
-		g.months = map[string]bool{}
-	}
-	if g.spelling[spelling] == 0 {
+	i := indexOf(g.order, spelling)
+	if i < 0 {
 		g.order = append(g.order, spelling)
+		g.counts = append(g.counts, 0)
+		i = len(g.order) - 1
 	}
-	g.spelling[spelling]++
+	g.counts[i]++
 	g.count++
 	g.total += cents
-	if len(date) >= 7 {
-		g.months[date[:7]] = true
+	if len(date) >= 7 && indexOf(g.months, date[:7]) < 0 {
+		g.months = append(g.months, date[:7])
 	}
 	if date > g.last {
 		g.last = date
 	}
 }
 
+func indexOf(list []string, s string) int {
+	for i := range list {
+		if list[i] == s {
+			return i
+		}
+	}
+	return -1
+}
+
 // name devolve a grafia mais frequente; em empate, a que apareceu primeiro.
 func (g *group) name() string {
 	best, bestN := "", 0
-	for _, s := range g.order {
-		if g.spelling[s] > bestN {
-			best, bestN = s, g.spelling[s]
+	for i, s := range g.order {
+		if g.counts[i] > bestN {
+			best, bestN = s, g.counts[i]
 		}
 	}
 	return best
@@ -68,26 +81,13 @@ func collapse(s string) string { return strings.Join(strings.Fields(s), " ") }
 
 // Recurring agrupa as despesas por categoria e por descrição (sem o número da parcela).
 func Recurring(txs []models.Transaction) Recurrence {
-	var expenses []models.Transaction
-	var total int64
-	for _, t := range txs {
-		if t.Type == "expense" {
-			expenses = append(expenses, t)
-			total += t.AmountCents
-		}
-	}
-	sort.SliceStable(expenses, func(i, j int) bool {
-		if expenses[i].Date != expenses[j].Date {
-			return expenses[i].Date < expenses[j].Date
-		}
-		return expenses[i].ID < expenses[j].ID
-	})
-
+	expenses, total := chronological(txs, "expense")
 	cats := map[string]*group{}
 	descs := map[string]*group{}
-	for _, t := range expenses {
+	for _, i := range expenses {
+		t := &txs[i]
 		cat := collapse(t.Category)
-		addTo(cats, textutil.Fold(cat), cat, t.AmountCents, t.Date)
+		addTo(cats, textutil.FoldCached(cat), cat, t.AmountCents, t.Date)
 
 		name := collapse(t.Description)
 		if info, ok := installments.Parse(t.Description); ok {
@@ -100,6 +100,31 @@ func Recurring(txs []models.Transaction) Recurrence {
 	r.ByCategory = rows(cats, total, 1)
 	r.ByDescription = rows(descs, total, 2)
 	return r
+}
+
+// chronological devolve os índices dos lançamentos do tipo, por data e depois ID, e a soma deles. Índices em vez
+// de cópias: cada lançamento tem ~250 bytes e o período pode ter dezenas de milhares. Lista já ordenada (o caso
+// comum, vinda do banco) não é reordenada.
+func chronological(txs []models.Transaction, typ string) ([]int, int64) {
+	var idx []int
+	var total int64
+	for i := range txs {
+		if txs[i].Type == typ {
+			idx = append(idx, i)
+			total += txs[i].AmountCents
+		}
+	}
+	less := func(i, j int) bool {
+		a, b := &txs[idx[i]], &txs[idx[j]]
+		if a.Date != b.Date {
+			return a.Date < b.Date
+		}
+		return a.ID < b.ID
+	}
+	if !sort.SliceIsSorted(idx, less) {
+		sort.SliceStable(idx, less)
+	}
+	return idx, total
 }
 
 func addTo(m map[string]*group, key, spelling string, cents int64, date string) {

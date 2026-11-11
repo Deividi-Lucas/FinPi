@@ -164,14 +164,20 @@ func (h *Handler) renderOverview(w http.ResponseWriter, r *http.Request, status 
 		return
 	}
 
-	var inputs []transfer.BookInput
+	// Os totais de cada livro vêm somados do banco (sem carregar cada lançamento do período); os lados ligados e
+	// marcados, que descontam do total geral, já estão nas ligações e nos marcados lidos acima.
+	var totals []transfer.BookTotals
 	for _, b := range activeBooks(books) {
-		txs, err := h.db.ForBook(b.ID).GetTransactionsBetween(period.From, period.To)
+		groups, err := h.db.ForBook(b.ID).GroupsBetween(period.From, period.To)
 		if err != nil {
 			serverError(w, "Erro ao carregar os lançamentos", err)
 			return
 		}
-		inputs = append(inputs, transfer.BookInput{Book: b, Txs: txs})
+		totals = append(totals, transfer.BookTotals{Book: b, Groups: groups})
+	}
+	sides := append([]models.Transaction(nil), solo...)
+	for _, l := range links {
+		sides = append(sides, l.Out, l.In)
 	}
 
 	all, truncated, err := h.db.AllTransactions(maxTransferTxs)
@@ -190,7 +196,7 @@ func (h *Handler) renderOverview(w http.ResponseWriter, r *http.Request, status 
 
 	page := overviewPage{
 		Version: h.version, Period: period, State: template.URL(period.stateQuery()), Error: errMsg,
-		Overview: transfer.BuildOverview(inputs, linked, soloSet),
+		Overview: transfer.BuildOverviewFromTotals(totals, period.From, period.To, sides, linked, soloSet),
 		Pending:  len(pairs), Truncated: truncated,
 	}
 	h.fillReview(&page, r, values, links, solo, free, pairs)

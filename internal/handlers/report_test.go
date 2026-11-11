@@ -5,12 +5,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"finpi/internal/database"
 	"finpi/internal/models"
+	"finpi/internal/report"
 )
 
 func getReport(h *Handler, target string) (int, string) {
@@ -577,5 +579,31 @@ func TestReport_FilterFormGuardsLiveUpdates(t *testing.T) {
 	script := body[strings.Index(body, "startLiveUpdates(function"):]
 	if !strings.Contains(script[:800], "filters-form") {
 		t.Error("o tempo real deve proteger também o formulário de filtros")
+	}
+}
+
+// Muitas fontes de receita: a página recebe só as primeiras de cada ordenação e o botão diz quantas existem.
+func TestReport_RankedTablesAreLimited(t *testing.T) {
+	h, db := newTestHandler(t)
+	n := report.MaxRankedRows + 30
+	for i := 0; i < n; i++ {
+		mustTx(t, db, "Fonte "+strconv.Itoa(i), "Salário", "income", int64(1000+i), "2026-01-10")
+	}
+
+	_, body := getReport(h, "/relatorio?ano=2026")
+
+	desc := incomePanel(body, "income-panel-descricao")
+	rows := strings.Count(desc, "data-irow ")
+	if rows < report.MaxRankedRows || rows >= n {
+		t.Errorf("linhas enviadas = %d, quer entre %d e %d", rows, report.MaxRankedRows, n-1)
+	}
+	if want := "Ver as " + strconv.Itoa(report.MaxRankedRows) + " primeiras (de " + strconv.Itoa(n) + ")"; !strings.Contains(desc, want) {
+		t.Errorf("botão deveria dizer %q", want)
+	}
+	if !strings.Contains(desc, "Fonte "+strconv.Itoa(n-1)) || strings.Contains(desc, ">Fonte 0<") {
+		t.Error("deveria manter as maiores fontes e cortar as menores")
+	}
+	if got := strings.TrimSpace(strings.TrimPrefix(slice(body, "const RANKED_LIMIT =", ";"), "const RANKED_LIMIT =")); got != strconv.Itoa(report.MaxRankedRows) {
+		t.Errorf("o script precisa do mesmo limite do servidor: RANKED_LIMIT = %q", got)
 	}
 }
