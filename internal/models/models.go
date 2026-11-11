@@ -14,7 +14,7 @@ const InternalCategory = "Movimentação interna"
 
 // IsInternal diz se a categoria é a de movimentação interna (ignora caixa e acentos).
 func IsInternal(category string) bool {
-	return textutil.Fold(category) == textutil.Fold(InternalCategory)
+	return textutil.FoldCached(category) == internalKey
 }
 
 // InvestmentCategory é a categoria do dinheiro aplicado em investimentos (saída) e dos resgates (entrada):
@@ -23,7 +23,7 @@ const InvestmentCategory = "Investimento"
 
 // IsInvestment diz se a categoria é a de investimento (ignora caixa e acentos).
 func IsInvestment(category string) bool {
-	return textutil.Fold(category) == textutil.Fold(InvestmentCategory)
+	return textutil.FoldCached(category) == investmentKey
 }
 
 // IsOutsideTotals diz se a categoria não entra nas receitas e despesas (movimentação interna ou investimento).
@@ -76,7 +76,6 @@ type PageData struct {
 	PrevMonthURL  string // seta do mês anterior ("" sem seta: mês inválido, limite da faixa ou "Todos os meses")
 	NextMonthURL  string // seta do próximo mês
 	Summary       Summary
-	Transactions  []Transaction
 	TodayDate     string // Data atual para preencher o formulário por padrão
 	ErrorMessage  string // Exibida no banner de alerta do template, quando preenchida
 	Version       string // Versão da build, exibida no rodapé
@@ -326,4 +325,20 @@ func (b Book) Hex() string {
 		}
 	}
 	return BookColors[0].Hex
+}
+
+// Chaves normalizadas das categorias fora dos totais, calculadas uma vez (IsInternal roda a cada lançamento).
+var (
+	internalKey   = textutil.Fold(InternalCategory)
+	investmentKey = textutil.Fold(InvestmentCategory)
+)
+
+// MonthGroup é a soma dos lançamentos de um mês com a mesma categoria, tipo e classificação (texto exato).
+// Basta para os totais e o resumo do mês sem carregar cada lançamento.
+type MonthGroup struct {
+	Category string
+	Type     string
+	Priority string
+	Count    int
+	Cents    int64
 }

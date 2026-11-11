@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"reflect"
 	"testing"
 
 	"finpi/internal/models"
@@ -133,5 +134,25 @@ func TestCompute_GroupsSumsCountsAndPercents(t *testing.T) {
 	}
 	if ess.Percent != 61.9 || sup.Percent != 28.6 || unc.Percent != 9.5 {
 		t.Errorf("percentuais = %v/%v/%v, quer 61.9/28.6/9.5", ess.Percent, sup.Percent, unc.Percent)
+	}
+}
+
+func TestSplitOutsideInPlace_SameAsSplitOutside(t *testing.T) {
+	mk := func() []models.Transaction {
+		return []models.Transaction{
+			{ID: 1, Type: "expense", Category: "Lazer", AmountCents: 100},
+			{ID: 2, Type: "income", Category: models.InternalCategory, AmountCents: 200},
+			{ID: 3, Type: "expense", Category: "investimento", AmountCents: 300},
+			{ID: 4, Type: "income", Category: "Salário", AmountCents: 400},
+			{ID: 5, Type: "expense", Category: "movimentação  interna", AmountCents: 500},
+		}
+	}
+	wantRegular, wantOut := SplitOutside(mk())
+	gotRegular, gotOut := SplitOutsideInPlace(mk())
+	if !reflect.DeepEqual(wantRegular, gotRegular) || wantOut != gotOut {
+		t.Errorf("no lugar difere:\n%+v %+v\n%+v %+v", wantRegular, wantOut, gotRegular, gotOut)
+	}
+	if r, o := SplitOutsideInPlace(nil); len(r) != 0 || o != (Outside{}) {
+		t.Errorf("lista vazia: %+v %+v", r, o)
 	}
 }
