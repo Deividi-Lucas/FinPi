@@ -124,6 +124,12 @@ selo `3/10`, quanto ainda resta e, nos meses seguintes, um bloco **Parcelas prev
 totais; marque **Incluir previstas nos totais** para somá-las (`?previstas=1`). A parcela deve ficar no fim da
 descrição, com `1 <= N <= M <= 60`.
 
+Ao **importar um extrato**, cada linha com o mesmo tipo e valor de uma parcela prevista, com data a até 5 dias
+dela (e da mesma conta, quando as duas têm conta), já vem com a descrição da série (`Geladeira 4/10`), a categoria
+dela e o selo **parcela prevista 4/10**. Assim a prevista some ao confirmar, sem editar nada. Desmarque a caixa do
+selo para voltar à descrição do banco (que fica guardada como descrição original de qualquer forma). Se duas
+previstas ou duas linhas puderem casar, nada é sugerido.
+
 ---
 
 ## 🏷️ Categorias

@@ -1628,6 +1628,16 @@
             }
             const row = e.target.closest('[data-import-row]');
             if (!row) return;
+            // Parcela prevista reconhecida: desmarcar volta para a descrição e a categoria sugeridas sem ela.
+            if (e.target.matches('input[data-match]')) {
+                const on = e.target.checked;
+                row.dataset.desc = on ? row.dataset.matchDesc : row.dataset.plainDesc;
+                const text = row.querySelector('[data-desc-text]');
+                if (text) text.textContent = row.dataset.desc;
+                const select = row.querySelector('select[data-cat]');
+                const cat = on ? row.dataset.matchCat : row.dataset.plainCat;
+                if (select && !select.disabled && Array.from(select.options).some(function (o) { return o.value === cat; })) select.value = cat;
+            }
             if (e.target.matches('select[data-cat]')) {
                 importPreview.querySelectorAll('[data-import-row]').forEach(function (other) {
                     const select = other.querySelector('select[data-cat]');

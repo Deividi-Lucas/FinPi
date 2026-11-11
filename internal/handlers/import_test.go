@@ -332,3 +332,44 @@ func TestImportPreview_ShowsTheDestinationBook(t *testing.T) {
 		t.Errorf("a prévia deveria dizer o livro de destino: %.300s", body)
 	}
 }
+
+func TestImportPreview_RecognizesProjectedInstallment(t *testing.T) {
+	h, db := newTestHandler(t)
+	if _, err := db.GetOrCreateCategory("Casa"); err != nil {
+		t.Fatal(err)
+	}
+	// 3/10 em julho: a 4/10 é prevista para 2026-08-04 com R$ 20,00 (mesmo valor do Pix enviado do extrato).
+	prev := models.Transaction{Description: "Geladeira 3/10", Type: "expense", Date: "2026-07-04", AmountCents: 2000, Category: "Casa"}
+	if err := db.CreateTransaction(&prev); err != nil {
+		t.Fatal(err)
+	}
+
+	body := importPreviewBody(t, h, "")
+	for _, want := range []string{"parcela prevista 4/10", `data-desc="Geladeira 4/10"`, `data-plain-desc="Pix enviado Beltrana Souza"`, `data-match-cat="Casa"`, "data-match checked"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("revisão sem %q", want)
+		}
+	}
+	// O Pix recebido (receita) não é parcela.
+	if strings.Count(body, "data-match ") != 1 {
+		t.Errorf("só uma linha deveria casar")
+	}
+
+	// Confirmando com a descrição sugerida, a prevista some do mês.
+	form := confirmForm([]confirmRow{{true, "2026-08-05", "Geladeira 4/10", "mp:172233555668|2026-08-05|-2000", "Casa", -2000}})
+	if rec := post(h.ImportConfirm, "/import/confirm", form); rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d: %s", rec.Code, rec.Body.String())
+	}
+	rec := httptest.NewRecorder()
+	h.Dashboard(rec, httptest.NewRequest(http.MethodGet, "/?month=2026-08", nil))
+	if strings.Contains(rec.Body.String(), "Parcelas previstas (") {
+		t.Error("a 4/10 já foi realizada: não deveria continuar prevista")
+	}
+}
+
+func TestImportPreview_NoInstallmentNoBadge(t *testing.T) {
+	h, _ := newTestHandler(t)
+	if body := importPreviewBody(t, h, ""); strings.Contains(body, "data-match") {
+		t.Error("sem parcelas não há selo")
+	}
+}

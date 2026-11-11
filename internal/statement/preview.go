@@ -49,6 +49,12 @@ type PreviewRow struct {
 	Status      Status
 	Selected    bool
 	Locked      bool
+
+	// Parcela prevista que a linha realiza (preenchido pelo handler). Com ela, Description e Category
+	// já vêm da série; PlainDescription e PlainCategory guardam a sugestão sem a parcela.
+	Installment      string // "4/10"; vazio: nenhuma parcela casou
+	PlainDescription string
+	PlainCategory    string
 }
 
 type Preview struct {

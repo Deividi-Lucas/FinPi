@@ -40,10 +40,19 @@
             </thead>
             <tbody class="divide-y divide-slate-800/60">
                 {{range .Preview.Rows}}
-                <tr data-import-row data-date="{{.Date}}" data-desc="{{.Description}}" data-amount="{{.SignedCents}}" data-ref="{{.ExternalID}}" data-orig="{{.Original}}" class="{{if .Locked}}opacity-50{{end}}">
+                <tr data-import-row data-date="{{.Date}}" data-desc="{{.Description}}" data-amount="{{.SignedCents}}" data-ref="{{.ExternalID}}" data-orig="{{.Original}}"{{if .Installment}} data-match-desc="{{.Description}}" data-match-cat="{{.Category}}" data-plain-desc="{{.PlainDescription}}" data-plain-cat="{{.PlainCategory}}"{{end}} class="{{if .Locked}}opacity-50{{end}}">
                     <td class="px-3 py-2"><input type="checkbox" data-sel {{if .Selected}}checked{{end}} {{if .Locked}}disabled{{end}} class="cursor-pointer"></td>
                     <td class="px-3 py-2 whitespace-nowrap text-slate-400">{{formatDate .Date}}</td>
-                    <td class="px-3 py-2 text-slate-100" {{with .Original}}title="{{.}}"{{end}}>{{.Description}}</td>
+                    <td class="px-3 py-2 text-slate-100" {{with .Original}}title="{{.}}"{{end}}>
+                        <span data-desc-text>{{.Description}}</span>
+                        {{if .Installment}}
+                        <label class="mt-1 flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer" title="Mesmo valor e data próxima de uma parcela prevista. Desmarque para importar com a descrição do banco.">
+                            <input type="checkbox" data-match checked class="cursor-pointer">
+                            <span class="px-1.5 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700 whitespace-nowrap">parcela prevista {{.Installment}}</span>
+                            <span class="text-slate-500 truncate">{{.PlainDescription}}</span>
+                        </label>
+                        {{end}}
+                    </td>
                     <td class="px-3 py-2 whitespace-nowrap text-right font-semibold {{if eq .Type "income"}}text-emerald-400{{else}}text-rose-400{{end}}">{{if eq .Type "income"}}+{{else}}-{{end}} {{formatCurrency .AmountCents}}</td>
                     <td class="px-3 py-2">
                         {{$cat := .Category}}
