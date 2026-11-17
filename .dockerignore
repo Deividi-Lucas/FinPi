@@ -1,0 +1,12 @@
+.git
+.github
+deploy
+*.ps1
+finpi.service
+finpi
+finpi-arm64
+*.db
+*.db-wal
+*.db-shm
+data
+backups
