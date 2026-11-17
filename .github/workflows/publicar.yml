@@ -1,0 +1,104 @@
+name: publicar
+# Imagem do FinPi para o k3s (homelab). O build.yml continua publicando o binário para o Pi 3.
+on:
+  push:
+    branches: [main]
+concurrency:
+  group: publicar
+  cancel-in-progress: false
+permissions:
+  contents: read
+env:
+  IMAGEM: ghcr.io/deividi-lucas/finpi
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - run: go mod verify
+      - run: go vet ./...
+      - run: go test ./...
+
+  imagem:
+    needs: testes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      digest: ${{ steps.publicar.outputs.digest }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: tag
+        run: echo "tag=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Build local para a varredura
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: finpi:varredura
+          build-args: VERSAO=${{ steps.tag.outputs.tag }}
+      - name: Trivy (falha com vulnerabilidade crítica corrigível)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: finpi:varredura
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build arm64 + amd64 e publicar
+        id: publicar
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/arm64,linux/amd64
+          push: true
+          tags: ${{ env.IMAGEM }}:${{ steps.tag.outputs.tag }}
+          build-args: VERSAO=${{ steps.tag.outputs.tag }}
+
+  homelab:
+    needs: imagem
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Deividi-Lucas/homelab
+          token: ${{ secrets.HOMELAB_TOKEN }}
+          path: homelab
+      - name: Trocar a versão do FinPi no homelab
+        env:
+          TAG: ${{ needs.imagem.outputs.tag }}
+          DIGEST: ${{ needs.imagem.outputs.digest }}
+        run: |
+          set -euo pipefail
+          cd homelab/apps/finpi
+          yq -i '(.images[] | select(.name == strenv(IMAGEM))).newTag = strenv(TAG)' kustomization.yaml
+          yq -i '(.images[] | select(.name == strenv(IMAGEM))).digest = strenv(DIGEST)' kustomization.yaml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet; then
+            echo "Nada mudou no homelab."
+            exit 0
+          fi
+          git commit -am "finpi: $TAG"
+          # outro app pode ter publicado ao mesmo tempo: traz as novidades e tenta de novo
+          for tentativa in 1 2 3; do
+            git pull --rebase && git push && exit 0
+            sleep 5
+          done
+          exit 1
