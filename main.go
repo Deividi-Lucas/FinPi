@@ -38,8 +38,6 @@ func main() {
 	host := flag.String("host", defaultHost, "Host/Interface de rede para bind")
 	flag.Parse()
 
-	log.Printf("[INFO] Iniciando 🪙 FinPi (%s) em modo produção embarcada...", version)
-
 	// 1. Inicializar Banco SQLite otimizado para Raspberry Pi
 	db, err := database.InitDB(*dbPath)
 	if err != nil {

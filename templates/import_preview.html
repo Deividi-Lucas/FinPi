@@ -2,14 +2,14 @@
 <div class="space-y-4">
     <p class="text-sm" style="color: {{.Book.Hex}}">Importando para o livro <strong>{{.Book.Name}}</strong></p>
     <p class="text-xs text-slate-400">Extrato <strong>{{.Bank}}</strong> ({{.Format}})</p>
-    <div class="p-4 rounded-xl bg-slate-800/60 border border-slate-700 text-sm text-slate-300">
+    <div class="p-4 rounded-md bg-slate-800/60 border border-slate-700 text-sm text-slate-300">
         <p class="font-medium text-slate-100 break-all">{{.FileName}}</p>
         <p class="mt-1 text-xs text-slate-400">
             {{len .Preview.Rows}} {{plural (len .Preview.Rows) "linha" "linhas"}} &middot; {{formatDate .Preview.FirstDate}} a {{formatDate .Preview.LastDate}}
             &middot; créditos {{formatCurrency .Preview.Credits}} &middot; débitos {{formatCurrency .Preview.Debits}}
         </p>
         {{if .Preview.SummaryMismatch}}
-        <p class="mt-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs">
+        <p class="mt-2 p-2 rounded bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs">
             Atenção: a soma das linhas não bate com o resumo do arquivo (créditos {{formatCurrency .Preview.FileCredits}}, débitos {{formatCurrency .Preview.FileDebits}}). Confira antes de importar.
         </p>
         {{end}}
@@ -18,15 +18,15 @@
 
     <div class="flex flex-wrap items-center gap-2 text-sm text-slate-300">
         <label for="import-account" class="text-xs text-slate-400">Conta:</label>
-        <select id="import-account" name="conta" data-import-account class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-sm text-slate-100 cursor-pointer">
+        <select id="import-account" name="conta" data-import-account class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-slate-100 cursor-pointer">
             {{if .BankAccountOK}}<option value="{{.BankAccount.ID}}" selected>{{.BankAccount.Name}}</option>{{else}}<option value="novo-banco" selected>{{.Bank}} (será criada)</option>{{end}}
             {{range .Accounts}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
             <option value="nova">Nova conta…</option>
         </select>
-        <input type="text" name="conta_nova" data-import-account-name maxlength="40" placeholder="Nome da nova conta" class="hidden bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-sm text-slate-100">
+        <input type="text" name="conta_nova" data-import-account-name maxlength="40" placeholder="Nome da nova conta" class="hidden bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-slate-100">
     </div>
 
-    <div class="overflow-x-auto rounded-xl border border-slate-800">
+    <div class="overflow-x-auto rounded-md border border-slate-800">
         <table class="w-full text-left text-xs text-slate-300">
             <thead class="bg-slate-900/60 uppercase tracking-wider text-slate-400 border-b border-slate-800">
                 <tr>
@@ -48,7 +48,7 @@
                         {{if .Installment}}
                         <label class="mt-1 flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer" title="Mesmo valor e data próxima de uma parcela prevista. Desmarque para importar com a descrição do banco.">
                             <input type="checkbox" data-match checked class="cursor-pointer">
-                            <span class="px-1.5 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700 whitespace-nowrap">parcela prevista {{.Installment}}</span>
+                            <span class="px-1.5 py-0.5 rounded-sm bg-slate-800 text-slate-300 border border-slate-700 whitespace-nowrap">parcela prevista {{.Installment}}</span>
                             <span class="text-slate-500 truncate">{{.PlainDescription}}</span>
                         </label>
                         {{end}}
@@ -56,15 +56,15 @@
                     <td class="px-3 py-2 whitespace-nowrap text-right font-semibold {{if eq .Type "income"}}text-emerald-400{{else}}text-rose-400{{end}}">{{if eq .Type "income"}}+{{else}}-{{end}} {{formatCurrency .AmountCents}}</td>
                     <td class="px-3 py-2">
                         {{$cat := .Category}}
-                        <select data-cat {{if .Locked}}disabled{{end}} class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-100 cursor-pointer">
+                        <select data-cat {{if .Locked}}disabled{{end}} class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-slate-100 cursor-pointer">
                             {{range $.Options}}<option value="{{.}}" {{if eq . $cat}}selected{{end}}>{{.}}{{if index $.NewOptions .}} (será criada){{end}}</option>{{end}}
                         </select>
                     </td>
                     <td class="px-3 py-2 whitespace-nowrap">
-                        {{if eq .Status "novo"}}<span class="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">Novo</span>
-                        {{else if eq .Status "ja_importado"}}<span class="px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700">Já importado</span>
-                        {{else if eq .Status "possivel_duplicado"}}<span class="px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/20" title="Já existe um lançamento seu com a mesma data, valor e tipo">Possível duplicado</span>
-                        {{else}}<span class="px-2 py-0.5 rounded-md bg-sky-500/10 text-sky-300 border border-sky-500/20" title="Tipo de transação ainda não conhecido: confira antes de importar">Tipo novo</span>{{end}}
+                        {{if eq .Status "novo"}}<span class="px-2 py-0.5 rounded-sm bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">Novo</span>
+                        {{else if eq .Status "ja_importado"}}<span class="px-2 py-0.5 rounded-sm bg-slate-800 text-slate-400 border border-slate-700">Já importado</span>
+                        {{else if eq .Status "possivel_duplicado"}}<span class="px-2 py-0.5 rounded-sm bg-amber-500/10 text-amber-300 border border-amber-500/20" title="Já existe um lançamento seu com a mesma data, valor e tipo">Possível duplicado</span>
+                        {{else}}<span class="px-2 py-0.5 rounded-sm bg-sky-500/10 text-sky-300 border border-sky-500/20" title="Tipo de transação ainda não conhecido: confira antes de importar">Tipo novo</span>{{end}}
                     </td>
                 </tr>
                 {{end}}
@@ -76,8 +76,8 @@
         <p class="text-xs text-slate-400"><span data-import-count>0</span> selecionadas &middot; receitas <span data-import-income>R$ 0,00</span> &middot; despesas <span data-import-expense>R$ 0,00</span></p>
         <div class="flex items-center justify-end gap-3">
             {{template "stateFields" .}}
-            <button type="button" data-import-discard class="px-4 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition cursor-pointer">Descartar</button>
-            <button type="button" data-import-confirm class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium text-sm px-5 py-2 rounded-xl transition cursor-pointer">Importar <span data-import-count-label>0</span> lançamentos</button>
+            <button type="button" data-import-discard class="px-4 py-2 rounded-md text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition cursor-pointer">Descartar</button>
+            <button type="button" data-import-confirm class="inline-flex items-center gap-2 bg-accent hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed text-slate-950 font-medium text-sm px-5 py-2 rounded-md transition cursor-pointer">Importar <span data-import-count-label>0</span> lançamentos</button>
         </div>
     </div>
 </div>

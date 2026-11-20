@@ -4,27 +4,26 @@
     {{template "headCommon"}}
     <title>FinPi - Relatório</title>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen font-sans antialiased selection:bg-emerald-500 selection:text-white">
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans antialiased tabular-nums selection:bg-accent selection:text-slate-950" style="--accent: {{.Book.Hex}}">
     {{template "liveUpdates"}}
     <div class="max-w-6xl mx-auto px-4 py-8">
 
         <header class="flex flex-col sm:flex-row items-center justify-between pb-6 border-b border-slate-800 gap-4" style="border-bottom-color: {{.Book.Hex}}">
-            <div class="flex items-center gap-3">
-                <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-xl">🪙</div>
+            <div class="flex items-center gap-3 border-l-4 border-accent pl-3">
                 <div>
+                    <a href="/" class="text-xs font-semibold uppercase tracking-widest text-accent">FinPi</a>
                     <h1 class="text-2xl font-bold tracking-tight text-white">Relatório</h1>
-                    <p class="text-xs text-slate-400">Fluxo de caixa e gastos recorrentes por período</p>
                 </div>
             </div>
             <div class="flex flex-wrap items-center justify-center gap-2">
             {{template "bookBarAll" .}}
-            <a href="/{{if not .AllBooks}}?livro={{.BookID}}{{end}}" class="inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-sm font-medium px-3 py-2 rounded-xl border border-slate-700 transition">Voltar ao mês</a>
-            <a href="/visao-geral" class="inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-sm font-medium px-3 py-2 rounded-xl border border-slate-700 transition">Visão geral</a>
+            <a href="/{{if not .AllBooks}}?livro={{.BookID}}{{end}}" class="inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-sm font-medium px-3 py-2 rounded-md border border-slate-700 transition">Voltar ao mês</a>
+            <a href="/visao-geral" class="inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-sm font-medium px-3 py-2 rounded-md border border-slate-700 transition">Visão geral</a>
             </div>
         </header>
 
         {{if .Warning}}
-        <div class="mt-4 p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm">{{.Warning}}</div>
+        <div class="mt-4 p-4 rounded-md bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm">{{.Warning}}</div>
         {{end}}
 
         {{template "liveBanner"}}
@@ -33,39 +32,39 @@
         <section class="mt-6 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div class="flex items-center gap-2">
                 {{if .Custom}}
-                <span class="px-3 py-2 rounded-xl bg-slate-800/80 border border-slate-700 text-sm text-slate-200">{{formatDate .From}} a {{formatDate .To}}</span>
+                <span class="px-3 py-2 rounded-md bg-slate-800/80 border border-slate-700 text-sm text-slate-200">{{formatDate .From}} a {{formatDate .To}}</span>
                 <a href="{{.YearURL}}" class="text-xs text-emerald-400 hover:text-emerald-300">Ver o ano completo</a>
                 {{else}}
-                {{if .PrevURL}}<a href="{{.PrevURL}}" class="px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm" title="Ano anterior" aria-label="Ano anterior">&lsaquo;</a>
-                {{else}}<span class="px-3 py-2 rounded-xl bg-slate-800 border border-slate-800 text-slate-600 text-sm cursor-not-allowed" aria-hidden="true">&lsaquo;</span>{{end}}
-                <span class="px-4 py-2 rounded-xl bg-slate-800/80 border border-slate-700 text-sm font-semibold text-white">{{.Year}}</span>
-                {{if .NextURL}}<a href="{{.NextURL}}" class="px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm" title="Próximo ano" aria-label="Próximo ano">&rsaquo;</a>
-                {{else}}<span class="px-3 py-2 rounded-xl bg-slate-800 border border-slate-800 text-slate-600 text-sm cursor-not-allowed" aria-hidden="true">&rsaquo;</span>{{end}}
+                {{if .PrevURL}}<a href="{{.PrevURL}}" class="px-3 py-2 rounded-md bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm" title="Ano anterior" aria-label="Ano anterior">&lsaquo;</a>
+                {{else}}<span class="px-3 py-2 rounded-md bg-slate-800 border border-slate-800 text-slate-600 text-sm cursor-not-allowed" aria-hidden="true">&lsaquo;</span>{{end}}
+                <span class="px-4 py-2 rounded-md bg-slate-800/80 border border-slate-700 text-sm font-semibold text-white">{{.Year}}</span>
+                {{if .NextURL}}<a href="{{.NextURL}}" class="px-3 py-2 rounded-md bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm" title="Próximo ano" aria-label="Próximo ano">&rsaquo;</a>
+                {{else}}<span class="px-3 py-2 rounded-md bg-slate-800 border border-slate-800 text-slate-600 text-sm cursor-not-allowed" aria-hidden="true">&rsaquo;</span>{{end}}
                 {{end}}
             </div>
 
             <form id="period-form" method="GET" action="/relatorio" class="flex flex-wrap items-center gap-2">
                 <input type="hidden" name="livro" value="{{.BookParam}}">
                 <label class="text-xs text-slate-300">De
-                    <input type="date" name="de" value="{{.From}}" required class="ml-1 bg-slate-900 text-slate-200 text-sm rounded-lg px-2 py-1.5 border border-slate-700 focus:outline-none focus:border-emerald-500">
+                    <input type="date" name="de" value="{{.From}}" required class="ml-1 bg-slate-900 text-slate-200 text-sm rounded px-2 py-1.5 border border-slate-700 focus:outline-none focus:border-accent">
                 </label>
                 <label class="text-xs text-slate-300">até
-                    <input type="date" name="ate" value="{{.To}}" required class="ml-1 bg-slate-900 text-slate-200 text-sm rounded-lg px-2 py-1.5 border border-slate-700 focus:outline-none focus:border-emerald-500">
+                    <input type="date" name="ate" value="{{.To}}" required class="ml-1 bg-slate-900 text-slate-200 text-sm rounded px-2 py-1.5 border border-slate-700 focus:outline-none focus:border-accent">
                 </label>
                 {{if .GroupExplicit}}<input type="hidden" name="agrupar" value="{{.Group}}">{{end}}
                 {{if .IncludeProjected}}<input type="hidden" name="previstas" value="1">{{end}}
                 {{template "filterHidden" .}}
-                <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm px-4 py-1.5 rounded-lg transition cursor-pointer">Aplicar</button>
+                <button type="submit" class="bg-accent hover:brightness-110 text-slate-950 font-medium text-sm px-4 py-1.5 rounded transition cursor-pointer">Aplicar</button>
             </form>
 
             <label class="flex items-center gap-1.5 text-xs font-medium text-slate-300 cursor-pointer">
-                <input type="checkbox" {{if .IncludeProjected}}checked{{end}} data-url="{{.ToggleProjected}}" onchange="location.href = this.dataset.url" class="accent-emerald-500 cursor-pointer">
+                <input type="checkbox" {{if .IncludeProjected}}checked{{end}} data-url="{{.ToggleProjected}}" onchange="location.href = this.dataset.url" class="accent-accent cursor-pointer">
                 Incluir previstas
             </label>
         </section>
 
         <!-- Filtros: todos os números do relatório (cartões, fluxo de caixa, recorrentes e receitas) respeitam o filtro -->
-        <section id="filters" class="mt-4 p-4 rounded-2xl bg-slate-800/40 border border-slate-800">
+        <section id="filters" class="mt-4 p-4 rounded-lg bg-slate-800/40 border border-slate-800">
             <form id="filters-form" method="GET" action="/relatorio" class="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
                 <input type="hidden" name="livro" value="{{.BookParam}}">
                 {{if .Custom}}<input type="hidden" name="de" value="{{.From}}"><input type="hidden" name="ate" value="{{.To}}">{{else}}<input type="hidden" name="ano" value="{{.Year}}">{{end}}
@@ -75,41 +74,41 @@
                 {{template "filterFields" .}}
 
                 <div class="flex items-center gap-2 pb-0.5">
-                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm px-4 py-2 rounded-lg transition cursor-pointer">Aplicar</button>
-                    <a href="{{.ClearURL}}" class="px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition">Limpar</a>
-                    {{if .Filter.Active}}<span class="px-2 py-1 rounded-md text-xs bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">{{.Filter.Active}} {{plural .Filter.Active "filtro ativo" "filtros ativos"}}</span>{{end}}
+                    <button type="submit" class="bg-accent hover:brightness-110 text-slate-950 font-medium text-sm px-4 py-2 rounded transition cursor-pointer">Aplicar</button>
+                    <a href="{{.ClearURL}}" class="px-3 py-2 rounded text-sm text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition">Limpar</a>
+                    {{if .Filter.Active}}<span class="px-2 py-1 rounded-sm text-xs bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">{{.Filter.Active}} {{plural .Filter.Active "filtro ativo" "filtros ativos"}}</span>{{end}}
                 </div>
             </form>
         </section>
 
         {{if .Empty}}
-        <p class="mt-8 p-6 rounded-2xl bg-slate-800/40 border border-slate-800 text-sm text-slate-500 text-center">{{if .Filter.Active}}Nenhum lançamento corresponde aos filtros neste período.{{else}}Sem lançamentos neste período.{{end}}</p>
+        <p class="mt-8 p-6 rounded-lg bg-slate-800/40 border border-slate-800 text-sm text-slate-500 text-center">{{if .Filter.Active}}Nenhum lançamento corresponde aos filtros neste período.{{else}}Sem lançamentos neste período.{{end}}</p>
         {{if or .Invested .Redeemed}}<p class="mt-3 text-xs text-emerald-300/80">Investimentos (fora dos totais): investido {{formatCurrency .Invested}} &middot; resgatado {{formatCurrency .Redeemed}}</p>{{end}}
         {{if or .InternalIn .InternalOut}}<p class="mt-3 text-xs text-slate-400">Movimentações internas (fora dos totais): entradas {{formatCurrency .InternalIn}} &middot; saídas {{formatCurrency .InternalOut}}</p>{{end}}{{template "reportExcluded" .}}
         {{else}}
 
         <!-- Cartões -->
-        <section class="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div class="p-5 rounded-2xl bg-slate-800/40 border border-slate-800">
+        <section class="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 rounded-lg border border-slate-800 divide-y lg:divide-y-0 lg:divide-x divide-slate-800">
+            <div class="px-5 py-4">
                 <p class="text-xs uppercase tracking-wider text-slate-400">Entradas</p>
-                <p class="mt-2 text-2xl font-extrabold text-emerald-400">{{formatCurrency .Cards.Income}}</p>
+                <p class="mt-2 text-2xl font-semibold text-emerald-400">{{formatCurrency .Cards.Income}}</p>
                 {{if .Cards.WithProjected}}<p class="mt-1 text-xs text-slate-500">(com previstas)</p>{{end}}
             </div>
-            <div class="p-5 rounded-2xl bg-slate-800/40 border border-slate-800">
+            <div class="px-5 py-4">
                 <p class="text-xs uppercase tracking-wider text-slate-400">Saídas</p>
-                <p class="mt-2 text-2xl font-extrabold text-rose-400">{{formatCurrency .Cards.Expense}}</p>
+                <p class="mt-2 text-2xl font-semibold text-rose-400">{{formatCurrency .Cards.Expense}}</p>
                 {{if .Cards.WithProjected}}<p class="mt-1 text-xs text-slate-500">(com previstas)</p>{{end}}
             </div>
-            <div class="p-5 rounded-2xl bg-slate-800/40 border border-slate-800">
+            <div class="px-5 py-4">
                 <p class="text-xs uppercase tracking-wider text-slate-400">Resultado</p>
-                <p class="mt-2 text-2xl font-extrabold {{if ge .Cards.Net 0}}text-emerald-400{{else}}text-rose-400{{end}}">{{formatCurrency .Cards.Net}}</p>
+                <p class="mt-2 text-2xl font-semibold {{if ge .Cards.Net 0}}text-emerald-400{{else}}text-rose-400{{end}}">{{formatCurrency .Cards.Net}}</p>
                 {{if .Cards.HasNetPercent}}<p class="mt-1 text-xs text-slate-500">{{formatPercent .Cards.NetPercent}} das entradas</p>{{end}}
                 {{if .Cards.WithProjected}}<p class="mt-1 text-xs text-slate-500">(com previstas)</p>{{end}}
             </div>
             {{if .Cards.HasAvg}}
-            <div class="p-5 rounded-2xl bg-slate-800/40 border border-slate-800">
+            <div class="px-5 py-4">
                 <p class="text-xs uppercase tracking-wider text-slate-400">Média de saídas por mês</p>
-                <p class="mt-2 text-2xl font-extrabold text-white">{{formatCurrency .Cards.AvgExpense}}</p>
+                <p class="mt-2 text-2xl font-semibold text-white">{{formatCurrency .Cards.AvgExpense}}</p>
                 {{if .Cards.WithProjected}}<p class="mt-1 text-xs text-slate-500">(com previstas)</p>{{end}}
             </div>
             {{end}}
@@ -118,14 +117,14 @@
         {{if or .InternalIn .InternalOut}}<p class="mt-3 text-xs text-slate-400">Movimentações internas (fora dos totais): entradas {{formatCurrency .InternalIn}} &middot; saídas {{formatCurrency .InternalOut}}</p>{{end}}{{template "reportExcluded" .}}
 
         <!-- Fluxo de caixa -->
-        <section class="mt-8 p-5 rounded-2xl bg-slate-800/40 border border-slate-800">
+        <section class="mt-8 p-5 rounded-lg bg-slate-800/40 border border-slate-800">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h2 class="text-base font-semibold text-white">Fluxo de caixa</h2>
                 <div class="flex items-center gap-2 text-xs">
                     <span class="text-slate-400">Agrupar por:</span>
                     {{range .Options}}
-                    {{if .Disabled}}<span class="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-600 border border-slate-800 cursor-not-allowed" title="Indisponível para o tamanho deste período">{{.Label}}</span>
-                    {{else}}<a href="{{.URL}}" class="px-3 py-1.5 rounded-lg border {{if .Active}}bg-emerald-600 text-white border-emerald-500{{else}}bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700{{end}}">{{.Label}}</a>{{end}}
+                    {{if .Disabled}}<span class="px-3 py-1.5 rounded bg-slate-800 text-slate-600 border border-slate-800 cursor-not-allowed" title="Indisponível para o tamanho deste período">{{.Label}}</span>
+                    {{else}}<a href="{{.URL}}" class="px-3 py-1.5 rounded border {{if .Active}}bg-accent text-slate-950 border-accent{{else}}bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700{{end}}">{{.Label}}</a>{{end}}
                     {{end}}
                     {{if .GroupExplicit}}<a href="{{.AutoURL}}" class="text-emerald-400 hover:text-emerald-300">automático</a>{{end}}
                 </div>
@@ -155,7 +154,7 @@
                 {{range .Chart.XLabels}}<text x="{{.X}}" y="{{$.Chart.Bottom}}" dy="18" text-anchor="middle" font-size="11" fill="#94a3b8">{{.Text}}</text>{{end}}
             </svg>
 
-            <div class="mt-4 overflow-x-auto rounded-xl border border-slate-800">
+            <div class="mt-4 overflow-x-auto rounded-md border border-slate-800">
                 <table class="w-full text-left text-xs text-slate-300">
                     <thead class="bg-slate-900/60 uppercase tracking-wider text-slate-400 border-b border-slate-800">
                         <tr>
@@ -169,7 +168,7 @@
                     <tbody class="divide-y divide-slate-800/60">
                         {{range .Buckets}}
                         <tr data-bucket {{if .HasProjection}}data-projected{{end}}>
-                            <td class="px-3 py-2 whitespace-nowrap text-slate-100">{{.Label}}{{if .HasProjection}} <span class="ml-1 px-1.5 py-0.5 rounded-md bg-sky-500/10 text-sky-300 border border-sky-500/20">prevista</span>{{end}}</td>
+                            <td class="px-3 py-2 whitespace-nowrap text-slate-100">{{.Label}}{{if .HasProjection}} <span class="ml-1 px-1.5 py-0.5 rounded-sm bg-sky-500/10 text-sky-300 border border-sky-500/20">prevista</span>{{end}}</td>
                             <td class="px-3 py-2 text-right text-emerald-400">{{formatCurrency .TotalIncome}}</td>
                             <td class="px-3 py-2 text-right text-rose-400">{{formatCurrency .TotalExpense}}</td>
                             <td class="px-3 py-2 text-right {{if ge .Net 0}}text-emerald-400{{else}}text-rose-400{{end}}">{{formatCurrency .Net}}</td>
@@ -182,7 +181,7 @@
         </section>
 
         <!-- Receitas: de onde vem o dinheiro -->
-        <section id="incomes" class="mt-8 p-5 rounded-2xl bg-slate-800/40 border border-slate-800">
+        <section id="incomes" class="mt-8 p-5 rounded-lg bg-slate-800/40 border border-slate-800">
             <h2 class="text-base font-semibold text-white">Receitas</h2>
             <p class="mt-1 text-xs text-slate-500">De onde vem o dinheiro que entrou no período (só lançamentos reais; as previstas ficam de fora).</p>
 
@@ -190,33 +189,33 @@
             <p class="mt-4 p-4 text-sm text-slate-500">Nenhuma receita neste período.</p>
             {{else}}
             <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div class="p-4 rounded-xl bg-slate-900/40 border border-slate-800">
+                <div class="p-4 rounded-md bg-slate-900/40 border border-slate-800">
                     <p class="text-xs uppercase tracking-wider text-slate-400">Fontes</p>
-                    <p class="mt-2 text-xl font-extrabold text-white">{{.Income.Sources}}</p>
+                    <p class="mt-2 text-xl font-semibold text-white">{{.Income.Sources}}</p>
                     <p class="mt-1 text-xs text-slate-500">{{plural .Income.Sources "descrição diferente" "descrições diferentes"}}</p>
                 </div>
                 {{with .Income.Largest}}
-                <div class="p-4 rounded-xl bg-slate-900/40 border border-slate-800">
+                <div class="p-4 rounded-md bg-slate-900/40 border border-slate-800">
                     <p class="text-xs uppercase tracking-wider text-slate-400">Maior fonte</p>
-                    <p class="mt-2 text-xl font-extrabold text-emerald-400 truncate">{{.Name}}</p>
+                    <p class="mt-2 text-xl font-semibold text-emerald-400 truncate">{{.Name}}</p>
                     <p class="mt-1 text-xs text-slate-500">{{formatPercent .Percent}} das entradas</p>
                 </div>
                 {{end}}
                 {{if .Income.HasMonthly}}
-                <div class="p-4 rounded-xl bg-slate-900/40 border border-slate-800">
+                <div class="p-4 rounded-md bg-slate-900/40 border border-slate-800">
                     <p class="text-xs uppercase tracking-wider text-slate-400">Meses com receita</p>
-                    <p class="mt-2 text-xl font-extrabold text-white">{{.Income.MonthsWithIncome}} de {{.Income.MonthsTouched}}</p>
+                    <p class="mt-2 text-xl font-semibold text-white">{{.Income.MonthsWithIncome}} de {{.Income.MonthsTouched}}</p>
                 </div>
-                <div class="p-4 rounded-xl bg-slate-900/40 border border-slate-800">
+                <div class="p-4 rounded-md bg-slate-900/40 border border-slate-800">
                     <p class="text-xs uppercase tracking-wider text-slate-400">Receita média por mês</p>
-                    <p class="mt-2 text-xl font-extrabold text-white">{{formatCurrency .Income.AvgMonthly}}</p>
+                    <p class="mt-2 text-xl font-semibold text-white">{{formatCurrency .Income.AvgMonthly}}</p>
                 </div>
                 {{end}}
             </div>
 
             <div class="mt-5 flex items-center gap-2 text-xs">
-                <button type="button" data-itab="descricao" class="px-3 py-1.5 rounded-lg border bg-emerald-600 text-white border-emerald-500 cursor-pointer">Descrição</button>
-                <button type="button" data-itab="categoria" class="px-3 py-1.5 rounded-lg border bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700 cursor-pointer">Categoria</button>
+                <button type="button" data-itab="descricao" class="px-3 py-1.5 rounded border bg-accent text-slate-950 border-accent cursor-pointer">Descrição</button>
+                <button type="button" data-itab="categoria" class="px-3 py-1.5 rounded border bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700 cursor-pointer">Categoria</button>
             </div>
 
             {{template "incomePanel" (dict "ID" "income-panel-descricao" "Tab" "descricao" "Rows" .Income.BySource "Total" .Income.SourceTotal "Limit" $.RankedLimit "ShowMonths" .Income.HasMonthly "MonthsTouched" .Income.MonthsTouched)}}
@@ -225,12 +224,12 @@
         </section>
 
         <!-- Gastos recorrentes -->
-        <section class="mt-8 p-5 rounded-2xl bg-slate-800/40 border border-slate-800" id="recurring">
+        <section class="mt-8 p-5 rounded-lg bg-slate-800/40 border border-slate-800" id="recurring">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h2 class="text-base font-semibold text-white">Gastos recorrentes</h2>
                 <div class="flex items-center gap-2 text-xs">
-                    <button type="button" data-tab="categoria" class="px-3 py-1.5 rounded-lg border bg-emerald-600 text-white border-emerald-500 cursor-pointer">Categoria</button>
-                    <button type="button" data-tab="descricao" class="px-3 py-1.5 rounded-lg border bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700 cursor-pointer">Descrição</button>
+                    <button type="button" data-tab="categoria" class="px-3 py-1.5 rounded border bg-accent text-slate-950 border-accent cursor-pointer">Categoria</button>
+                    <button type="button" data-tab="descricao" class="px-3 py-1.5 rounded border bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700 cursor-pointer">Descrição</button>
                 </div>
             </div>
 
@@ -240,8 +239,7 @@
         {{end}}
 
         <footer class="mt-12 text-center text-xs text-slate-500">
-            <p>🪙 FinPi &bull; Binário único em Go &bull; Armazenamento SQLite WAL &bull; Otimizado para Raspberry Pi 3</p>
-            <p class="mt-1 text-slate-600">Versão {{.Version}}</p>
+            <p>FinPi &middot; Versão {{.Version}}</p>
         </footer>
     </div>
 
@@ -296,8 +294,8 @@
             function render() {
                 document.querySelectorAll('[data-' + A.tab + ']').forEach(function (btn) {
                     const active = btn.dataset[A.tab] === state.tab;
-                    btn.className = 'px-3 py-1.5 rounded-lg border cursor-pointer ' +
-                        (active ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700');
+                    btn.className = 'px-3 py-1.5 rounded border cursor-pointer ' +
+                        (active ? 'bg-accent text-slate-950 border-accent' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700');
                 });
                 document.querySelectorAll('[data-' + A.panel + ']').forEach(function (panel) {
                     const tab = panel.dataset[A.panel];
@@ -359,7 +357,7 @@
 {{define "recurringPanel"}}
 <div id="{{.ID}}" data-panel="{{.Tab}}" class="mt-4 {{if ne .Tab "categoria"}}hidden{{end}}">
     {{if .Rows}}
-    <div class="overflow-x-auto rounded-xl border border-slate-800">
+    <div class="overflow-x-auto rounded-md border border-slate-800">
         <table class="w-full text-left text-xs text-slate-300">
             <thead class="bg-slate-900/60 uppercase tracking-wider text-slate-400 border-b border-slate-800">
                 <tr>
@@ -392,7 +390,7 @@
 
 {{define "incomePanel"}}
 <div id="{{.ID}}" data-ipanel="{{.Tab}}" class="mt-4 {{if ne .Tab "descricao"}}hidden{{end}}">
-    <div class="overflow-x-auto rounded-xl border border-slate-800">
+    <div class="overflow-x-auto rounded-md border border-slate-800">
         <table class="w-full text-left text-xs text-slate-300">
             <thead class="bg-slate-900/60 uppercase tracking-wider text-slate-400 border-b border-slate-800">
                 <tr>
