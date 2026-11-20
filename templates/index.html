@@ -2,22 +2,17 @@
 <html lang="pt-BR">
 <head>
     {{template "headCommon"}}
-    <title>FinPi - Gestão Financeira Ultraleve</title>
+    <title>FinPi</title>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen font-sans antialiased selection:bg-emerald-500 selection:text-white">
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans antialiased tabular-nums selection:bg-accent selection:text-slate-950" style="--accent: {{.Book.Hex}}">
     <div class="max-w-6xl mx-auto px-4 py-8">
         
         <!-- Header -->
         <header class="flex flex-col sm:flex-row items-center justify-between pb-8 border-b border-slate-800 gap-4" style="border-bottom-color: {{.Book.Hex}}">
-            <div class="flex items-center gap-3">
-                <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-xl">
-                    🪙
-                </div>
+            <div class="flex items-center gap-3 border-l-4 border-accent pl-3">
                 <div>
-                    <h1 class="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-                        FinPi <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-emerald-400 border border-slate-700">Go &bull; ARM64</span>
-                    </h1>
-                    <p class="text-xs text-slate-400">Controle financeiro pessoal minimalista, ultraleve e open source</p>
+                    <a href="/" class="text-xs font-semibold uppercase tracking-widest text-accent">FinPi</a>
+                    <h1 class="text-2xl font-bold tracking-tight text-white">{{.DisplayMonth}}</h1>
                 </div>
             </div>
 
@@ -26,29 +21,29 @@
             <button
                 type="button"
                 onclick="openBooksModal()"
-                class="inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-sm font-medium px-3 py-2 rounded-xl border border-slate-700 transition cursor-pointer"
+                class="inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-sm font-medium px-3 py-2 rounded-md border border-slate-700 transition cursor-pointer"
             >
                 Livros
             </button>
-            <a href="/relatorio?livro={{.BookID}}" class="inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-sm font-medium px-3 py-2 rounded-xl border border-slate-700 transition">
+            <a href="/relatorio?livro={{.BookID}}" class="inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-sm font-medium px-3 py-2 rounded-md border border-slate-700 transition">
                 Relatório
             </a>
-            <a href="/visao-geral" class="inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-sm font-medium px-3 py-2 rounded-xl border border-slate-700 transition">
+            <a href="/visao-geral" class="inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-sm font-medium px-3 py-2 rounded-md border border-slate-700 transition">
                 Visão geral
             </a>
             <button
                 type="button"
                 onclick="openCategoriesModal()"
-                class="inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-sm font-medium px-3 py-2 rounded-xl border border-slate-700 transition cursor-pointer"
+                class="inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-sm font-medium px-3 py-2 rounded-md border border-slate-700 transition cursor-pointer"
             >
                 Categorias
             </button>
 
             <!-- Filtro de Mês -->
-            <form method="GET" action="/" class="flex flex-wrap items-center justify-center gap-2 bg-slate-800/80 p-1.5 rounded-xl border border-slate-700">
+            <form method="GET" action="/" class="flex flex-wrap items-center justify-center gap-2 bg-slate-800/80 p-1.5 rounded-md border border-slate-700">
                 <input type="hidden" name="livro" value="{{.BookID}}">
                 <div class="flex items-center gap-2">
-                {{if or .PrevMonthURL .NextMonthURL}}{{if .PrevMonthURL}}<a href="{{.PrevMonthURL}}" class="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm" title="Mês anterior" aria-label="Mês anterior">&lsaquo;</a>{{else}}<span class="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-800 text-slate-600 text-sm cursor-not-allowed" aria-hidden="true">&lsaquo;</span>{{end}}{{end}}
+                {{if or .PrevMonthURL .NextMonthURL}}{{if .PrevMonthURL}}<a href="{{.PrevMonthURL}}" class="px-3 py-1.5 rounded bg-slate-900 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm" title="Mês anterior" aria-label="Mês anterior">&lsaquo;</a>{{else}}<span class="px-3 py-1.5 rounded bg-slate-800 border border-slate-800 text-slate-600 text-sm cursor-not-allowed" aria-hidden="true">&lsaquo;</span>{{end}}{{end}}
                 <label for="month" class="hidden sm:inline text-xs font-medium text-slate-300 pl-2">Mês:</label>
                 <input 
                     type="month" 
@@ -57,9 +52,9 @@
                     name="month" 
                     value="{{.SelectedMonth}}" 
                     onchange="this.form.submit()"
-                    class="bg-slate-900 text-slate-200 text-sm font-medium rounded-lg px-3 py-1.5 border border-slate-700 focus:outline-none focus:border-emerald-500 cursor-pointer"
+                    class="bg-slate-900 text-slate-200 text-sm font-medium rounded px-3 py-1.5 border border-slate-700 focus:outline-none focus:border-accent cursor-pointer"
                 >
-                {{if or .PrevMonthURL .NextMonthURL}}{{if .NextMonthURL}}<a href="{{.NextMonthURL}}" class="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm" title="Próximo mês" aria-label="Próximo mês">&rsaquo;</a>{{else}}<span class="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-800 text-slate-600 text-sm cursor-not-allowed" aria-hidden="true">&rsaquo;</span>{{end}}{{end}}
+                {{if or .PrevMonthURL .NextMonthURL}}{{if .NextMonthURL}}<a href="{{.NextMonthURL}}" class="px-3 py-1.5 rounded bg-slate-900 hover:bg-slate-700 border border-slate-700 text-slate-200 text-sm" title="Próximo mês" aria-label="Próximo mês">&rsaquo;</a>{{else}}<span class="px-3 py-1.5 rounded bg-slate-800 border border-slate-800 text-slate-600 text-sm cursor-not-allowed" aria-hidden="true">&rsaquo;</span>{{end}}{{end}}
                 </div>
                 <label class="flex items-center gap-1.5 text-xs font-medium text-slate-300 pl-2 pr-2 cursor-pointer">
                     <input
@@ -68,7 +63,7 @@
                         value="1"
                         {{if .IncludeProjected}}checked{{end}}
                         onchange="this.form.submit()"
-                        class="accent-emerald-500 cursor-pointer"
+                        class="accent-accent cursor-pointer"
                     >
                     Incluir previstas nos totais
                 </label>
@@ -78,13 +73,13 @@
         </header>
 
         {{with .ImportResult}}
-        <div id="import-result" class="mt-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm">
+        <div id="import-result" class="mt-4 p-3 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm">
             {{.Imported}} {{plural .Imported "lançamento importado" "lançamentos importados"}}{{if gt .Skipped 0}} &middot; {{.Skipped}} {{plural .Skipped "já existia e foi ignorado" "já existiam e foram ignorados"}}{{end}}.
         </div>
         {{end}}
 
         {{with .BulkResult}}
-        <div id="bulk-result" class="mt-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm">
+        <div id="bulk-result" class="mt-4 p-3 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm">
             {{if eq .Kind "edit"}}{{.Count}} {{plural .Count "lançamento alterado" "lançamentos alterados"}}{{else if eq .Kind "delete"}}{{.Count}} {{plural .Count "lançamento excluído" "lançamentos excluídos"}}{{else if eq .Kind "move"}}{{.Count}} {{plural .Count "lançamento movido" "lançamentos movidos"}} para outro livro{{else}}{{.Count}} {{plural .Count "lançamento restaurado" "lançamentos restaurados"}}{{end}}{{if gt .Skipped 0}} &middot; {{.Skipped}} {{if eq .Kind "undo"}}{{plural .Skipped "foi alterado depois e ficou como está" "foram alterados depois e ficaram como estão"}}{{else}}{{plural .Skipped "sem mudança ou inexistente" "sem mudança ou inexistentes"}}{{end}}{{end}}.
             {{if and $.Undo (ne .Kind "undo")}}
             <form method="POST" action="/bulk/undo" onsubmit="return confirm('Desfazer a última edição em lote?');" class="inline ml-2">
@@ -97,7 +92,7 @@
 
         <!-- Mensagens de Erro / Alerta -->
         {{if .ErrorMessage}}
-        <div class="mt-4 p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm flex items-center gap-2">
+        <div class="mt-4 p-4 rounded-md bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm flex items-center gap-2">
             <svg class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
             </svg>
@@ -107,59 +102,21 @@
 
         {{template "liveBanner"}}
         <!-- Cards do Dashboard -->
-        <section class="grid grid-cols-1 md:grid-cols-3 gap-4 my-8">
-            <!-- Total de Receitas -->
-            <div class="bg-slate-800/60 backdrop-blur border border-slate-800 rounded-2xl p-6 relative overflow-hidden shadow-sm hover:border-slate-700 transition">
-                <div class="flex items-center justify-between">
-                    <span class="text-sm font-medium text-slate-400">Receitas do Mês</span>
-                    <span class="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12" />
-                        </svg>
-                    </span>
-                </div>
-                <div class="mt-4">
-                    <span class="text-2xl sm:text-3xl font-extrabold text-emerald-400 tracking-tight">
-                        {{formatCurrency .Summary.TotalIncome}}
-                    </span>
-                </div>
-                <p class="text-xs text-slate-500 mt-2">{{.DisplayMonth}}{{if and .IncludeProjected .Projected}} (com previstas){{end}}</p>
+        <section class="grid grid-cols-1 md:grid-cols-3 my-8 rounded-lg border border-slate-800 divide-y md:divide-y-0 md:divide-x divide-slate-800">
+            <div class="px-6 py-5">
+                <p class="text-xs uppercase tracking-wider text-slate-400">Receitas</p>
+                <p class="mt-2 text-2xl font-semibold text-emerald-400">{{formatCurrency .Summary.TotalIncome}}</p>
+                <p class="text-xs text-slate-500 mt-1">{{.DisplayMonth}}{{if and .IncludeProjected .Projected}} (com previstas){{end}}</p>
             </div>
-
-            <!-- Total de Despesas -->
-            <div class="bg-slate-800/60 backdrop-blur border border-slate-800 rounded-2xl p-6 relative overflow-hidden shadow-sm hover:border-slate-700 transition">
-                <div class="flex items-center justify-between">
-                    <span class="text-sm font-medium text-slate-400">Despesas do Mês</span>
-                    <span class="p-2 rounded-lg bg-rose-500/10 text-rose-400">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 13l-5 5m0 0l-5-5m5 5V6" />
-                        </svg>
-                    </span>
-                </div>
-                <div class="mt-4">
-                    <span class="text-2xl sm:text-3xl font-extrabold text-rose-400 tracking-tight">
-                        {{formatCurrency .Summary.TotalExpense}}
-                    </span>
-                </div>
-                <p class="text-xs text-slate-500 mt-2">{{.DisplayMonth}}{{if and .IncludeProjected .Projected}} (com previstas){{end}}</p>
+            <div class="px-6 py-5">
+                <p class="text-xs uppercase tracking-wider text-slate-400">Despesas</p>
+                <p class="mt-2 text-2xl font-semibold text-rose-400">{{formatCurrency .Summary.TotalExpense}}</p>
+                <p class="text-xs text-slate-500 mt-1">{{.DisplayMonth}}{{if and .IncludeProjected .Projected}} (com previstas){{end}}</p>
             </div>
-
-            <!-- Saldo Atual -->
-            <div class="bg-slate-800/60 backdrop-blur border border-slate-800 rounded-2xl p-6 relative overflow-hidden shadow-sm hover:border-slate-700 transition">
-                <div class="flex items-center justify-between">
-                    <span class="text-sm font-medium text-slate-400">Saldo Atual</span>
-                    <span class="p-2 rounded-lg {{if ge .Summary.Balance 0}}bg-emerald-500/10 text-emerald-400{{else}}bg-rose-500/10 text-rose-400{{end}}">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
-                        </svg>
-                    </span>
-                </div>
-                <div class="mt-4">
-                    <span class="text-2xl sm:text-3xl font-extrabold {{if ge .Summary.Balance 0}}text-emerald-400{{else}}text-rose-400{{end}} tracking-tight">
-                        {{formatCurrency .Summary.Balance}}
-                    </span>
-                </div>
-                <p class="text-xs text-slate-500 mt-2">Diferença entre receitas e despesas{{if and .IncludeProjected .Projected}} (com previstas){{end}}</p>
+            <div class="px-6 py-5 bg-slate-800/40">
+                <p class="text-xs uppercase tracking-wider text-slate-400">Saldo</p>
+                <p class="mt-2 text-3xl font-bold {{if ge .Summary.Balance 0}}text-emerald-400{{else}}text-rose-400{{end}}">{{formatCurrency .Summary.Balance}}</p>
+                <p class="text-xs text-slate-500 mt-1">Receitas menos despesas{{if and .IncludeProjected .Projected}} (com previstas){{end}}</p>
             </div>
         </section>
         {{if or .Invested .Redeemed}}<p class="mt-3 text-xs text-emerald-300/80">Investido no mês (fora dos totais): aplicado {{formatCurrency .Invested}} &middot; resgatado {{formatCurrency .Redeemed}}</p>{{end}}
@@ -169,28 +126,28 @@
         <section id="month-dashboard" class="mb-8">
             <h2 class="text-base font-semibold text-white mb-3">Dashboard do mês</h2>
             {{if eq .Stats.TotalCount 0}}
-            <p class="p-6 rounded-2xl bg-slate-800/40 border border-slate-800 text-sm text-slate-500 text-center">Sem lançamentos neste mês.</p>
+            <p class="p-6 rounded-lg bg-slate-800/40 border border-slate-800 text-sm text-slate-500 text-center">Sem lançamentos neste mês.</p>
             {{else}}
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="p-5 rounded-2xl bg-slate-800/40 border border-slate-800">
+            <div class="grid grid-cols-1 md:grid-cols-3 rounded-lg border border-slate-800 divide-y md:divide-y-0 md:divide-x divide-slate-800">
+                <div class="px-5 py-4">
                     <p class="text-xs uppercase tracking-wider text-slate-400">Transações</p>
-                    <p class="mt-2 text-2xl font-extrabold text-white">{{.Stats.TotalCount}}</p>
+                    <p class="mt-2 text-2xl font-semibold text-white">{{.Stats.TotalCount}}</p>
                     <p class="mt-1 text-xs text-slate-500">{{.Stats.IncomeCount}} {{plural .Stats.IncomeCount "receita" "receitas"}} &middot; {{.Stats.ExpenseCount}} {{plural .Stats.ExpenseCount "despesa" "despesas"}}</p>
                 </div>
-                <div class="p-5 rounded-2xl bg-slate-800/40 border border-slate-800">
+                <div class="px-5 py-4">
                     <p class="text-xs uppercase tracking-wider text-slate-400">Maior gasto</p>
                     {{with .Stats.Largest}}
-                    <p class="mt-2 text-2xl font-extrabold text-rose-400">{{formatCurrency .AmountCents}}</p>
+                    <p class="mt-2 text-2xl font-semibold text-rose-400">{{formatCurrency .AmountCents}}</p>
                     <p class="mt-1 text-xs text-slate-300 truncate">{{.Description}}</p>
                     <p class="text-xs text-slate-500">{{formatDate .Date}} &middot; {{.Category}}</p>
                     {{else}}
                     <p class="mt-2 text-sm text-slate-500">Sem despesas neste mês.</p>
                     {{end}}
                 </div>
-                <div class="p-5 rounded-2xl bg-slate-800/40 border border-slate-800">
+                <div class="px-5 py-4">
                     <p class="text-xs uppercase tracking-wider text-slate-400">Menor gasto</p>
                     {{with .Stats.Smallest}}
-                    <p class="mt-2 text-2xl font-extrabold text-rose-400">{{formatCurrency .AmountCents}}</p>
+                    <p class="mt-2 text-2xl font-semibold text-rose-400">{{formatCurrency .AmountCents}}</p>
                     <p class="mt-1 text-xs text-slate-300 truncate">{{.Description}}</p>
                     <p class="text-xs text-slate-500">{{formatDate .Date}} &middot; {{.Category}}</p>
                     {{else}}
@@ -200,9 +157,9 @@
             </div>
 
             {{if gt .Stats.ExpenseCount 0}}
-            <div class="mt-4 p-5 rounded-2xl bg-slate-800/40 border border-slate-800">
+            <div class="mt-4 p-5 rounded-lg bg-slate-800/40 border border-slate-800">
                 <p class="text-xs uppercase tracking-wider text-slate-400 mb-3">Despesas: essencial &times; supérfluo</p>
-                <div class="flex h-3 w-full overflow-hidden rounded-full bg-slate-800" role="img" aria-label="Divisão das despesas por classificação">
+                <div class="flex h-3 w-full overflow-hidden rounded-sm bg-slate-800" role="img" aria-label="Divisão das despesas por classificação">
                     {{range .Stats.Groups}}{{if gt .Cents 0}}<div class="{{if eq .Key "essential"}}bg-sky-500{{else if eq .Key "superfluous"}}bg-violet-500{{else}}bg-slate-500{{end}}" style="width: {{printf "%.1f" .Percent}}%"></div>{{end}}{{end}}
                 </div>
                 <ul class="mt-4 space-y-2 text-sm">
@@ -218,9 +175,9 @@
                     {{end}}
                 </ul>
                 {{with .Stats.Unclassified}}{{if gt .Count 0}}
-                <div class="mt-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-sm flex items-center justify-between gap-3">
+                <div class="mt-4 p-3 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-200 text-sm flex items-center justify-between gap-3">
                     <span>{{.Count}} {{plural .Count "gasto" "gastos"}} ({{formatCurrency .Cents}}) ainda sem classificação.</span>
-                    <button type="button" onclick="openCategoriesModal()" class="px-2 py-1 rounded-lg text-xs font-medium text-amber-100 hover:bg-amber-500/20 transition cursor-pointer whitespace-nowrap">Classificar categorias</button>
+                    <button type="button" onclick="openCategoriesModal()" class="px-2 py-1 rounded text-xs font-medium text-amber-100 hover:bg-amber-500/20 transition cursor-pointer whitespace-nowrap">Classificar categorias</button>
                 </div>
                 {{end}}{{end}}
             </div>
@@ -230,18 +187,18 @@
 
         <!-- Novo Lançamento (abre o pop-up) -->
         <div class="mb-8 flex items-center justify-end gap-3">
-            <span id="draft-dot" class="hidden text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 px-2 py-1 rounded-lg">rascunho salvo</span>
+            <span id="draft-dot" class="hidden text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 px-2 py-1 rounded">rascunho salvo</span>
             <button
                 type="button"
                 onclick="openImportModal()"
-                class="inline-flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-100 font-medium text-sm px-5 py-2.5 rounded-xl border border-slate-700 active:scale-[0.98] transition cursor-pointer"
+                class="inline-flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-100 font-medium text-sm px-5 py-2.5 rounded-md border border-slate-700 active:scale-[0.98] transition cursor-pointer"
             >
                 Importar extrato
             </button>
             <button
                 type="button"
                 onclick="openNewModal()"
-                class="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm px-5 py-2.5 rounded-xl shadow-lg shadow-emerald-600/20 active:scale-[0.98] transition cursor-pointer"
+                class="inline-flex items-center justify-center gap-2 bg-accent hover:brightness-110 text-slate-950 font-medium text-sm px-5 py-2.5 rounded-md active:scale-[0.98] transition cursor-pointer"
             >
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -251,9 +208,9 @@
         </div>
 
         <!-- Filtros do histórico (só a lista é filtrada; os cartões e o dashboard do mês não mudam) -->
-        <section id="filters" class="mb-4 p-4 rounded-2xl bg-slate-800/40 border border-slate-800">
+        <section id="filters" class="mb-4 p-4 rounded-lg bg-slate-800/40 border border-slate-800">
             {{if .Filter.Warning}}
-            <div class="mb-3 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm">{{.Filter.Warning}}</div>
+            <div class="mb-3 p-3 rounded-md bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm">{{.Filter.Warning}}</div>
             {{end}}
             <form id="filters-form" method="GET" action="/" class="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
                 <input type="hidden" name="livro" value="{{.BookID}}">
@@ -262,18 +219,18 @@
 
                 {{template "filterFields" .}}
 
-                <label class="flex items-center gap-1.5 text-xs font-medium text-slate-300 cursor-pointer pb-2.5"><input type="checkbox" name="todos" value="1" {{if .Filter.AllMonths}}checked{{end}} class="accent-emerald-500"> Todos os meses</label>
+                <label class="flex items-center gap-1.5 text-xs font-medium text-slate-300 cursor-pointer pb-2.5"><input type="checkbox" name="todos" value="1" {{if .Filter.AllMonths}}checked{{end}} class="accent-accent"> Todos os meses</label>
 
                 <div class="flex items-center gap-2 pb-0.5">
-                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm px-4 py-2 rounded-lg transition cursor-pointer">Aplicar</button>
-                    <a href="/?month={{.SelectedMonth}}&livro={{.BookID}}{{if .IncludeProjected}}&previstas=1{{end}}" class="px-3 py-2 rounded-lg text-sm text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition">Limpar</a>
-                    {{if .Filter.Active}}<span class="px-2 py-1 rounded-md text-xs bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">{{.Filter.Active}} {{plural .Filter.Active "filtro ativo" "filtros ativos"}}</span>{{end}}
+                    <button type="submit" class="bg-accent hover:brightness-110 text-slate-950 font-medium text-sm px-4 py-2 rounded transition cursor-pointer">Aplicar</button>
+                    <a href="/?month={{.SelectedMonth}}&livro={{.BookID}}{{if .IncludeProjected}}&previstas=1{{end}}" class="px-3 py-2 rounded text-sm text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition">Limpar</a>
+                    {{if .Filter.Active}}<span class="px-2 py-1 rounded-sm text-xs bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">{{.Filter.Active}} {{plural .Filter.Active "filtro ativo" "filtros ativos"}}</span>{{end}}
                 </div>
             </form>
         </section>
 
         <!-- Tabela de Histórico / Listagem -->
-        <section id="history" class="bg-slate-800/40 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+        <section id="history" class="bg-slate-800/40 border border-slate-800 rounded-lg overflow-hidden">
             <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
                 <h2 class="text-base font-semibold text-white flex items-center gap-2">
                     <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -290,17 +247,17 @@
                 <span>Desfazer última edição em lote: {{.Summary}} &middot; {{.Count}} {{plural .Count "lançamento" "lançamentos"}} &middot; {{.At}}</span>
                 <form method="POST" action="/bulk/undo" onsubmit="return confirm('Desfazer a edição de {{.Count}} {{plural .Count "lançamento" "lançamentos"}}?');" class="inline">
                     {{template "stateFields" $}}
-                    <button type="submit" class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 cursor-pointer">Desfazer</button>
+                    <button type="submit" class="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 cursor-pointer">Desfazer</button>
                 </form>
             </div>
             {{end}}
             <div id="bulk-bar" class="hidden px-6 py-3 flex flex-wrap items-center gap-3 text-sm bg-emerald-500/10 border-b border-emerald-500/30 text-emerald-200">
                 <span><strong id="bulk-count">0</strong> selecionados</span>
-                <button type="button" onclick="openBulkEdit()" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium cursor-pointer">Editar…</button>
-                <button type="button" onclick="openBulkAccount()" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-xs font-medium cursor-pointer">Definir conta…</button>
-                <button type="button" onclick="openBulkDelete()" class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-medium cursor-pointer">Excluir</button>
-                {{if gt (len .Books) 1}}<button type="button" onclick="openBulkMove()" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium cursor-pointer">Mover…</button>{{end}}
-                <button type="button" onclick="clearBulkSelection()" class="px-3 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-slate-800 cursor-pointer">Limpar seleção</button>
+                <button type="button" onclick="openBulkEdit()" class="px-3 py-1.5 rounded bg-accent hover:brightness-110 text-slate-950 text-xs font-medium cursor-pointer">Editar…</button>
+                <button type="button" onclick="openBulkAccount()" class="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 text-white text-xs font-medium cursor-pointer">Definir conta…</button>
+                <button type="button" onclick="openBulkDelete()" class="px-3 py-1.5 rounded bg-rose-600 hover:bg-rose-500 text-white text-xs font-medium cursor-pointer">Excluir</button>
+                {{if gt (len .Books) 1}}<button type="button" onclick="openBulkMove()" class="px-3 py-1.5 rounded bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium cursor-pointer">Mover…</button>{{end}}
+                <button type="button" onclick="clearBulkSelection()" class="px-3 py-1.5 rounded text-xs text-slate-300 hover:bg-slate-800 cursor-pointer">Limpar seleção</button>
             </div>
 
             <div class="overflow-x-auto">
@@ -326,31 +283,27 @@
                             <td class="px-6 py-4 font-medium text-slate-100" {{with .OriginalDescription}}title="{{.}}"{{end}}>
                                 {{.Description}}
                                 {{with .Installment}}
-                                <span class="ml-2 px-2 py-0.5 rounded-md text-xs font-medium bg-sky-500/10 text-sky-300 border border-sky-500/20">{{.Number}}/{{.Total}}</span>
+                                <span class="ml-2 px-2 py-0.5 rounded-sm text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">{{.Number}}/{{.Total}}</span>
                                 {{if gt .Remaining 0}}
                                 <span class="block text-xs font-normal text-slate-500 mt-0.5">restam {{.Remaining}} {{if eq .Remaining 1}}parcela{{else}}parcelas{{end}} &bull; {{formatCurrency .RemainingCents}}</span>
                                 {{end}}
                                 {{end}}
-                                {{with .TransferNote}}<span class="ml-2 px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-slate-700/60 text-slate-300 border border-slate-600">{{.}}</span>{{end}}
+                                {{with .TransferNote}}<span class="ml-2 px-1.5 py-0.5 rounded-sm text-[10px] font-medium bg-slate-700/60 text-slate-300 border border-slate-600">{{.}}</span>{{end}}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="px-2.5 py-1 rounded-md text-xs bg-slate-800 text-slate-300 border border-slate-700">
+                                <span class="px-2.5 py-1 rounded-sm text-xs bg-slate-800 text-slate-300 border border-slate-700">
                                     {{.Category}}
                                 </span>
-                                {{if isInternal .Category}}<span class="ml-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-slate-700/60 text-slate-300 border border-slate-600">interna</span>{{end}}
-                                {{if isInvestment .Category}}<span class="ml-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-emerald-900/40 text-emerald-300 border border-emerald-700/50">investimento</span>{{end}}
-                                {{if .AccountID}}<span data-account-badge title="Conta" class="ml-1 px-2 py-0.5 rounded-md text-xs bg-amber-500/10 text-amber-300 border border-amber-500/20">{{.AccountName}}</span>{{end}}
-                                {{if eq .EffectivePriority "essential"}}<span data-priority-badge="essential" class="ml-1 px-2 py-0.5 rounded-md text-xs bg-sky-500/10 text-sky-300 border border-sky-500/20">Essencial</span>{{else if eq .EffectivePriority "superfluous"}}<span data-priority-badge="superfluous" class="ml-1 px-2 py-0.5 rounded-md text-xs bg-violet-500/10 text-violet-300 border border-violet-500/20">Supérfluo</span>{{end}}
+                                {{if isInternal .Category}}<span class="ml-1 px-1.5 py-0.5 rounded-sm text-[10px] font-medium bg-slate-700/60 text-slate-300 border border-slate-600">interna</span>{{end}}
+                                {{if isInvestment .Category}}<span class="ml-1 px-1.5 py-0.5 rounded-sm text-[10px] font-medium bg-emerald-900/40 text-emerald-300 border border-emerald-700/50">investimento</span>{{end}}
+                                {{if .AccountID}}<span data-account-badge title="Conta" class="ml-1 px-2 py-0.5 rounded-sm text-xs bg-slate-800 text-slate-400 border border-slate-700">{{.AccountName}}</span>{{end}}
+                                {{if eq .EffectivePriority "essential"}}<span data-priority-badge="essential" class="ml-1 px-2 py-0.5 rounded-sm text-xs bg-sky-500/10 text-sky-300 border border-sky-500/20">Essencial</span>{{else if eq .EffectivePriority "superfluous"}}<span data-priority-badge="superfluous" class="ml-1 px-2 py-0.5 rounded-sm text-xs bg-violet-500/10 text-violet-300 border border-violet-500/20">Supérfluo</span>{{end}}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 {{if eq .Type "income"}}
-                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Receita
-                                </span>
+                                <span class="text-xs font-medium text-emerald-400">Receita</span>
                                 {{else}}
-                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span> Despesa
-                                </span>
+                                <span class="text-xs font-medium text-rose-400">Despesa</span>
                                 {{end}}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right font-semibold {{if eq .Type "income"}}text-emerald-400{{else}}text-rose-400{{end}}">
@@ -371,7 +324,7 @@
                                         data-account-name="{{.AccountName}}"
                                         onclick="openEditModal(this)"
                                         title="Editar lançamento"
-                                        class="relative p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition cursor-pointer"
+                                        class="relative p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 rounded transition cursor-pointer"
                                     >
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -387,7 +340,7 @@
                                         <button 
                                             type="submit" 
                                             title="Excluir lançamento"
-                                            class="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition cursor-pointer"
+                                            class="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded transition cursor-pointer"
                                         >
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -415,7 +368,7 @@
 
         {{if .Projected}}
         <!-- Parcelas previstas (calculadas, não gravadas) -->
-        <section class="mt-8 bg-slate-800/40 border border-dashed border-sky-500/30 rounded-2xl overflow-hidden shadow-sm">
+        <section class="mt-8 bg-slate-800/40 border border-dashed border-sky-500/30 rounded-lg overflow-hidden">
             <div class="p-6 border-b border-slate-800 flex items-center justify-between gap-3">
                 <h2 class="text-lg font-semibold text-slate-100">Parcelas previstas ({{len .Projected}})</h2>
                 <span class="text-xs text-slate-400">Calculadas pelo histórico; some quando a parcela real é lançada</span>
@@ -428,8 +381,8 @@
                             <td class="px-6 py-3 whitespace-nowrap text-xs text-slate-400">{{formatDate .Date}}</td>
                             <td class="px-6 py-3 font-medium text-slate-100">
                                 {{.Name}}
-                                <span class="ml-2 px-2 py-0.5 rounded-md text-xs font-medium bg-sky-500/10 text-sky-300 border border-sky-500/20">{{.Number}}/{{.Total}}</span>
-                                <span class="ml-1 px-2 py-0.5 rounded-md text-xs bg-slate-800 text-slate-400 border border-slate-700">prevista</span>
+                                <span class="ml-2 px-2 py-0.5 rounded-sm text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">{{.Number}}/{{.Total}}</span>
+                                <span class="ml-1 px-2 py-0.5 rounded-sm text-xs bg-slate-800 text-slate-400 border border-slate-700">prevista</span>
                             </td>
                             <td class="px-6 py-3 whitespace-nowrap text-right font-semibold {{if eq .Type "income"}}text-emerald-400{{else}}text-rose-400{{end}}">
                                 {{if eq .Type "income"}}+{{else}}-{{end}} {{formatCurrency .AmountCents}}
@@ -448,14 +401,13 @@
 
         <!-- Footer Informativo -->
         <footer class="mt-12 text-center text-xs text-slate-500">
-            <p>🪙 FinPi &bull; Binário único em Go &bull; Armazenamento SQLite WAL &bull; Otimizado para Raspberry Pi 3</p>
-            <p class="mt-1 text-slate-600">Versão {{.Version}}</p>
+            <p>FinPi &middot; Versão {{.Version}}</p>
         </footer>
     </div>
 
     <!-- Modal de Edição de Lançamento -->
-    <div id="edit-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 backdrop-blur-sm p-4" onclick="handleBackdropClick(event)">
-        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl p-6 relative" onclick="event.stopPropagation()">
+    <div id="edit-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/80 p-4" onclick="handleBackdropClick(event)">
+        <div class="bg-slate-900 border border-slate-700 rounded-lg w-full max-w-lg p-6 relative" onclick="event.stopPropagation()">
             <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-5">
                 <h3 class="text-lg font-semibold text-white flex items-center gap-2">
                     <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -463,19 +415,19 @@
                     </svg>
                     Editar Lançamento
                 </h3>
-                <button type="button" onclick="closeEditModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer">
+                <button type="button" onclick="closeEditModal()" class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition cursor-pointer">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                 </button>
             </div>
 
-            <div id="edit-draft-notice" class="hidden mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-sm items-center justify-between gap-3">
+            <div id="edit-draft-notice" class="hidden mb-4 p-3 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-200 text-sm items-center justify-between gap-3">
                 <span id="edit-draft-message">Rascunho restaurado.</span>
-                <button id="edit-discard-btn" type="button" onclick="discardEditDraft()" class="px-2 py-1 rounded-lg text-xs font-medium text-amber-100 hover:bg-amber-500/20 transition cursor-pointer">Descartar</button>
+                <button id="edit-discard-btn" type="button" onclick="discardEditDraft()" class="px-2 py-1 rounded text-xs font-medium text-amber-100 hover:bg-amber-500/20 transition cursor-pointer">Descartar</button>
             </div>
 
-            <div id="edit-form-error" role="alert" class="hidden mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm"></div>
+            <div id="edit-form-error" role="alert" class="hidden mb-4 p-3 rounded-md bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm"></div>
 
             <form id="edit-form" method="POST" action="/transactions/update" data-draft-prefix="finpi:draft:editar-lancamento:" class="space-y-4">
                 <input type="hidden" id="edit-id" name="id">
@@ -493,7 +445,7 @@
                         name="description" 
                         required 
                         placeholder="Ex: Mercado, Salário, Internet" 
-                        class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
+                        class="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-accent focus:ring-1 focus:ring-emerald-500 transition"
                     >
                 </div>
 
@@ -509,7 +461,7 @@
                             name="amount" 
                             required 
                             placeholder="0,00" 
-                            class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
+                            class="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-accent focus:ring-1 focus:ring-emerald-500 transition"
                         >
                     </div>
 
@@ -521,7 +473,7 @@
                             name="type"
                             onchange="syncPriorityField(this.form)"
                             required
-                            class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
+                            class="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-accent focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
                         >
                             <option value="expense">Despesa</option>
                             <option value="income">Receita</option>
@@ -538,7 +490,7 @@
                             name="category"
                             required
                             onchange="toggleNewCategory(this)"
-                            class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
+                            class="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-accent focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
                         >
                             {{range .Categories}}
                             <option value="{{.Name}}" data-priority="{{.Priority}}">{{.Name}}</option>
@@ -551,7 +503,7 @@
                             name="new_category"
                             maxlength="40"
                             placeholder="Nome da nova categoria"
-                            class="hidden mt-2 w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
+                            class="hidden mt-2 w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-accent focus:ring-1 focus:ring-emerald-500 transition"
                         >
                     </div>
 
@@ -563,7 +515,7 @@
                             id="edit-date"
                             name="date" 
                             required 
-                            class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
+                            class="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-accent focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
                         >
                     </div>
                 </div>
@@ -574,7 +526,7 @@
                     <select
                         id="edit-priority"
                         name="priority"
-                        class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
+                        class="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-accent focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
                     >
                         <option value="">Seguir a categoria</option>
                         <option value="essential">Essencial</option>
@@ -588,7 +540,7 @@
                     <select
                         id="edit-account"
                         name="conta"
-                        class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
+                        class="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-accent focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
                     >
                         <option value="0">Sem conta</option>
                         {{range .Accounts}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
@@ -600,13 +552,13 @@
                     <button 
                         type="button" 
                         onclick="closeEditModal()" 
-                        class="px-4 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition cursor-pointer"
+                        class="px-4 py-2 rounded-md text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition cursor-pointer"
                     >
                         Cancelar
                     </button>
                     <button 
                         type="submit" 
-                        class="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm px-5 py-2 rounded-xl shadow-lg shadow-emerald-600/20 active:scale-[0.98] transition cursor-pointer"
+                        class="inline-flex items-center justify-center gap-2 bg-accent hover:brightness-110 text-slate-950 font-medium text-sm px-5 py-2 rounded-md active:scale-[0.98] transition cursor-pointer"
                     >
                         Salvar Alterações
                     </button>
@@ -616,8 +568,8 @@
     </div>
 
     <!-- Pop-up de Novo Lançamento (o rascunho fica guardado no navegador) -->
-    <div id="new-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 backdrop-blur-sm p-4" onclick="closeNewModal()">
-        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl p-6 relative" onclick="event.stopPropagation()">
+    <div id="new-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/80 p-4" onclick="closeNewModal()">
+        <div class="bg-slate-900 border border-slate-700 rounded-lg w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 relative" onclick="event.stopPropagation()">
             <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-5">
                 <h3 class="text-lg font-semibold text-white flex items-center gap-2">
                     <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -625,19 +577,19 @@
                     </svg>
                     Novo Lançamento
                 </h3>
-                <button type="button" onclick="closeNewModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer" title="Fechar (o rascunho é mantido)">
+                <button type="button" onclick="closeNewModal()" class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition cursor-pointer" title="Fechar (o rascunho é mantido)">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                 </button>
             </div>
 
-            <div id="draft-notice" class="hidden mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-sm items-center justify-between gap-3">
+            <div id="draft-notice" class="hidden mb-4 p-3 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-200 text-sm items-center justify-between gap-3">
                 <span>Rascunho restaurado.</span>
-                <button type="button" onclick="discardDraft()" class="px-2 py-1 rounded-lg text-xs font-medium text-amber-100 hover:bg-amber-500/20 transition cursor-pointer">Descartar</button>
+                <button type="button" onclick="discardDraft()" class="px-2 py-1 rounded text-xs font-medium text-amber-100 hover:bg-amber-500/20 transition cursor-pointer">Descartar</button>
             </div>
 
-            <div id="new-form-error" role="alert" class="hidden mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm"></div>
+            <div id="new-form-error" role="alert" class="hidden mb-4 p-3 rounded-md bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm"></div>
 
             <form id="new-form" method="POST" action="/transactions" data-draft-key="finpi:draft:novo-lancamento" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <input type="hidden" name="livro" value="{{.BookID}}">
@@ -653,7 +605,7 @@
                         name="description"
                         required
                         placeholder="Ex: Mercado, Salário, Internet"
-                        class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
+                        class="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-accent focus:ring-1 focus:ring-emerald-500 transition"
                     >
                 </div>
 
@@ -667,7 +619,7 @@
                         name="amount"
                         required
                         placeholder="0,00"
-                        class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
+                        class="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-accent focus:ring-1 focus:ring-emerald-500 transition"
                     >
                 </div>
 
@@ -678,7 +630,7 @@
                         name="type"
                         onchange="syncPriorityField(this.form)"
                         required
-                        class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
+                        class="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-accent focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
                     >
                         <option value="expense">Despesa</option>
                         <option value="income">Receita</option>
@@ -692,7 +644,7 @@
                         name="category"
                         required
                         onchange="toggleNewCategory(this)"
-                        class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
+                        class="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-accent focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
                     >
                         {{range .Categories}}
                         <option value="{{.Name}}" data-priority="{{.Priority}}">{{.Name}}</option>
@@ -704,7 +656,7 @@
                         name="new_category"
                         maxlength="40"
                         placeholder="Nome da nova categoria"
-                        class="hidden mt-2 w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
+                        class="hidden mt-2 w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-accent focus:ring-1 focus:ring-emerald-500 transition"
                     >
                 </div>
 
@@ -716,7 +668,7 @@
                         name="date"
                         value="{{.TodayDate}}"
                         required
-                        class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
+                        class="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-accent focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
                     >
                 </div>
 
@@ -725,7 +677,7 @@
                     <label class="block text-xs font-medium text-slate-300 mb-1">Prioridade</label>
                     <select
                         name="priority"
-                        class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
+                        class="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-accent focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
                     >
                         <option value="">Seguir a categoria</option>
                         <option value="essential">Essencial</option>
@@ -738,7 +690,7 @@
                     <label class="block text-xs font-medium text-slate-300 mb-1">Conta</label>
                     <select
                         name="conta"
-                        class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
+                        class="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-accent focus:ring-1 focus:ring-emerald-500 transition cursor-pointer"
                     >
                         <option value="">Sem conta</option>
                         {{range .Accounts}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
@@ -750,14 +702,14 @@
                     <button
                         type="button"
                         onclick="closeNewModal()"
-                        class="px-4 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition cursor-pointer"
+                        class="px-4 py-2 rounded-md text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition cursor-pointer"
                     >
                         Fechar
                     </button>
                     <button
                         id="new-form-submit"
                         type="submit"
-                        class="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium text-sm px-5 py-2 rounded-xl shadow-lg shadow-emerald-600/20 active:scale-[0.98] transition cursor-pointer"
+                        class="inline-flex items-center justify-center gap-2 bg-accent hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed text-slate-950 font-medium text-sm px-5 py-2 rounded-md active:scale-[0.98] transition cursor-pointer"
                     >
                         Registrar Lançamento
                     </button>
@@ -767,28 +719,28 @@
     </div>
 
     <!-- Pop-up de Importar extrato (a revisão fica na página enquanto o pop-up estiver fechado) -->
-    <div id="import-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 backdrop-blur-sm p-4" onclick="closeImportModal()">
-        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl p-6 relative" onclick="event.stopPropagation()">
+    <div id="import-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/80 p-4" onclick="closeImportModal()">
+        <div class="bg-slate-900 border border-slate-700 rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6 relative" onclick="event.stopPropagation()">
             <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-5">
                 <div>
                     <h3 class="text-lg font-semibold text-white">Importar extrato</h3>
                     <p class="text-xs text-slate-400">Os lançamentos entram no livro <strong style="color: {{.Book.Hex}}">{{.Book.Name}}</strong>.</p>
                 </div>
-                <button type="button" onclick="closeImportModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer" title="Fechar (a revisão é mantida)">
+                <button type="button" onclick="closeImportModal()" class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition cursor-pointer" title="Fechar (a revisão é mantida)">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                 </button>
             </div>
 
-            <div id="import-error" role="alert" class="hidden mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm"></div>
+            <div id="import-error" role="alert" class="hidden mb-4 p-3 rounded-md bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm"></div>
 
             <div id="import-picker">
                 <p class="text-sm text-slate-400 mb-3">Envie o extrato do Mercado Pago (<strong>.xlsx</strong> ou <strong>.csv</strong>), do Nubank (<strong>.ofx</strong> ou <strong>.csv</strong>), do Sicredi (<strong>.xlsx</strong>, mesmo que o arquivo venha com extensão .csv) ou do Banco do Brasil (<strong>.csv</strong>, extrato da conta corrente), sem abrir e salvar no Excel. Você revisa tudo antes de gravar.</p>
                 <form id="import-form" method="POST" action="/import/preview" enctype="multipart/form-data" class="flex flex-col gap-3 sm:flex-row sm:items-center">
                     {{template "stateFields" .}}
-                    <input type="file" name="file" accept=".xlsx,.csv,.ofx" required class="flex-1 text-sm text-slate-300 file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border-0 file:bg-slate-800 file:text-slate-200 file:cursor-pointer">
-                    <button id="import-submit" type="submit" class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-medium text-sm px-5 py-2 rounded-xl transition cursor-pointer">Ler arquivo</button>
+                    <input type="file" name="file" accept=".xlsx,.csv,.ofx" required class="flex-1 text-sm text-slate-300 file:mr-3 file:px-3 file:py-2 file:rounded file:border-0 file:bg-slate-800 file:text-slate-200 file:cursor-pointer">
+                    <button id="import-submit" type="submit" class="bg-accent hover:brightness-110 disabled:opacity-60 text-slate-950 font-medium text-sm px-5 py-2 rounded-md transition cursor-pointer">Ler arquivo</button>
                 </form>
             </div>
 
@@ -797,16 +749,16 @@
     </div>
 
     <!-- Pop-up de edição múltipla (edição ou exclusão em lote, sempre com prévia) -->
-    <div id="bulk-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 backdrop-blur-sm p-4" onclick="closeBulkModal()">
-        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl p-6 relative" onclick="event.stopPropagation()">
+    <div id="bulk-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/80 p-4" onclick="closeBulkModal()">
+        <div class="bg-slate-900 border border-slate-700 rounded-lg w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 relative" onclick="event.stopPropagation()">
             <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-5">
                 <h3 id="bulk-modal-title" class="text-lg font-semibold text-white">Editar lançamentos</h3>
-                <button type="button" onclick="closeBulkModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer" title="Fechar">
+                <button type="button" onclick="closeBulkModal()" class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition cursor-pointer" title="Fechar">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
             </div>
 
-            <div id="bulk-error" role="alert" class="hidden mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm"></div>
+            <div id="bulk-error" role="alert" class="hidden mb-4 p-3 rounded-md bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm"></div>
 
             <form id="bulk-form" method="POST" action="/bulk/preview" class="space-y-4">
                 {{template "stateFields" .}}
@@ -814,14 +766,14 @@
                 <p class="text-xs text-slate-400">Cada campo começa em "não alterar". Você verá a prévia antes de gravar.</p>
 
                 <label class="block text-xs font-medium text-slate-300">Categoria
-                    <select name="categoria" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100">
+                    <select name="categoria" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100">
                         <option value="">Não alterar</option>
                         {{range .Categories}}<option value="{{.Name}}">{{.Name}}</option>{{end}}
                     </select>
                 </label>
 
                 <label class="block text-xs font-medium text-slate-300">Prioridade (só despesas)
-                    <select name="prioridade" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100">
+                    <select name="prioridade" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100">
                         <option value="">Não alterar</option>
                         <option value="seguir">Seguir a categoria</option>
                         <option value="essential">Essencial</option>
@@ -830,17 +782,17 @@
                 </label>
 
                 <div class="text-xs font-medium text-slate-300">Data
-                    <select name="data_modo" id="bulk-date-mode" onchange="syncBulkDateMode()" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100">
+                    <select name="data_modo" id="bulk-date-mode" onchange="syncBulkDateMode()" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100">
                         <option value="">Não alterar</option>
                         <option value="definir">Definir uma data</option>
                         <option value="deslocar">Deslocar</option>
                     </select>
                     <div id="bulk-date-set" class="hidden mt-2">
-                        <input type="date" name="data" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100">
+                        <input type="date" name="data" class="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100">
                     </div>
                     <div id="bulk-date-shift" class="hidden mt-2 flex items-center gap-2">
-                        <input type="number" name="desloca" step="1" placeholder="Ex.: 1 ou -3" class="w-32 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100">
-                        <select name="desloca_unidade" class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100">
+                        <input type="number" name="desloca" step="1" placeholder="Ex.: 1 ou -3" class="w-32 bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100">
+                        <select name="desloca_unidade" class="bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100">
                             <option value="dias">dias</option>
                             <option value="meses">meses</option>
                         </select>
@@ -850,14 +802,14 @@
 
                 <div class="text-xs font-medium text-slate-300">Descrição: localizar e substituir
                     <div class="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <input type="text" name="localizar" maxlength="100" placeholder="Localizar (ignora maiúsculas)" class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100">
-                        <input type="text" name="substituir" maxlength="200" placeholder="Substituir por (vazio remove)" class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100">
+                        <input type="text" name="localizar" maxlength="100" placeholder="Localizar (ignora maiúsculas)" class="bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100">
+                        <input type="text" name="substituir" maxlength="200" placeholder="Substituir por (vazio remove)" class="bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100">
                     </div>
                 </div>
 
                 <div class="flex items-center justify-end gap-3 pt-2 border-t border-slate-800">
-                    <button type="button" onclick="closeBulkModal()" class="px-4 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition cursor-pointer">Cancelar</button>
-                    <button id="bulk-form-submit" type="submit" class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-medium text-sm px-5 py-2 rounded-xl transition cursor-pointer">Ver prévia</button>
+                    <button type="button" onclick="closeBulkModal()" class="px-4 py-2 rounded-md text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition cursor-pointer">Cancelar</button>
+                    <button id="bulk-form-submit" type="submit" class="bg-accent hover:brightness-110 disabled:opacity-60 text-slate-950 font-medium text-sm px-5 py-2 rounded-md transition cursor-pointer">Ver prévia</button>
                 </div>
             </form>
 
@@ -865,13 +817,13 @@
                 {{template "stateFields" .}}
                 <input type="hidden" name="acao" value="mover">
                 <label class="block text-xs font-medium text-slate-300">Mover para o livro
-                    <select name="livro_destino" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100">
+                    <select name="livro_destino" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100">
                         {{range .Books}}{{if ne .ID $.BookID}}<option value="{{.ID}}">{{.Name}}</option>{{end}}{{end}}
                     </select>
                 </label>
                 <div class="flex items-center justify-end gap-3 pt-2 border-t border-slate-800">
-                    <button type="button" onclick="closeBulkModal()" class="px-4 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition cursor-pointer">Cancelar</button>
-                    <button type="submit" class="bg-sky-600 hover:bg-sky-500 text-white font-medium text-sm px-5 py-2 rounded-xl transition cursor-pointer">Ver prévia</button>
+                    <button type="button" onclick="closeBulkModal()" class="px-4 py-2 rounded-md text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition cursor-pointer">Cancelar</button>
+                    <button type="submit" class="bg-sky-600 hover:bg-sky-500 text-white font-medium text-sm px-5 py-2 rounded-md transition cursor-pointer">Ver prévia</button>
                 </div>
             </form>
 
@@ -879,14 +831,14 @@
                 {{template "stateFields" .}}
                 <input type="hidden" name="acao" value="conta">
                 <label class="block text-xs font-medium text-slate-300">Definir a conta
-                    <select name="conta" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100">
+                    <select name="conta" class="mt-1 w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100">
                         <option value="0">Sem conta</option>
                         {{range .Accounts}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
                     </select>
                 </label>
                 <div class="flex items-center justify-end gap-3 pt-2 border-t border-slate-800">
-                    <button type="button" onclick="closeBulkModal()" class="px-4 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition cursor-pointer">Cancelar</button>
-                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm px-5 py-2 rounded-xl transition cursor-pointer">Ver prévia</button>
+                    <button type="button" onclick="closeBulkModal()" class="px-4 py-2 rounded-md text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition cursor-pointer">Cancelar</button>
+                    <button type="submit" class="bg-accent hover:brightness-110 text-slate-950 font-medium text-sm px-5 py-2 rounded-md transition cursor-pointer">Ver prévia</button>
                 </div>
             </form>
 
@@ -895,11 +847,11 @@
     </div>
 
     <!-- Pop-up de Categorias -->
-    <div id="categories-modal" data-open="{{.ShowCategories}}" class="fixed inset-0 z-50 {{if .ShowCategories}}flex{{else}}hidden{{end}} items-center justify-center bg-black/60 backdrop-blur-sm p-4" onclick="closeCategoriesModal()">
-        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl p-6 relative" onclick="event.stopPropagation()">
+    <div id="categories-modal" data-open="{{.ShowCategories}}" class="fixed inset-0 z-50 {{if .ShowCategories}}flex{{else}}hidden{{end}} items-center justify-center bg-slate-950/80 p-4" onclick="closeCategoriesModal()">
+        <div class="bg-slate-900 border border-slate-700 rounded-lg w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 relative" onclick="event.stopPropagation()">
             <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-5">
                 <h3 class="text-lg font-semibold text-white">Categorias</h3>
-                <button type="button" onclick="closeCategoriesModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer" title="Fechar">
+                <button type="button" onclick="closeCategoriesModal()" class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition cursor-pointer" title="Fechar">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
@@ -907,7 +859,7 @@
             </div>
 
             {{if .CategoryError}}
-            <div class="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm">{{.CategoryError}}</div>
+            <div class="mb-4 p-3 rounded-md bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm">{{.CategoryError}}</div>
             {{end}}
 
             <form method="POST" action="/categories" class="flex items-center gap-2 mb-5">
@@ -918,9 +870,9 @@
                     required
                     maxlength="40"
                     placeholder="Nova categoria"
-                    class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
+                    class="flex-1 bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-accent focus:ring-1 focus:ring-emerald-500 transition"
                 >
-                <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm px-4 py-2 rounded-xl transition cursor-pointer">Adicionar</button>
+                <button type="submit" class="bg-accent hover:brightness-110 text-slate-950 font-medium text-sm px-4 py-2 rounded-md transition cursor-pointer">Adicionar</button>
             </form>
 
             <ul class="divide-y divide-slate-800/60">
@@ -929,26 +881,26 @@
                     <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                         <div class="min-w-0">
                             <span class="font-medium text-slate-100">{{.Name}}</span>
-                            {{if .Hidden}}<span class="ml-2 px-2 py-0.5 rounded-md text-xs bg-slate-800 text-slate-400 border border-slate-700">oculta</span>{{end}}
-                            {{if eq .Priority "essential"}}<span class="ml-2 px-2 py-0.5 rounded-md text-xs bg-sky-500/10 text-sky-300 border border-sky-500/20">Essencial</span>{{else if eq .Priority "superfluous"}}<span class="ml-2 px-2 py-0.5 rounded-md text-xs bg-violet-500/10 text-violet-300 border border-violet-500/20">Supérfluo</span>{{end}}
+                            {{if .Hidden}}<span class="ml-2 px-2 py-0.5 rounded-sm text-xs bg-slate-800 text-slate-400 border border-slate-700">oculta</span>{{end}}
+                            {{if eq .Priority "essential"}}<span class="ml-2 px-2 py-0.5 rounded-sm text-xs bg-sky-500/10 text-sky-300 border border-sky-500/20">Essencial</span>{{else if eq .Priority "superfluous"}}<span class="ml-2 px-2 py-0.5 rounded-sm text-xs bg-violet-500/10 text-violet-300 border border-violet-500/20">Supérfluo</span>{{end}}
                             <span class="block text-xs text-slate-500">{{.Usage}} lançamento{{if ne .Usage 1}}s{{end}}</span>
                         </div>
                         <div class="flex flex-wrap items-center gap-1 sm:flex-shrink-0">
                             <form method="POST" action="/categories/priority" class="inline">
                                 {{template "stateFields" $}}
                                 <input type="hidden" name="id" value="{{.ID}}">
-                                <select name="priority" onchange="this.form.submit()" title="Classificação das despesas desta categoria" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-200 cursor-pointer">
+                                <select name="priority" onchange="this.form.submit()" title="Classificação das despesas desta categoria" class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-slate-200 cursor-pointer">
                                     <option value="" {{if eq .Priority ""}}selected{{end}}>Sem classificação</option>
                                     <option value="essential" {{if eq .Priority "essential"}}selected{{end}}>Essencial</option>
                                     <option value="superfluous" {{if eq .Priority "superfluous"}}selected{{end}}>Supérfluo</option>
                                 </select>
                             </form>
-                            <button type="button" onclick="toggleRename({{.ID}})" class="px-2 py-1 rounded-lg text-xs text-slate-300 hover:bg-slate-800 transition cursor-pointer">Renomear</button>
+                            <button type="button" onclick="toggleRename({{.ID}})" class="px-2 py-1 rounded text-xs text-slate-300 hover:bg-slate-800 transition cursor-pointer">Renomear</button>
                             <form method="POST" action="/categories/visibility" class="inline">
                                 {{template "stateFields" $}}
                                 <input type="hidden" name="id" value="{{.ID}}">
                                 <input type="hidden" name="hidden" value="{{if .Hidden}}0{{else}}1{{end}}">
-                                <button type="submit" class="px-2 py-1 rounded-lg text-xs text-slate-300 hover:bg-slate-800 transition cursor-pointer">{{if .Hidden}}Exibir{{else}}Ocultar{{end}}</button>
+                                <button type="submit" class="px-2 py-1 rounded text-xs text-slate-300 hover:bg-slate-800 transition cursor-pointer">{{if .Hidden}}Exibir{{else}}Ocultar{{end}}</button>
                             </form>
                             <form method="POST" action="/categories/delete" class="inline" onsubmit="return confirm('Excluir esta categoria?');">
                                 {{template "stateFields" $}}
@@ -956,7 +908,7 @@
                                 <button
                                     type="submit"
                                     {{if gt .Usage 0}}disabled title="Em uso por lançamentos: renomeie ou oculte"{{else}}title="Excluir categoria"{{end}}
-                                    class="px-2 py-1 rounded-lg text-xs text-rose-400 hover:bg-rose-500/10 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                                    class="px-2 py-1 rounded text-xs text-rose-400 hover:bg-rose-500/10 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                                 >Excluir</button>
                             </form>
                         </div>
@@ -971,9 +923,9 @@
                                 required
                                 maxlength="40"
                                 value="{{.Name}}"
-                                class="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 transition"
+                                class="flex-1 bg-slate-800 border border-slate-700 rounded-md px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-accent transition"
                             >
-                            <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition cursor-pointer">Salvar</button>
+                            <button type="submit" class="bg-accent hover:brightness-110 text-slate-950 text-xs font-medium px-3 py-1.5 rounded transition cursor-pointer">Salvar</button>
                             <button type="button" onclick="toggleRename({{.ID}})" class="text-xs text-slate-400 hover:text-slate-200 px-2 py-1.5 transition cursor-pointer">Cancelar</button>
                         </div>
                     </form>
@@ -984,11 +936,11 @@
     </div>
 
     <!-- Pop-up de Livros -->
-    <div id="books-modal" data-open="{{.ShowBooks}}" class="fixed inset-0 z-50 {{if .ShowBooks}}flex{{else}}hidden{{end}} items-center justify-center bg-black/60 backdrop-blur-sm p-4" onclick="closeBooksModal()">
-        <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl p-6 relative" onclick="event.stopPropagation()">
+    <div id="books-modal" data-open="{{.ShowBooks}}" class="fixed inset-0 z-50 {{if .ShowBooks}}flex{{else}}hidden{{end}} items-center justify-center bg-slate-950/80 p-4" onclick="closeBooksModal()">
+        <div class="bg-slate-900 border border-slate-700 rounded-lg w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 relative" onclick="event.stopPropagation()">
             <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-5">
                 <h3 class="text-lg font-semibold text-white">Livros</h3>
-                <button type="button" onclick="closeBooksModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer" title="Fechar">
+                <button type="button" onclick="closeBooksModal()" class="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition cursor-pointer" title="Fechar">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
@@ -996,7 +948,7 @@
             </div>
 
             {{if .BookError}}
-            <div class="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm">{{.BookError}}</div>
+            <div class="mb-4 p-3 rounded-md bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm">{{.BookError}}</div>
             {{end}}
 
             <p class="mb-4 text-xs text-slate-400">Cada livro tem seus próprios lançamentos e categorias (ex.: Pessoal e PJ).</p>
@@ -1008,26 +960,26 @@
                         <div class="min-w-0 flex items-center gap-2">
                             <span class="inline-block h-2.5 w-2.5 rounded-full" style="background: {{.Hex}}"></span>
                             <span class="font-medium text-slate-100">{{.Name}}</span>
-                            {{if eq .ID $.BookID}}<span class="px-2 py-0.5 rounded-md text-xs bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">aberto</span>{{end}}
-                            {{if .Archived}}<span class="px-2 py-0.5 rounded-md text-xs bg-slate-800 text-slate-400 border border-slate-700">arquivado</span>{{end}}
+                            {{if eq .ID $.BookID}}<span class="px-2 py-0.5 rounded-sm text-xs bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">aberto</span>{{end}}
+                            {{if .Archived}}<span class="px-2 py-0.5 rounded-sm text-xs bg-slate-800 text-slate-400 border border-slate-700">arquivado</span>{{end}}
                         </div>
                         <form method="POST" action="/livros/arquivar" class="inline"{{if not .Archived}} onsubmit="return confirm('Arquivar este livro? Os lançamentos ficam guardados e ele pode ser reativado depois.');"{{end}}>
                             <input type="hidden" name="livro" value="{{$.BookID}}">
                             <input type="hidden" name="month" value="{{$.SelectedMonth}}">
                             <input type="hidden" name="id" value="{{.ID}}">
                             <input type="hidden" name="arquivar" value="{{if .Archived}}0{{else}}1{{end}}">
-                            <button type="submit" class="px-2 py-1 rounded-lg text-xs text-slate-300 hover:bg-slate-800 transition cursor-pointer">{{if .Archived}}Reativar{{else}}Arquivar{{end}}</button>
+                            <button type="submit" class="px-2 py-1 rounded text-xs text-slate-300 hover:bg-slate-800 transition cursor-pointer">{{if .Archived}}Reativar{{else}}Arquivar{{end}}</button>
                         </form>
                     </div>
                     <form method="POST" action="/livros/editar" class="mt-2 flex flex-wrap items-center gap-2">
                         <input type="hidden" name="livro" value="{{$.BookID}}">
                         <input type="hidden" name="month" value="{{$.SelectedMonth}}">
                         <input type="hidden" name="id" value="{{.ID}}">
-                        <input type="text" name="name" required maxlength="40" value="{{.Name}}" aria-label="Nome do livro" class="flex-1 min-w-[8rem] bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-emerald-500 transition">
-                        <select name="color" aria-label="Cor do livro" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-200 cursor-pointer">
+                        <input type="text" name="name" required maxlength="40" value="{{.Name}}" aria-label="Nome do livro" class="flex-1 min-w-[8rem] bg-slate-800 border border-slate-700 rounded-md px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-accent transition">
+                        <select name="color" aria-label="Cor do livro" class="bg-slate-800 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 cursor-pointer">
                             {{range $.BookColors}}<option value="{{.Key}}" {{if eq .Key $b.Color}}selected{{end}}>{{.Label}}</option>{{end}}
                         </select>
-                        <button type="submit" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition cursor-pointer">Salvar</button>
+                        <button type="submit" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-medium px-3 py-1.5 rounded transition cursor-pointer">Salvar</button>
                     </form>
                     {{if not .Archived}}
                     <div class="mt-3 pl-3 border-l border-slate-800">
@@ -1039,16 +991,16 @@
                                     <input type="hidden" name="livro" value="{{$b.ID}}">
                                     <input type="hidden" name="month" value="{{$.SelectedMonth}}">
                                     <input type="hidden" name="id" value="{{.ID}}">
-                                    <input type="text" name="name" required maxlength="40" value="{{.Name}}" aria-label="Nome da conta" class="flex-1 min-w-[6rem] bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-100 focus:outline-none focus:border-emerald-500 transition">
-                                    <button type="submit" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-medium px-2 py-1 rounded-lg transition cursor-pointer">Salvar</button>
+                                    <input type="text" name="name" required maxlength="40" value="{{.Name}}" aria-label="Nome da conta" class="flex-1 min-w-[6rem] bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-slate-100 focus:outline-none focus:border-accent transition">
+                                    <button type="submit" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-medium px-2 py-1 rounded transition cursor-pointer">Salvar</button>
                                 </form>
-                                {{if .Archived}}<span class="px-2 py-0.5 rounded-md text-xs bg-slate-800 text-slate-400 border border-slate-700">arquivada</span>{{end}}
+                                {{if .Archived}}<span class="px-2 py-0.5 rounded-sm text-xs bg-slate-800 text-slate-400 border border-slate-700">arquivada</span>{{end}}
                                 <form method="POST" action="/contas/arquivar" class="inline">
                                     <input type="hidden" name="livro" value="{{$b.ID}}">
                                     <input type="hidden" name="month" value="{{$.SelectedMonth}}">
                                     <input type="hidden" name="id" value="{{.ID}}">
                                     <input type="hidden" name="arquivar" value="{{if .Archived}}0{{else}}1{{end}}">
-                                    <button type="submit" class="px-2 py-1 rounded-lg text-xs text-slate-300 hover:bg-slate-800 transition cursor-pointer">{{if .Archived}}Reativar{{else}}Arquivar{{end}}</button>
+                                    <button type="submit" class="px-2 py-1 rounded text-xs text-slate-300 hover:bg-slate-800 transition cursor-pointer">{{if .Archived}}Reativar{{else}}Arquivar{{end}}</button>
                                 </form>
                             </div>
                         </div>
@@ -1058,8 +1010,8 @@
                         <form method="POST" action="/contas" class="mt-1 flex flex-wrap items-center gap-2">
                             <input type="hidden" name="livro" value="{{$b.ID}}">
                             <input type="hidden" name="month" value="{{$.SelectedMonth}}">
-                            <input type="text" name="name" required maxlength="40" placeholder="Nova conta (ex.: Nubank)" aria-label="Nome da nova conta" class="flex-1 min-w-[8rem] bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition">
-                            <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium px-3 py-1 rounded-lg transition cursor-pointer">Adicionar conta</button>
+                            <input type="text" name="name" required maxlength="40" placeholder="Nova conta (ex.: Nubank)" aria-label="Nome da nova conta" class="flex-1 min-w-[8rem] bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-accent transition">
+                            <button type="submit" class="bg-accent hover:brightness-110 text-slate-950 text-xs font-medium px-3 py-1 rounded transition cursor-pointer">Adicionar conta</button>
                         </form>
                     </div>
                     {{end}}
@@ -1072,17 +1024,17 @@
                 <input type="hidden" name="month" value="{{.SelectedMonth}}">
                 <h4 class="text-sm font-semibold text-slate-200">Novo livro</h4>
                 <div class="flex flex-wrap items-center gap-2">
-                    <input type="text" name="name" required maxlength="40" placeholder="Nome (ex.: PJ)" class="flex-1 min-w-[8rem] bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition">
-                    <select name="color" aria-label="Cor do livro" class="bg-slate-800 border border-slate-700 rounded-lg px-2 py-2 text-xs text-slate-200 cursor-pointer">
+                    <input type="text" name="name" required maxlength="40" placeholder="Nome (ex.: PJ)" class="flex-1 min-w-[8rem] bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-accent focus:ring-1 focus:ring-emerald-500 transition">
+                    <select name="color" aria-label="Cor do livro" class="bg-slate-800 border border-slate-700 rounded px-2 py-2 text-xs text-slate-200 cursor-pointer">
                         {{range .BookColors}}<option value="{{.Key}}">{{.Label}}</option>{{end}}
                     </select>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
-                    <select name="copiar_de" aria-label="Categorias do livro novo" class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-2 py-2 text-xs text-slate-200 cursor-pointer">
+                    <select name="copiar_de" aria-label="Categorias do livro novo" class="flex-1 bg-slate-800 border border-slate-700 rounded px-2 py-2 text-xs text-slate-200 cursor-pointer">
                         <option value="">Começar vazio</option>
                         {{range .Books}}<option value="{{.ID}}">Copiar categorias de {{.Name}}</option>{{end}}
                     </select>
-                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm px-4 py-2 rounded-xl transition cursor-pointer">Criar livro</button>
+                    <button type="submit" class="bg-accent hover:brightness-110 text-slate-950 font-medium text-sm px-4 py-2 rounded-md transition cursor-pointer">Criar livro</button>
                 </div>
             </form>
         </div>

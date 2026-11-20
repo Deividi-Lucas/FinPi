@@ -8,6 +8,7 @@
             theme: {
                 extend: {
                     colors: {
+                        accent: 'var(--accent)',
                         brand: {
                             50: '#f0fdf4',
                             100: '#dcfce7',
@@ -52,9 +53,9 @@
 
 {{define "liveBanner"}}
         <!-- Aviso de atualização em tempo real (exibido só se você estiver editando algo) -->
-        <div id="live-update-banner" class="hidden mt-4 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm items-center justify-between gap-3">
+        <div id="live-update-banner" class="hidden mt-4 p-4 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm items-center justify-between gap-3">
             <span>Há novas atualizações nesta tela.</span>
-            <button type="button" onclick="location.reload()" class="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium cursor-pointer">
+            <button type="button" onclick="location.reload()" class="px-3 py-1 rounded bg-accent hover:brightness-110 text-slate-950 text-xs font-medium cursor-pointer">
                 Atualizar agora
             </button>
         </div>
@@ -94,43 +95,43 @@
 {{/* filterFields: campos comuns da barra de filtros (busca, categorias, conta, tipo e valor). O ponto precisa ter .Filter e .AllCategories. */}}
 {{define "filterFields"}}
                 <label class="flex-1 min-w-[12rem] text-xs text-slate-300">Buscar na descrição
-                    <input type="search" name="q" value="{{.Filter.Text}}" maxlength="100" placeholder="Ex.: pix fulano" class="mt-1 w-full bg-slate-900 text-slate-200 text-sm rounded-lg px-3 py-2 border border-slate-700 focus:outline-none focus:border-emerald-500">
+                    <input type="search" name="q" value="{{.Filter.Text}}" maxlength="100" placeholder="Ex.: pix fulano" class="mt-1 w-full bg-slate-900 text-slate-200 text-sm rounded px-3 py-2 border border-slate-700 focus:outline-none focus:border-accent">
                 </label>
 
                 <details class="relative text-xs text-slate-300">
-                    <summary class="list-none px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-sm text-slate-200 cursor-pointer select-none">Categorias{{if .Filter.Categories}} ({{len .Filter.Categories}}){{end}} &#9662;</summary>
-                    <div class="absolute z-20 mt-1 max-h-64 w-56 overflow-y-auto p-2 rounded-xl bg-slate-900 border border-slate-700 shadow-xl">
+                    <summary class="list-none px-3 py-2 rounded bg-slate-900 border border-slate-700 text-sm text-slate-200 cursor-pointer select-none">Categorias{{if .Filter.Categories}} ({{len .Filter.Categories}}){{end}} &#9662;</summary>
+                    <div class="absolute z-20 mt-1 max-h-64 w-56 overflow-y-auto p-2 rounded-md bg-slate-900 border border-slate-700">
                         {{range .AllCategories}}
-                        <label class="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-800 cursor-pointer"><input type="checkbox" name="cat" value="{{.Name}}" {{if index $.Filter.Selected .Name}}checked{{end}} class="accent-emerald-500"> {{.Name}}{{if .Hidden}} <span class="text-slate-500">(oculta)</span>{{end}}</label>
+                        <label class="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-800 cursor-pointer"><input type="checkbox" name="cat" value="{{.Name}}" {{if index $.Filter.Selected .Name}}checked{{end}} class="accent-accent"> {{.Name}}{{if .Hidden}} <span class="text-slate-500">(oculta)</span>{{end}}</label>
                         {{end}}
                     </div>
                 </details>
 
                 {{if or .Filter.AccountOptions .Filter.Accounts}}
                 <details class="relative text-xs text-slate-300" data-account-filter>
-                    <summary class="list-none px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-sm text-slate-200 cursor-pointer select-none">Conta{{if .Filter.AccountShown}} ({{.Filter.AccountShown}}){{end}} &#9662;</summary>
-                    <div class="absolute z-20 mt-1 max-h-64 w-64 overflow-y-auto p-2 rounded-xl bg-slate-900 border border-slate-700 shadow-xl">
+                    <summary class="list-none px-3 py-2 rounded bg-slate-900 border border-slate-700 text-sm text-slate-200 cursor-pointer select-none">Conta{{if .Filter.AccountShown}} ({{.Filter.AccountShown}}){{end}} &#9662;</summary>
+                    <div class="absolute z-20 mt-1 max-h-64 w-64 overflow-y-auto p-2 rounded-md bg-slate-900 border border-slate-700">
                         {{range .Filter.AccountOptions}}
-                        <label class="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-800 cursor-pointer"><input type="checkbox" name="conta" value="{{.ID}}" {{if index $.Filter.AccountSelected .ID}}checked{{end}} class="accent-emerald-500"> {{.Name}}{{if .BookName}} <span class="text-slate-500" data-account-book>{{.BookName}}</span>{{end}}{{if .Archived}} <span class="text-slate-500">(arquivada)</span>{{end}}</label>
+                        <label class="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-800 cursor-pointer"><input type="checkbox" name="conta" value="{{.ID}}" {{if index $.Filter.AccountSelected .ID}}checked{{end}} class="accent-accent"> {{.Name}}{{if .BookName}} <span class="text-slate-500" data-account-book>{{.BookName}}</span>{{end}}{{if .Archived}} <span class="text-slate-500">(arquivada)</span>{{end}}</label>
                         {{end}}
-                        <label class="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-800 cursor-pointer"><input type="checkbox" name="conta" value="0" {{if index $.Filter.AccountSelected 0}}checked{{end}} class="accent-emerald-500"> Sem conta</label>
+                        <label class="flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-800 cursor-pointer"><input type="checkbox" name="conta" value="0" {{if index $.Filter.AccountSelected 0}}checked{{end}} class="accent-accent"> Sem conta</label>
                     </div>
                 </details>
                 {{end}}
 
                 <div class="text-xs text-slate-300">Tipo
-                    <div class="mt-1 flex items-center gap-3 px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-sm text-slate-200">
-                        <label class="flex items-center gap-1 cursor-pointer"><input type="radio" name="tipo" value="" {{if eq .Filter.Type ""}}checked{{end}} class="accent-emerald-500"> Todos</label>
-                        <label class="flex items-center gap-1 cursor-pointer"><input type="radio" name="tipo" value="receita" {{if eq .Filter.Type "receita"}}checked{{end}} class="accent-emerald-500"> Receitas</label>
-                        <label class="flex items-center gap-1 cursor-pointer"><input type="radio" name="tipo" value="despesa" {{if eq .Filter.Type "despesa"}}checked{{end}} class="accent-emerald-500"> Despesas</label>
+                    <div class="mt-1 flex items-center gap-3 px-3 py-2 rounded bg-slate-900 border border-slate-700 text-sm text-slate-200">
+                        <label class="flex items-center gap-1 cursor-pointer"><input type="radio" name="tipo" value="" {{if eq .Filter.Type ""}}checked{{end}} class="accent-accent"> Todos</label>
+                        <label class="flex items-center gap-1 cursor-pointer"><input type="radio" name="tipo" value="receita" {{if eq .Filter.Type "receita"}}checked{{end}} class="accent-accent"> Receitas</label>
+                        <label class="flex items-center gap-1 cursor-pointer"><input type="radio" name="tipo" value="despesa" {{if eq .Filter.Type "despesa"}}checked{{end}} class="accent-accent"> Despesas</label>
                     </div>
                 </div>
 
                 <div class="text-xs text-slate-300">Valor (R$)
                     <div class="mt-1 flex items-center gap-2">
-                        <input type="text" inputmode="decimal" name="min" value="{{.Filter.Min}}" placeholder="de" class="w-24 bg-slate-900 text-slate-200 text-sm rounded-lg px-3 py-2 border border-slate-700 focus:outline-none focus:border-emerald-500">
+                        <input type="text" inputmode="decimal" name="min" value="{{.Filter.Min}}" placeholder="de" class="w-24 bg-slate-900 text-slate-200 text-sm rounded px-3 py-2 border border-slate-700 focus:outline-none focus:border-accent">
                         <span class="text-slate-500">a</span>
-                        <input type="text" inputmode="decimal" name="max" value="{{.Filter.Max}}" placeholder="até" class="w-24 bg-slate-900 text-slate-200 text-sm rounded-lg px-3 py-2 border border-slate-700 focus:outline-none focus:border-emerald-500">
+                        <input type="text" inputmode="decimal" name="max" value="{{.Filter.Max}}" placeholder="até" class="w-24 bg-slate-900 text-slate-200 text-sm rounded px-3 py-2 border border-slate-700 focus:outline-none focus:border-accent">
                     </div>
                 </div>
 {{end}}
@@ -138,11 +139,11 @@
 {{/* bookBar: seletor do livro. O ponto precisa ter .Book, .Books e .BookPath. */}}
 {{define "bookBar"}}
         <details class="relative" data-book-bar>
-            <summary class="list-none inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-100 text-sm font-medium px-3 py-2 rounded-xl border cursor-pointer" style="border-color: {{.Book.Hex}}">
+            <summary class="list-none inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-100 text-sm font-medium px-3 py-2 rounded-md border cursor-pointer" style="border-color: {{.Book.Hex}}">
                 <span class="inline-block h-2.5 w-2.5 rounded-full" style="background: {{.Book.Hex}}"></span>{{.Book.Name}} <span class="text-slate-400">&#9662;</span>
             </summary>
-            <div class="absolute z-40 mt-2 min-w-[12rem] rounded-xl border border-slate-700 bg-slate-900 shadow-2xl p-1">
-                {{range .Books}}<a href="{{$.BookPath}}?livro={{.ID}}" class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-200 hover:bg-slate-800"><span class="inline-block h-2.5 w-2.5 rounded-full" style="background: {{.Hex}}"></span>{{.Name}}</a>{{end}}
+            <div class="absolute z-40 mt-2 min-w-[12rem] rounded-md border border-slate-700 bg-slate-900 p-1">
+                {{range .Books}}<a href="{{$.BookPath}}?livro={{.ID}}" class="flex items-center gap-2 px-3 py-2 rounded text-sm text-slate-200 hover:bg-slate-800"><span class="inline-block h-2.5 w-2.5 rounded-full" style="background: {{.Hex}}"></span>{{.Name}}</a>{{end}}
             </div>
         </details>
 {{end}}
@@ -150,12 +151,12 @@
 {{/* bookBarAll: o seletor do bookBar com a opção "Todos os livros" (só no Relatório). O ponto precisa ter .Book, .Books, .BookPath e .AllBooks. */}}
 {{define "bookBarAll"}}
         <details class="relative" data-book-bar>
-            <summary class="list-none inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-100 text-sm font-medium px-3 py-2 rounded-xl border cursor-pointer" style="border-color: {{.Book.Hex}}">
+            <summary class="list-none inline-flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-slate-100 text-sm font-medium px-3 py-2 rounded-md border cursor-pointer" style="border-color: {{.Book.Hex}}">
                 <span class="inline-block h-2.5 w-2.5 rounded-full" style="background: {{.Book.Hex}}"></span>{{.Book.Name}} <span class="text-slate-400">&#9662;</span>
             </summary>
-            <div class="absolute z-40 mt-2 min-w-[12rem] rounded-xl border border-slate-700 bg-slate-900 shadow-2xl p-1">
-                {{range .Books}}<a href="{{$.BookPath}}?livro={{.ID}}" class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-200 hover:bg-slate-800"><span class="inline-block h-2.5 w-2.5 rounded-full" style="background: {{.Hex}}"></span>{{.Name}}</a>{{end}}
-            <a href="{{$.BookPath}}?livro=todos" class="flex items-center gap-2 px-3 py-2 mt-1 border-t border-slate-800 rounded-lg text-sm text-slate-200 hover:bg-slate-800{{if .AllBooks}} bg-slate-800{{end}}"><span class="inline-block h-2.5 w-2.5 rounded-full" style="background: #94a3b8"></span>Todos os livros</a>
+            <div class="absolute z-40 mt-2 min-w-[12rem] rounded-md border border-slate-700 bg-slate-900 p-1">
+                {{range .Books}}<a href="{{$.BookPath}}?livro={{.ID}}" class="flex items-center gap-2 px-3 py-2 rounded text-sm text-slate-200 hover:bg-slate-800"><span class="inline-block h-2.5 w-2.5 rounded-full" style="background: {{.Hex}}"></span>{{.Name}}</a>{{end}}
+            <a href="{{$.BookPath}}?livro=todos" class="flex items-center gap-2 px-3 py-2 mt-1 border-t border-slate-800 rounded text-sm text-slate-200 hover:bg-slate-800{{if .AllBooks}} bg-slate-800{{end}}"><span class="inline-block h-2.5 w-2.5 rounded-full" style="background: #94a3b8"></span>Todos os livros</a>
             </div>
         </details>
 {{end}}
